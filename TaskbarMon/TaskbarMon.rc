@@ -9,6 +9,7 @@
 //
 #ifndef APSTUDIO_INVOKED
 #include "targetver.h"
+
 #endif
 #include "afxres.h"
 #include "verrsrc.h"
@@ -255,6 +256,14 @@ IDB_NOTIFY_ICON_PREVIEW_LIGHT BITMAP                  "res\\notify_preview_light
 
 IDR_ACKNOWLEDGEMENT_TEXT TEXT                    "res\\Acknowledgement.txt"
 
+IDR_DISPLAY_ITEM_CONTEXT_MENU MENU
+BEGIN
+    POPUP "1"
+    BEGIN
+        MENUITEM "TXT_RESTORE_DEFAULT",         ID_RESTORE_DEFAULT
+    END
+END
+
 IDR_LICENSE             TEXT                    "..\\LICENSE_CN"
 
 IDR_COMPILE_TIME        TEXT                    "compile_time.txt"
@@ -267,13 +276,6 @@ IDR_LANGUAGE            TEXT                    "language\\Simplified_Chinese.in
 // Menu
 //
 
-IDR_DISPLAY_ITEM_CONTEXT_MENU MENU
-BEGIN
-    POPUP "1"
-    BEGIN
-        MENUITEM "TXT_RESTORE_DEFAULT",         ID_RESTORE_DEFAULT
-    END
-END
 
 #endif    // 中文(简体，中国) resources
 /////////////////////////////////////////////////////////////////////////////
@@ -428,8 +430,6 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP,7,66,138,17
 END
 
-IDD_MAIN_COLOR_DIALOG DIALOGEX 0, 0, 167, 112
-STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
 CAPTION "TXT_TITLE_MAIN_COLOR_DIALOG"
 FONT 9, "微软雅黑", 400, 0, 0x0
 BEGIN
@@ -438,8 +438,6 @@ BEGIN
     CONTROL         "",IDC_LIST1,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,7,153,79
 END
 
-IDD_MAIN_WND_SETTINGS_DIALOG DIALOGEX 0, 0, 269, 222
-STYLE DS_SETFONT | WS_CHILD | WS_SYSMENU
 FONT 9, "微软雅黑", 400, 0, 0x0
 BEGIN
     CONTROL         "TXT_FULLSCREEN_HIDE_CHECK",IDC_FULLSCREEN_HIDE_CHECK,
@@ -514,8 +512,6 @@ BEGIN
     PUSHBUTTON      ">",IDC_NEXT_BUTTON,24,126,16,13
 END
 
-IDD_SKIN_DIALOG DIALOGEX 0, 0, 282, 183
-STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "TXT_TITLE_SKIN_DLG"
 FONT 9, "微软雅黑", 400, 0, 0x0
@@ -709,8 +705,6 @@ BEGIN
     PUSHBUTTON      "TXT_RESTORE_DEFAULT_BUTTON",IDC_RESTORE_DEFAULT_BUTTON,108,45,53,14
 END
 
-IDD_PLUGIN_MANAGER_DIALOG DIALOGEX 0, 0, 255, 143
-STYLE DS_SETFONT | WS_MAXIMIZEBOX | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "TXT_TITLE_PLUGIN_MANAGE"
 FONT 9, "微软雅黑", 400, 0, 0x0
@@ -747,8 +741,6 @@ BEGIN
     LISTBOX         IDC_LIST1,7,7,158,89,LBS_OWNERDRAWFIXED | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
 END
 
-IDD_SKIN_AUTO_ADAPT_DLG DIALOGEX 0, 0, 233, 61
-STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_THICKFRAME
 CAPTION "TXT_TITLE_SKIN_AUTO_ADAPTT_DLG"
 FONT 9, "微软雅黑", 400, 0, 0x0
 BEGIN
@@ -824,21 +816,7 @@ BEGIN
         BOTTOMMARGIN, 101
     END
 
-    IDD_MAIN_COLOR_DIALOG, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 160
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 105
-    END
 
-    IDD_MAIN_WND_SETTINGS_DIALOG, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 263
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 217
-    END
 
     IDD_OPTIONS_DIALOG, DIALOG
     BEGIN
@@ -856,13 +834,6 @@ BEGIN
         BOTTOMMARGIN, 139
     END
 
-    IDD_SKIN_DIALOG, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 275
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 176
-    END
 
     IDD_TASKBAR_COLOR_DIALOG, DIALOG
     BEGIN
@@ -928,13 +899,6 @@ BEGIN
         BOTTOMMARGIN, 95
     END
 
-    IDD_PLUGIN_MANAGER_DIALOG, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 248
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 136
-    END
 
     IDD_APP_ALREAD_RUNING_DIALOG, DIALOG
     BEGIN
@@ -952,13 +916,6 @@ BEGIN
         BOTTOMMARGIN, 115
     END
 
-    IDD_SKIN_AUTO_ADAPT_DLG, DIALOG
-    BEGIN
-        LEFTMARGIN, 7
-        RIGHTMARGIN, 226
-        TOPMARGIN, 7
-        BOTTOMMARGIN, 54
-    END
 
     IDD_WIN11_TASKBAR_SETTING_DLG, DIALOG
     BEGIN
@@ -1065,54 +1022,7 @@ BEGIN
     0, 100, 100, 0
 END
 
-IDD_MAIN_COLOR_DIALOG AFX_DIALOG_LAYOUT
-BEGIN
-    0,
-    100, 100, 0, 0,
-    100, 100, 0, 0,
-    0, 0, 100, 100
-END
 
-IDD_MAIN_WND_SETTINGS_DIALOG AFX_DIALOG_LAYOUT
-BEGIN
-    0,
-    0, 0, 100, 0,
-    0, 0, 100, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    100, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 70, 0,
-    0, 0, 70, 0,
-    70, 0, 30, 0,
-    70, 0, 30, 0,
-    70, 0, 0, 0,
-    70, 0, 30, 0,
-    0, 0, 70, 0,
-    70, 0, 30, 0,
-    0, 0, 100, 0,
-    0, 0, 0, 0,
-    0, 0, 100, 0,
-    0, 0, 70, 0,
-    70, 0, 30, 0,
-    70, 0, 30, 0,
-    70, 0, 30, 0,
-    0, 0, 70, 0,
-    0, 0, 0, 0,
-    0, 0, 100, 0,
-    100, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 70, 0,
-    0, 0, 50, 0,
-    50, 0, 50, 0,
-    0, 0, 50, 0,
-    50, 0, 50, 0,
-    100, 0, 0, 0
-END
 
 IDD_OPTIONS_DIALOG AFX_DIALOG_LAYOUT
 BEGIN
@@ -1133,22 +1043,6 @@ BEGIN
     0, 100, 0, 0
 END
 
-IDD_SKIN_DIALOG AFX_DIALOG_LAYOUT
-BEGIN
-    0,
-    100, 100, 0, 0,
-    100, 100, 0, 0,
-    30, 0, 70, 100,
-    0, 0, 30, 0,
-    30, 100, 70, 0,
-    0, 100, 0, 0,
-    0, 100, 0, 0,
-    30, 100, 70, 0,
-    0, 100, 0, 0,
-    0, 100, 70, 0,
-    70, 100, 30, 0,
-    0, 0, 30, 100
-END
 
 IDD_TASKBAR_COLOR_DIALOG AFX_DIALOG_LAYOUT
 BEGIN
@@ -1289,17 +1183,6 @@ BEGIN
     100, 0, 0, 0
 END
 
-IDD_PLUGIN_MANAGER_DIALOG AFX_DIALOG_LAYOUT
-BEGIN
-    0,
-    100, 100, 0, 0,
-    0, 0, 100, 100,
-    0, 100, 0, 0,
-    0, 100, 0, 0,
-    33, 100, 33, 0,
-    0, 100, 33, 0,
-    66, 100, 34, 0
-END
 
 IDD_APP_ALREAD_RUNING_DIALOG AFX_DIALOG_LAYOUT
 BEGIN
@@ -1319,16 +1202,6 @@ BEGIN
     0, 0, 100, 100
 END
 
-IDD_SKIN_AUTO_ADAPT_DLG AFX_DIALOG_LAYOUT
-BEGIN
-    0,
-    100, 100, 0, 0,
-    100, 100, 0, 0,
-    0, 0, 0, 0,
-    0, 0, 100, 0,
-    0, 0, 0, 0,
-    0, 0, 100, 0
-END
 
 IDD_WIN11_TASKBAR_SETTING_DLG AFX_DIALOG_LAYOUT
 BEGIN
@@ -1461,15 +1334,6 @@ BEGIN
     END
 END
 
-IDR_PLUGIN_MANAGER_MENU MENU
-BEGIN
-    POPUP "1"
-    BEGIN
-        MENUITEM "TXT_PLUGIN_DETAIL",           ID_PLUGIN_DETAIL
-        MENUITEM "TXT_PLUGIN_OPTIONS",          ID_PLUGIN_OPTIONS
-        MENUITEM "TXT_PLUGIN_DISABLE",          ID_PLUGIN_DISABLE
-    END
-END
 
 #endif    // 英语(美国) resources
 /////////////////////////////////////////////////////////////////////////////

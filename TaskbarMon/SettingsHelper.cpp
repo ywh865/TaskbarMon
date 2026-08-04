@@ -36,40 +36,6 @@ void CSettingsHelper::LoadFontData(const wchar_t* AppName, FontInfo& font, const
     font.strike_out = style[3];
 }
 
-void CSettingsHelper::LoadMainWndColors(const wchar_t* AppName, const wchar_t* KeyName, const std::set<CommonDisplayItem>& all_items, std::map<CommonDisplayItem, COLORREF>& text_colors, COLORREF default_color)
-{
-    CString default_str;
-    default_str.Format(_T("%d"), default_color);
-    wstring str{ default_str.GetString() };
-    _GetString(AppName, KeyName, str);
-    std::vector<wstring> split_result;
-    CCommon::StringSplit(str, L',', split_result);
-    size_t index = 0;
-    const std::set<CommonDisplayItem>& items{ all_items.empty() ? AllDisplayItems : all_items };
-    for (auto iter = items.begin(); iter != items.end(); ++iter)
-    {
-        if (index < split_result.size())
-            text_colors[*iter] = _wtoi(split_result[index].c_str());
-        else if (!split_result.empty())
-            text_colors[*iter] = _wtoi(split_result[0].c_str());
-        else
-            text_colors[*iter] = default_color;
-        index++;
-    }
-}
-
-void CSettingsHelper::SaveMainWndColors(const wchar_t* AppName, const wchar_t* KeyName, const std::map<CommonDisplayItem, COLORREF>& text_colors)
-{
-    CString str;
-    for (auto iter = text_colors.begin(); iter != text_colors.end(); ++iter)
-    {
-        CString tmp;
-        tmp.Format(_T("%d,"), iter->second);
-        str += tmp;
-    }
-    _WriteString(AppName, KeyName, wstring(str));
-}
-
 void CSettingsHelper::LoadTaskbarWndColors(const wchar_t* AppName, const wchar_t* KeyName, std::map<CommonDisplayItem, TaskbarItemColor>& text_colors, const wchar_t* default_str)
 {
     wstring str{ default_str };
