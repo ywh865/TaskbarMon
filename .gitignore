@@ -29,3 +29,7 @@ compile_time.txt
 *.lib
 *.exp
 *.log
+build_log*.txt
+build_x86.txt
+build_lite*.txt
+
