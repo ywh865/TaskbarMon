@@ -186,24 +186,11 @@ struct LanguageInfo
 //选项设置数据
 struct MainConfigData
 {
-    int m_transparency{ 100 };          //窗口透明度
-    bool m_show_more_info{ false };     //显示更多信息
     bool m_show_task_bar_wnd{ false };  //显示任务栏窗口
-    bool m_hide_main_window;            //隐藏主窗口
-    //bool m_tbar_show_cpu_memory;      //任务栏窗口显示CPU和内存利用率
-
-    int m_position_x;   //窗口位置的x坐标
-    int m_position_y;   //窗口位置的y坐标
 
     bool m_auto_select{ false };    //自动选择连接
     bool m_select_all{ false };     //统计所有连接的网速
     string m_connection_name;      //当前选择网络的名称
-
-    wstring m_skin_name;            //选择的皮肤的名称
-
-    bool skin_auto_adapt{ false };  //根据深色/浅色模式自动切换皮肤
-    wstring skin_name_light_mode;   //浅色模式下的皮肤名称
-    wstring skin_name_dark_mode;    //深色模式下的皮肤名称
 
     int m_dft_notify_icon = 0;      //默认的通知图标(用于区分win10的深色和浅色模式)
     int m_notify_icon_selected{};   //要显示的通知区图标
@@ -213,7 +200,6 @@ struct MainConfigData
     bool m_use_log_scale{ false };          //“历史流量统计”对话框中绘制表示历史流量数值的矩形时是否使用对数比例
     HistoryTrafficViewType m_view_type{};
     bool m_sunday_first{ true };            //是否将周日作为一周的第一天
-    StringSet plugin_disabled;      //已禁用的插件
 
 };
 
@@ -223,18 +209,6 @@ enum class MemoryDisplay
     USAGE_PERCENTAGE,       //已使用百分比
     MEMORY_USED,            //内存已使用
     MEMORY_AVAILABLE        //内存可用
-};
-
-//为每个皮肤单独保存的数据
-struct SkinSettingData
-{
-    FontInfo font;          //字体
-    DispStrings disp_str;   //显示的文本
-    std::map<CommonDisplayItem, COLORREF> text_colors{};    //文字的颜色
-    bool specify_each_item_color{};
-
-    bool IsEmpty() const;
-    bool operator==(const SkinSettingData& a) const;
 };
 
 //选项设置中“主窗口设置”和“任务栏窗口设置”中公共的数据（不使用此结构体创建对象）
@@ -258,19 +232,6 @@ struct PublicSettingData
 
 //#define MAIN_WND_COLOR_NUM 9      //主窗口颜色数量
 //选项设置中“主窗口设置”的数据
-struct MainWndSettingData : public PublicSettingData
-{
-    std::map<CommonDisplayItem, COLORREF> text_colors{};    //文字的颜色
-    bool swap_up_down{ false };     //交换上传和下载显示的位置
-    bool hide_main_wnd_when_fullscreen;     //有程序全屏运行时隐藏悬浮窗
-    bool m_always_on_top{ false };      //窗口置顶
-    bool m_lock_window_pos{ false };    //锁定窗口位置
-    bool m_mouse_penetrate{ false };    //鼠标穿透
-    bool m_alow_out_of_border{ false };     //是否允许悬浮窗超出屏幕边界
-
-    void FormSkinSettingData(const SkinSettingData& sking_setting_data);
-    SkinSettingData ToSkinSettingData() const;
-};
 
 //#define TASKBAR_COLOR_NUM 18      //任务栏窗口颜色数量
 

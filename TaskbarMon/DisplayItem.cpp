@@ -129,11 +129,8 @@ const wchar_t* CommonDisplayItem::GetItemIniKeyName() const
 
 CString CommonDisplayItem::GetItemValueText(bool is_main_window) const
 {
-    const PublicSettingData* cfg_data{};
-    if (is_main_window)
-        cfg_data = &theApp.m_main_wnd_data;
-    else
-        cfg_data = &theApp.m_taskbar_data;
+    //主窗口已移除，统一使用任务栏窗口的显示设置
+    const PublicSettingData* cfg_data = &theApp.m_taskbar_data;
     CString str_value;
     switch (item_type)
     {
@@ -151,9 +148,6 @@ CString CommonDisplayItem::GetItemValueText(bool is_main_window) const
             str_out_speed += _T("/s");
             str_total_speed += _T("/s");
         }
-        //交换上传和下载位置
-        if (is_main_window && theApp.m_main_wnd_data.swap_up_down)
-            std::swap(str_in_speed, str_out_speed);
         if (item_type == TDI_UP)
             str_value = str_out_speed;
         else if (item_type == TDI_DOWN)

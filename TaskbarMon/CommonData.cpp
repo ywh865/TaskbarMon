@@ -151,36 +151,6 @@ std::set<std::wstring>& StringSet::data()
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-bool SkinSettingData::IsEmpty() const
-{
-    return font.name.IsEmpty() && disp_str.GetAllItems().empty() && text_colors.empty();
-}
-
-bool SkinSettingData::operator==(const SkinSettingData& a) const
-{
-    return font == a.font && disp_str == a.disp_str && text_colors == a.text_colors && specify_each_item_color == a.specify_each_item_color;
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-void MainWndSettingData::FormSkinSettingData(const SkinSettingData& sking_setting_data)
-{
-    font = sking_setting_data.font;
-    disp_str = sking_setting_data.disp_str;
-    text_colors = sking_setting_data.text_colors;
-    specify_each_item_color = sking_setting_data.specify_each_item_color;
-}
-
-SkinSettingData MainWndSettingData::ToSkinSettingData() const
-{
-    SkinSettingData sking_setting_data;
-    sking_setting_data.font = font;
-    sking_setting_data.disp_str = disp_str;
-    sking_setting_data.text_colors = text_colors;
-    sking_setting_data.specify_each_item_color = specify_each_item_color;
-    return sking_setting_data;
-}
-
-///////////////////////////////////////////////////////////////////////////////////
 bool TaskBarSettingData::IsTaskbarTransparent() const
 {
     if (CWindowsSettingHelper::IsWindows10LightTheme() || theApp.m_win_version.IsWindows8Or8point1() || theApp.IsWindows11Taskbar())

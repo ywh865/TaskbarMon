@@ -63,7 +63,6 @@ public:
     bool m_module_dir_writable{ true };         //指示程序所在目录是否可写
 
     //选项设置数据
-    MainWndSettingData m_main_wnd_data;
     TaskBarSettingData m_taskbar_data;
     GeneralSettingData m_general_data;
     //其他设置数据

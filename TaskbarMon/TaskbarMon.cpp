@@ -57,374 +57,53 @@ CTaskbarMonApp::CTaskbarMonApp()
 
 void CTaskbarMonApp::LoadLanguageConfig()
 {
-    CIniHelper ini{ m_config_path };
-    m_general_data.language.fromConfigString(ini.GetString(_T("general"), _T("language"), L""));
+    ConfigStore store{ m_config_path };
+    store.LoadLanguage(m_general_data.language);
 }
 
 void CTaskbarMonApp::LoadConfig()
 {
-    CSettingsHelper ini;
+    ConfigStore store{ m_config_path };
+    ConfigStore::EnvironmentDefaults defaults;
+    defaults.default_font_name = m_str_table.GetLanguageInfo().default_font_name;
+    defaults.system_dir = m_system_dir;
+    defaults.default_notify_icon = m_cfg_data.m_dft_notify_icon;
+    defaults.update_source_default = (m_str_table.IsSimplifiedChinese() ? 1 : 0);
+    defaults.is_windows7_or_8 = (m_win_version.IsWindows7() || m_win_version.IsWindows8Or8point1());
+    defaults.is_windows8_or_later = m_win_version.IsWindows8OrLater();
+    defaults.is_windows10_or_later = m_win_version.IsWindows10OrLater();
+    defaults.is_windows7 = m_win_version.IsWindows7();
+    defaults.default_light_theme = CWindowsSettingHelper::IsWindows10LightTheme();
+    defaults.d2d_supported = CTaskBarDlgDrawCommonSupport::CheckSupport();
 
-    //常规设置
-    m_general_data.check_update_when_start = ini.GetBool(_T("general"), _T("check_update_when_start"), true);
-    //m_general_data.allow_skin_cover_font = ini.GetBool(_T("general"), _T("allow_skin_cover_font"), true);
-    //m_general_data.allow_skin_cover_text = ini.GetBool(_T("general"), _T("allow_skin_cover_text"), true);
-    m_general_data.show_all_interface = ini.GetBool(L"general", L"show_all_interface", false);
-    bool is_chinese_language{ m_str_table.IsSimplifiedChinese() };     //当前语言是否为简体中文
-    m_general_data.update_source = ini.GetInt(L"general", L"update_source", is_chinese_language ? 1 : 0);   //如果当前语言为简体，则默认更新源为Gitee，否则为GitHub
-    m_general_data.cpu_usage_acquire_method = static_cast<GeneralSettingData::CpuUsageAcquireMethod>(ini.GetInt(L"general", L"cpu_usage_acquire_method", GeneralSettingData::CA_PDH));
-    m_general_data.monitor_time_span = ini.GetInt(L"general", L"monitor_time_span", 1000);
-    if (m_general_data.monitor_time_span < MONITOR_TIME_SPAN_MIN || m_general_data.monitor_time_span > MONITOR_TIME_SPAN_MAX)
-        m_general_data.monitor_time_span = 1000;
-    m_general_data.hard_disk_name = ini.GetString(L"general", L"hard_disk_name", L"");
-    m_general_data.cpu_core_name = ini.GetString(L"general", L"cpu_core_name", L"Core Average");
-    m_general_data.hardware_monitor_item = ini.GetInt(L"general", L"hardware_monitor_item", 0);
-    std::vector<std::wstring> connections_hide;
-    ini.GetStringList(L"general", L"connections_hide", connections_hide, std::vector<std::wstring>{});
-    m_general_data.connections_hide.FromVector(connections_hide);
+    store.Load(m_general_data, m_taskbar_data, m_cfg_data, defaults);
+    ConfigStore::Validate(m_general_data, m_taskbar_data);
 
     //Windows10颜色模式设置
-    bool is_windows10_light_theme = CWindowsSettingHelper::IsWindows10LightTheme();
-    if (is_windows10_light_theme)
+    if (defaults.default_light_theme)
         CCommon::SetColorMode(ColorMode::Light);
     else
         CCommon::SetColorMode(ColorMode::Default);
 
-    //主窗口设置
-    m_cfg_data.m_transparency = ini.GetInt(_T("config"), _T("transparency"), 80);
-    m_main_wnd_data.m_always_on_top = ini.GetBool(_T("config"), _T("always_on_top"), true);
-    m_main_wnd_data.m_lock_window_pos = ini.GetBool(_T("config"), _T("lock_window_pos"), false);
-    m_general_data.show_notify_icon = ini.GetBool(_T("config"), _T("show_notify_icon"), true);
-    m_cfg_data.m_show_more_info = ini.GetBool(_T("config"), _T("show_cpu_memory"), false);
-    m_main_wnd_data.m_mouse_penetrate = ini.GetBool(_T("config"), _T("mouse_penetrate"), false);
-    m_cfg_data.m_show_task_bar_wnd = ini.GetBool(_T("config"), _T("show_task_bar_wnd"), false);
-    m_cfg_data.m_position_x = ini.GetInt(_T("config"), _T("position_x"), -1);
-    m_cfg_data.m_position_y = ini.GetInt(_T("config"), _T("position_y"), -1);
-    m_cfg_data.m_auto_select = ini.GetBool(_T("connection"), _T("auto_select"), true);
-    m_cfg_data.m_select_all = ini.GetBool(_T("connection"), _T("select_all"), false);
-    m_cfg_data.m_connection_name = CCommon::UnicodeToStr(ini.GetString(L"connection", L"connection_name", L"").c_str());
-    m_cfg_data.m_notify_icon_selected = ini.GetInt(_T("config"), _T("notify_icon_selected"), (m_win_version.IsWindows7() || m_win_version.IsWindows8Or8point1() ? 2 : m_cfg_data.m_dft_notify_icon));       //Win7/8/8.1默认使用蓝色通知区图标，因为隐藏通知区图标后白色图标会看不清，其他系统默认使用白色图标
-    m_cfg_data.m_notify_icon_auto_adapt = ini.GetBool(_T("config"), _T("notify_icon_auto_adapt"), true);
     if (m_cfg_data.m_notify_icon_auto_adapt)
         AutoSelectNotifyIcon();
-    m_main_wnd_data.swap_up_down = ini.GetBool(_T("config"), _T("swap_up_down"), false);
-    m_main_wnd_data.hide_main_wnd_when_fullscreen = ini.GetBool(_T("config"), _T("hide_main_wnd_when_fullscreen"), true);
-
-    //由于主窗口的文本颜色、字体、显示文本设置不再从配置文件读取，这些设置保存在每个皮肤的单独设置中，因此这里只将它们初始化为固定的值
-    m_main_wnd_data.text_colors[TDI_UP] = RGB(255, 255, 255);
-    m_main_wnd_data.specify_each_item_color = false;
-    m_main_wnd_data.font.name = m_str_table.GetLanguageInfo().default_font_name.c_str();
-    m_main_wnd_data.font.size = 10;
-    m_main_wnd_data.disp_str.Get(TDI_UP) = CCommon::LoadText(IDS_UPLOAD_DISP, L": ");
-    m_main_wnd_data.disp_str.Get(TDI_DOWN) = CCommon::LoadText(IDS_DOWNLOAD_DISP, L": ");
-    m_main_wnd_data.disp_str.Get(TDI_CPU) = L"CPU: ";
-    m_main_wnd_data.disp_str.Get(TDI_MEMORY) = CCommon::LoadText(IDS_MEMORY_DISP, _T(": "));
-
-    m_main_wnd_data.speed_short_mode = ini.GetBool(_T("config"), _T("speed_short_mode"), false);
-    m_main_wnd_data.separate_value_unit_with_space = ini.GetBool(_T("config"), _T("separate_value_unit_with_space"), true);
-    m_main_wnd_data.show_tool_tip = ini.GetBool(_T("config"), _T("show_tool_tip"), true);
-    m_main_wnd_data.memory_display = static_cast<MemoryDisplay>(ini.GetInt(L"config", L"memory_display", static_cast<int>(MemoryDisplay::USAGE_PERCENTAGE)));
-    m_main_wnd_data.unit_byte = ini.GetBool(_T("config"), _T("unit_byte"), true);
-    m_main_wnd_data.speed_unit = static_cast<SpeedUnit>(ini.GetInt(_T("config"), _T("speed_unit"), 0));
-    m_main_wnd_data.hide_unit = ini.GetBool(_T("config"), _T("hide_unit"), false);
-    m_main_wnd_data.hide_percent = ini.GetBool(_T("config"), _T("hide_percent"), false);
-    m_main_wnd_data.double_click_action = static_cast<DoubleClickAction>(ini.GetInt(_T("config"), _T("double_click_action"), 0));
-    m_main_wnd_data.double_click_exe = ini.GetString(L"config", L"double_click_exe", (theApp.m_system_dir + L"\\Taskmgr.exe").c_str());
-
-    m_main_wnd_data.m_alow_out_of_border = ini.GetBool(_T("config"), _T("alow_out_of_border"), false);
-
-    m_general_data.traffic_tip_enable = ini.GetBool(L"notify_tip", L"traffic_tip_enable", false);
-    m_general_data.traffic_tip_value = ini.GetInt(L"notify_tip", L"traffic_tip_value", 200);
-    m_general_data.traffic_tip_unit = ini.GetInt(L"notify_tip", L"traffic_tip_unit", 0);
-    m_general_data.memory_usage_tip.enable = ini.GetBool(L"notify_tip", L"memory_usage_tip_enable", false);
-    m_general_data.memory_usage_tip.tip_value = ini.GetInt(L"notify_tip", L"memory_tip_value", 80);
-    m_general_data.cpu_temp_tip.enable = ini.GetBool(L"notify_tip", L"cpu_temperature_tip_enable", false);
-    m_general_data.cpu_temp_tip.tip_value = ini.GetInt(L"notify_tip", L"cpu_temperature_tip_value", 80);
-    m_general_data.gpu_temp_tip.enable = ini.GetBool(L"notify_tip", L"gpu_temperature_tip_enable", false);
-    m_general_data.gpu_temp_tip.tip_value = ini.GetInt(L"notify_tip", L"gpu_temperature_tip_value", 80);
-    m_general_data.hdd_temp_tip.enable = ini.GetBool(L"notify_tip", L"hdd_temperature_tip_enable", false);
-    m_general_data.hdd_temp_tip.tip_value = ini.GetInt(L"notify_tip", L"hdd_temperature_tip_value", 80);
-    m_general_data.mainboard_temp_tip.enable = ini.GetBool(L"notify_tip", L"mainboard_temperature_tip_enable", false);
-    m_general_data.mainboard_temp_tip.tip_value = ini.GetInt(L"notify_tip", L"mainboard_temperature_tip_value", 80);
-
-    //任务栏窗口设置
-    m_taskbar_data.back_color = ini.GetInt(_T("task_bar"), _T("task_bar_back_color"), m_taskbar_data.dft_back_color);
-    m_taskbar_data.transparent_color = ini.GetInt(_T("task_bar"), _T("transparent_color"), m_taskbar_data.dft_transparent_color);
-    if (m_taskbar_data.IsTaskbarTransparent()) //如果任务栏背景透明，则需要将颜色转换一下
-    {
-        CCommon::TransparentColorConvert(m_taskbar_data.back_color);
-        CCommon::TransparentColorConvert(m_taskbar_data.transparent_color);
-    }
-    m_taskbar_data.status_bar_color = ini.GetInt(_T("task_bar"), _T("status_bar_color"), m_taskbar_data.dft_status_bar_color);
-    //m_taskbar_data.text_color = GetPrivateProfileInt(_T("task_bar"), _T("task_bar_text_color"), 0x00ffffffU, m_config_path.c_str());
-    ini.LoadTaskbarWndColors(_T("task_bar"), _T("task_bar_text_color"), m_taskbar_data.text_colors, m_taskbar_data.dft_text_colors);
-    m_taskbar_data.specify_each_item_color = ini.GetBool(L"task_bar", L"specify_each_item_color", false);
-    //m_cfg_data.m_tbar_show_cpu_memory = ini.GetBool(_T("task_bar"), _T("task_bar_show_cpu_memory"), false);
-    m_taskbar_data.display_item.FromInt(ini.GetInt(L"task_bar", L"tbar_display_item", DisplayItemSet{ TDI_UP, TDI_DOWN }.ToInt()));
-    m_taskbar_data.show_taskbar_wnd_in_secondary_display = ini.GetBool(L"task_bar", L"show_taskbar_wnd_in_secondary_display", false);
-    m_taskbar_data.secondary_display_index = ini.GetInt(L"task_bar", L"secondary_display_index", 0);
-
-    //不含温度监控的版本，不显示温度监控相关项目
-#ifdef WITHOUT_TEMPERATURE
-    m_taskbar_data.display_item.Remove(TDI_CPU_TEMP);
-    m_taskbar_data.display_item.Remove(TDI_GPU_TEMP);
-    m_taskbar_data.display_item.Remove(TDI_HDD_TEMP);
-    m_taskbar_data.display_item.Remove(TDI_MAIN_BOARD_TEMP);
-#endif
-
-    //如果选项设置中关闭了某个硬件监控，则不显示对应的温度监控相关项目
-    if (!m_general_data.IsHardwareEnable(HI_CPU))
-        m_taskbar_data.display_item.Remove(TDI_CPU_TEMP);
-    if (!m_general_data.IsHardwareEnable(HI_GPU))
-    {
-        m_taskbar_data.display_item.Remove(TDI_GPU_TEMP);
-    }
-    if (!m_general_data.IsHardwareEnable(HI_HDD))
-    {
-        m_taskbar_data.display_item.Remove(TDI_HDD_TEMP);
-    }
-    if (!m_general_data.IsHardwareEnable(HI_MBD))
-        m_taskbar_data.display_item.Remove(TDI_MAIN_BOARD_TEMP);
-
-    //m_taskbar_data.swap_up_down = ini.GetBool(_T("task_bar"), _T("task_bar_swap_up_down"), false);
-
-    if (m_taskbar_data.back_color == 0 && !m_taskbar_data.text_colors.empty() && m_taskbar_data.text_colors.begin()->second.label == 0)     //万一读取到的背景色和文本颜色都为0（黑色），则将文本色和背景色设置成默认颜色
-    {
-        m_taskbar_data.back_color = m_taskbar_data.dft_back_color;
-        m_taskbar_data.text_colors.begin()->second.label = m_taskbar_data.dft_text_colors;
-    }
-
-    FontInfo default_font;
-    default_font.name = m_str_table.GetLanguageInfo().default_font_name.c_str();
-    default_font.size = 9;
-    ini.LoadFontData(_T("task_bar"), m_taskbar_data.font, default_font);
-
-    //载入显示文本设置
-    ini.LoadDisplayStr(L"task_bar", m_taskbar_data.disp_str, false);
-
-    m_taskbar_data.tbar_wnd_on_left = ini.GetBool(_T("task_bar"), _T("task_bar_wnd_on_left"), false);
-    m_taskbar_data.speed_short_mode = ini.GetBool(_T("task_bar"), _T("task_bar_speed_short_mode"), true);
-    m_taskbar_data.tbar_wnd_snap = ini.GetBool(_T("task_bar"), _T("task_bar_wnd_snap"), false);
-    m_taskbar_data.unit_byte = ini.GetBool(_T("task_bar"), _T("unit_byte"), true);
-    m_taskbar_data.speed_unit = static_cast<SpeedUnit>(ini.GetInt(_T("task_bar"), _T("task_bar_speed_unit"), 0));
-    m_taskbar_data.hide_unit = ini.GetBool(_T("task_bar"), _T("task_bar_hide_unit"), false);
-    m_taskbar_data.hide_percent = ini.GetBool(_T("task_bar"), _T("task_bar_hide_percent"), false);
-    m_taskbar_data.value_right_align = ini.GetBool(_T("task_bar"), _T("value_right_align"), true);
-    m_taskbar_data.horizontal_arrange = ini.GetBool(_T("task_bar"), _T("horizontal_arrange"), false);
-    m_taskbar_data.show_status_bar = ini.GetBool(_T("task_bar"), _T("show_status_bar"), true);
-    m_taskbar_data.separate_value_unit_with_space = ini.GetBool(_T("task_bar"), _T("separate_value_unit_with_space"), true);
-    m_taskbar_data.show_tool_tip = ini.GetBool(_T("task_bar"), _T("show_tool_tip"), true);
-    m_taskbar_data.digits_number = ini.GetInt(_T("task_bar"), _T("digits_number"), 4);
-    m_taskbar_data.memory_display = static_cast<MemoryDisplay>(ini.GetInt(L"task_bar", L"memory_display", static_cast<int>(MemoryDisplay::USAGE_PERCENTAGE)));
-    m_taskbar_data.double_click_action = static_cast<DoubleClickAction>(ini.GetInt(_T("task_bar"), _T("double_click_action"), 0));
-    m_taskbar_data.double_click_exe = ini.GetString(L"task_bar", L"double_click_exe", (theApp.m_system_dir + L"\\Taskmgr.exe").c_str());
-    m_taskbar_data.cm_graph_type = ini.GetBool(_T("task_bar"), _T("cm_graph_type"), true);
-    m_taskbar_data.show_graph_dashed_box = ini.GetBool(L"task_bar", L"show_graph_dashed_box", false);
-    m_taskbar_data.item_space = ini.GetInt(L"task_bar", L"item_space", 8);
-    m_taskbar_data.vertical_margin = ini.GetInt(L"task_bar", L"vertical_margin", 0);
-    m_taskbar_data.window_offset_top = ini.GetInt(L"task_bar", L"window_offset_top", 0);
-    m_taskbar_data.window_offset_left = ini.GetInt(L"task_bar", L"window_offset_left", 0);
-    m_taskbar_data.ValidItemSpace();
-    m_taskbar_data.ValidWindowOffsetTop();
-    m_taskbar_data.ValidWindowOffsetLeft();
-    m_taskbar_data.avoid_overlap_with_widgets = ini.GetBool(_T("task_bar"), _T("avoid_overlap_with_widgets"), false);
-    m_taskbar_data.taskbar_left_space_win11 = ini.GetInt(L"task_bar", L"taskbar_left_space_win11", 160);
-    m_taskbar_data.taskbar_right_space_win11 = ini.GetInt(L"task_bar", L"taskbar_right_space_win11", 280);
-
-    if (m_win_version.IsWindows10OrLater())     //只有Win10才支持自动适应系统深色/浅色主题
-        m_taskbar_data.auto_adapt_light_theme = ini.GetBool(L"task_bar", L"auto_adapt_light_theme", false);
-    else
-        m_taskbar_data.auto_adapt_light_theme = false;
-    m_taskbar_data.dark_default_style = ini.GetInt(L"task_bar", L"dark_default_style", 0);
-    m_taskbar_data.light_default_style = ini.GetInt(L"task_bar", L"light_default_style", TASKBAR_DEFAULT_LIGHT_STYLE_INDEX);
-
-    if (m_win_version.IsWindows8OrLater())
-        m_taskbar_data.auto_set_background_color = ini.GetBool(L"task_bar", L"auto_set_background_color", false);
-    else
-        m_taskbar_data.auto_set_background_color = false;
-
-    m_taskbar_data.item_order.Init();
-    m_taskbar_data.item_order.FromString(ini.GetString(L"task_bar", L"item_order", L""));
-    m_taskbar_data.plugin_display_item.FromString(ini.GetString(L"task_bar", L"plugin_display_item", L""));
-    m_taskbar_data.auto_save_taskbar_color_settings_to_preset = ini.GetBool(L"task_bar", L"auto_save_taskbar_color_settings_to_preset", true);
-
-    m_taskbar_data.show_netspeed_figure = ini.GetBool(L"task_bar", L"show_netspeed_figure", true);
-    m_taskbar_data.netspeed_figure_max_value = ini.GetInt(L"task_bar", L"netspeed_figure_max_value", 10);
-    m_taskbar_data.netspeed_figure_max_value_unit = ini.GetInt(L"task_bar", L"netspeed_figure_max_value_unit", 1);
-    m_taskbar_data.graph_color_following_system = ini.GetBool(L"task_bar", L"graph_color_following_system", true);
-
-    if (CTaskBarDlgDrawCommonSupport::CheckSupport())
-        m_taskbar_data.disable_d2d = ini.GetBool(L"task_bar", L"disable_d2d", true);
-    else
-        m_taskbar_data.disable_d2d = true;
-    m_taskbar_data.enable_colorful_emoji = ini.GetBool(L"task_bar", L"enable_colorful_emoji", true);
-
-    //其他设置
-    //m_cfg_data.m_show_internet_ip = ini.GetBool(L"connection_details", L"show_internet_ip", false);
-    m_cfg_data.m_use_log_scale = ini.GetBool(_T("histroy_traffic"), _T("use_log_scale"), true);
-    m_cfg_data.m_sunday_first = ini.GetBool(_T("histroy_traffic"), _T("sunday_first"), true);
-    m_cfg_data.m_view_type = static_cast<HistoryTrafficViewType>(ini.GetInt(_T("histroy_traffic"), _T("view_type"), static_cast<int>(HistoryTrafficViewType::HV_DAY)));
-
-    m_notify_interval = ini.GetInt(_T("other"), _T("notify_interval"), 60);
-    m_exit_when_start_by_restart_manager = ini.GetBool(_T("other"), _T("exit_when_start_by_restart_manager"), true);
-    m_debug_log = ini.GetBool(_T("other"), _T("debug_log"), false);
-    //由于Win7系统中设置任务栏窗口透明色会导致任务栏窗口不可见，因此默认在Win7中禁用透明色的设定
-    m_taksbar_transparent_color_enable = ini.GetBool(L"other", L"taksbar_transparent_color_enable", !m_win_version.IsWindows7());
-    m_last_light_mode = ini.GetBool(L"other", L"last_light_mode", CWindowsSettingHelper::IsWindows10LightTheme());
-    m_show_dot_net_notinstalled_tip = ini.GetBool(L"other", L"show_dot_net_notinstalled_tip", true);
 }
+
 
 void CTaskbarMonApp::SaveConfig()
 {
-    CSettingsHelper ini;
-
-    //常规设置
-    ini.WriteBool(_T("general"), _T("check_update_when_start"), m_general_data.check_update_when_start);
-    //ini.WriteBool(_T("general"), _T("allow_skin_cover_font"), m_general_data.allow_skin_cover_font);
-    //ini.WriteBool(_T("general"), _T("allow_skin_cover_text"), m_general_data.allow_skin_cover_text);
-    ini.WriteString(_T("general"), _T("language"), m_general_data.language.toConfigString());
-    ini.WriteInt(L"general", L"update_source", m_general_data.update_source);
-    ini.WriteBool(L"general", L"show_all_interface", m_general_data.show_all_interface);
-    ini.WriteInt(L"general", L"cpu_usage_acquire_method", m_general_data.cpu_usage_acquire_method);
-    ini.WriteInt(L"general", L"monitor_time_span", m_general_data.monitor_time_span);
-    ini.WriteString(L"general", L"hard_disk_name", m_general_data.hard_disk_name);
-    ini.WriteString(L"general", L"cpu_core_name", m_general_data.cpu_core_name);
-    ini.WriteInt(L"general", L"hardware_monitor_item", m_general_data.hardware_monitor_item);
-    ini.WriteStringList(L"general", L"connections_hide", m_general_data.connections_hide.ToVector());
-
-    //主窗口设置
-    ini.WriteInt(L"config", L"transparency", m_cfg_data.m_transparency);
-    ini.WriteBool(L"config", L"always_on_top", m_main_wnd_data.m_always_on_top);
-    ini.WriteBool(L"config", L"lock_window_pos", m_main_wnd_data.m_lock_window_pos);
-    ini.WriteBool(L"config", L"show_notify_icon", m_general_data.show_notify_icon);
-    ini.WriteBool(L"config", L"show_cpu_memory", m_cfg_data.m_show_more_info);
-    ini.WriteBool(L"config", L"mouse_penetrate", m_main_wnd_data.m_mouse_penetrate);
-    ini.WriteBool(L"config", L"show_task_bar_wnd", m_cfg_data.m_show_task_bar_wnd);
-    ini.WriteInt(L"config", L"position_x", m_cfg_data.m_position_x);
-    ini.WriteInt(L"config", L"position_y", m_cfg_data.m_position_y);
-    ini.WriteBool(L"connection", L"auto_select", m_cfg_data.m_auto_select);
-    ini.WriteBool(L"connection", L"select_all", m_cfg_data.m_select_all);
-    //ini.SaveMainWndColors(L"config", L"text_color", m_main_wnd_data.text_colors);
-    //ini.WriteBool(_T("config"), _T("specify_each_item_color"), m_main_wnd_data.specify_each_item_color);
-    ini.WriteInt(L"config", L"hide_main_window", m_cfg_data.m_hide_main_window);
-    ini.WriteString(L"connection", L"connection_name", CCommon::StrToUnicode(m_cfg_data.m_connection_name.c_str()));
-
-
-    ini.WriteInt(L"config", L"notify_icon_selected", m_cfg_data.m_notify_icon_selected);
-    ini.WriteBool(L"config", L"notify_icon_auto_adapt", m_cfg_data.m_notify_icon_auto_adapt);
-
-    //ini.SaveFontData(L"config", m_main_wnd_data.font);
-
-    ini.WriteBool(L"config", L"swap_up_down", m_main_wnd_data.swap_up_down);
-    ini.WriteBool(L"config", L"hide_main_wnd_when_fullscreen", m_main_wnd_data.hide_main_wnd_when_fullscreen);
-
-    //ini.SaveDisplayStr(L"config", m_main_wnd_data.disp_str);
-
-    ini.WriteBool(L"config", L"speed_short_mode", m_main_wnd_data.speed_short_mode);
-    ini.WriteBool(L"config", L"separate_value_unit_with_space", m_main_wnd_data.separate_value_unit_with_space);
-    ini.WriteBool(L"config", L"show_tool_tip", m_main_wnd_data.show_tool_tip);
-    ini.WriteInt(L"config", L"memory_display", static_cast<int>(m_main_wnd_data.memory_display));
-    ini.WriteBool(L"config", L"unit_byte", m_main_wnd_data.unit_byte);
-    ini.WriteInt(L"config", L"speed_unit", static_cast<int>(m_main_wnd_data.speed_unit));
-    ini.WriteBool(L"config", L"hide_unit", m_main_wnd_data.hide_unit);
-    ini.WriteBool(L"config", L"hide_percent", m_main_wnd_data.hide_percent);
-    ini.WriteInt(L"config", L"double_click_action", static_cast<int>(m_main_wnd_data.double_click_action));
-    ini.WriteString(L"config", L"double_click_exe", m_main_wnd_data.double_click_exe);
-
-    ini.WriteInt(L"config", L"alow_out_of_border", m_main_wnd_data.m_alow_out_of_border);
-
-    ini.WriteBool(L"notify_tip", L"traffic_tip_enable", m_general_data.traffic_tip_enable);
-    ini.WriteInt(L"notify_tip", L"traffic_tip_value", m_general_data.traffic_tip_value);
-    ini.WriteInt(L"notify_tip", L"traffic_tip_unit", m_general_data.traffic_tip_unit);
-    ini.WriteBool(L"notify_tip", L"memory_usage_tip_enable", m_general_data.memory_usage_tip.enable);
-    ini.WriteInt(L"notify_tip", L"memory_tip_value", m_general_data.memory_usage_tip.tip_value);
-    ini.WriteBool(L"notify_tip", L"cpu_temperature_tip_enable", m_general_data.cpu_temp_tip.enable);
-    ini.WriteInt(L"notify_tip", L"cpu_temperature_tip_value", m_general_data.cpu_temp_tip.tip_value);
-    ini.WriteBool(L"notify_tip", L"gpu_temperature_tip_enable", m_general_data.gpu_temp_tip.enable);
-    ini.WriteInt(L"notify_tip", L"gpu_temperature_tip_value", m_general_data.gpu_temp_tip.tip_value);
-    ini.WriteBool(L"notify_tip", L"hdd_temperature_tip_enable", m_general_data.hdd_temp_tip.enable);
-    ini.WriteInt(L"notify_tip", L"hdd_temperature_tip_value", m_general_data.hdd_temp_tip.tip_value);
-    ini.WriteBool(L"notify_tip", L"mainboard_temperature_tip_enable", m_general_data.mainboard_temp_tip.enable);
-    ini.WriteInt(L"notify_tip", L"mainboard_temperature_tip_value", m_general_data.mainboard_temp_tip.tip_value);
-
-    //任务栏窗口设置
-    ini.WriteInt(L"task_bar", L"task_bar_back_color", m_taskbar_data.back_color);
-    ini.WriteInt(L"task_bar", L"transparent_color", m_taskbar_data.transparent_color);
-    ini.WriteInt(L"task_bar", L"status_bar_color", m_taskbar_data.status_bar_color);
-    ini.SaveTaskbarWndColors(L"task_bar", L"task_bar_text_color", m_taskbar_data.text_colors);
-    ini.WriteBool(L"task_bar", L"specify_each_item_color", m_taskbar_data.specify_each_item_color);
-    //ini.WriteBool(L"task_bar", L"task_bar_show_cpu_memory", m_cfg_data.m_tbar_show_cpu_memory);
-    ini.WriteInt(L"task_bar", L"tbar_display_item", m_taskbar_data.display_item.ToInt());
-    ini.SaveFontData(L"task_bar", m_taskbar_data.font);
-    //ini.WriteBool(L"task_bar", L"task_bar_swap_up_down", m_taskbar_data.swap_up_down);
-    ini.WriteBool(L"task_bar", L"show_taskbar_wnd_in_secondary_display", m_taskbar_data.show_taskbar_wnd_in_secondary_display);
-    ini.WriteInt(L"task_bar", L"secondary_display_index", m_taskbar_data.secondary_display_index);
-
-    ini.SaveDisplayStr(L"task_bar", m_taskbar_data.disp_str);
-
-    ini.WriteBool(L"task_bar", L"task_bar_wnd_on_left", m_taskbar_data.tbar_wnd_on_left);
-    ini.WriteBool(L"task_bar", L"task_bar_wnd_snap", m_taskbar_data.tbar_wnd_snap);
-    ini.WriteBool(L"task_bar", L"task_bar_speed_short_mode", m_taskbar_data.speed_short_mode);
-    ini.WriteBool(L"task_bar", L"unit_byte", m_taskbar_data.unit_byte);
-    ini.WriteInt(L"task_bar", L"task_bar_speed_unit", static_cast<int>(m_taskbar_data.speed_unit));
-    ini.WriteBool(L"task_bar", L"task_bar_hide_unit", m_taskbar_data.hide_unit);
-    ini.WriteBool(L"task_bar", L"task_bar_hide_percent", m_taskbar_data.hide_percent);
-    ini.WriteBool(L"task_bar", L"value_right_align", m_taskbar_data.value_right_align);
-    ini.WriteBool(L"task_bar", L"horizontal_arrange", m_taskbar_data.horizontal_arrange);
-    ini.WriteBool(L"task_bar", L"show_status_bar", m_taskbar_data.show_status_bar);
-    ini.WriteBool(L"task_bar", L"separate_value_unit_with_space", m_taskbar_data.separate_value_unit_with_space);
-    ini.WriteBool(L"task_bar", L"show_tool_tip", m_taskbar_data.show_tool_tip);
-    ini.WriteInt(L"task_bar", L"digits_number", m_taskbar_data.digits_number);
-    ini.WriteInt(L"task_bar", L"memory_display", static_cast<int>(m_taskbar_data.memory_display));
-    ini.WriteInt(L"task_bar", L"double_click_action", static_cast<int>(m_taskbar_data.double_click_action));
-    ini.WriteString(L"task_bar", L"double_click_exe", m_taskbar_data.double_click_exe);
-    ini.WriteBool(L"task_bar", L"cm_graph_type", m_taskbar_data.cm_graph_type);
-    ini.WriteBool(L"task_bar", L"show_graph_dashed_box", m_taskbar_data.show_graph_dashed_box);
-    ini.WriteInt(L"task_bar", L"item_space", m_taskbar_data.item_space);
-    ini.WriteInt(L"task_bar", L"vertical_margin", m_taskbar_data.vertical_margin);
-    ini.WriteInt(L"task_bar", L"window_offset_top", m_taskbar_data.window_offset_top);
-    ini.WriteInt(L"task_bar", L"window_offset_left", m_taskbar_data.window_offset_left);
-    ini.WriteBool(L"task_bar", L"avoid_overlap_with_widgets", m_taskbar_data.avoid_overlap_with_widgets);
-    ini.WriteInt(L"task_bar", L"taskbar_left_space_win11", m_taskbar_data.taskbar_left_space_win11);
-    ini.WriteInt(L"task_bar", L"taskbar_right_space_win11", m_taskbar_data.taskbar_right_space_win11);
-
-    ini.WriteBool(L"task_bar", L"auto_adapt_light_theme", m_taskbar_data.auto_adapt_light_theme);
-    ini.WriteInt(L"task_bar", L"dark_default_style", m_taskbar_data.dark_default_style);
-    ini.WriteInt(L"task_bar", L"light_default_style", m_taskbar_data.light_default_style);
-    ini.WriteBool(L"task_bar", L"auto_set_background_color", m_taskbar_data.auto_set_background_color);
-
-    ini.WriteString(L"task_bar", L"item_order", m_taskbar_data.item_order.ToString());
-    ini.WriteString(L"task_bar", L"plugin_display_item", m_taskbar_data.plugin_display_item.ToString());
-    ini.WriteBool(L"task_bar", L"auto_save_taskbar_color_settings_to_preset", m_taskbar_data.auto_save_taskbar_color_settings_to_preset);
-
-    ini.WriteBool(L"task_bar", L"show_netspeed_figure", m_taskbar_data.show_netspeed_figure);
-    ini.WriteInt(L"task_bar", L"netspeed_figure_max_value", m_taskbar_data.netspeed_figure_max_value);
-    ini.WriteInt(L"task_bar", L"netspeed_figure_max_value_unit", m_taskbar_data.netspeed_figure_max_value_unit);
-    ini.WriteBool(L"task_bar", L"graph_color_following_system", m_taskbar_data.graph_color_following_system);
-
-    ini.WriteBool(L"task_bar", L"disable_d2d", m_taskbar_data.disable_d2d);
-    ini.WriteBool(L"task_bar", L"enable_colorful_emoji", m_taskbar_data.enable_colorful_emoji);
-
-    //其他设置
-    //ini.WriteBool(L"connection_details", L"show_internet_ip", m_cfg_data.m_show_internet_ip);
-    ini.WriteBool(L"histroy_traffic", L"use_log_scale", m_cfg_data.m_use_log_scale);
-    ini.WriteBool(L"histroy_traffic", L"sunday_first", m_cfg_data.m_sunday_first);
-    ini.WriteInt(L"histroy_traffic", L"view_type", static_cast<int>(m_cfg_data.m_view_type));
-
-    ini.WriteBool(_T("other"), _T("no_multistart_warning"), m_no_multistart_warning);
-    ini.WriteBool(_T("other"), _T("exit_when_start_by_restart_manager"), m_exit_when_start_by_restart_manager);
-    ini.WriteBool(_T("other"), _T("debug_log"), m_debug_log);
-    ini.WriteInt(_T("other"), _T("notify_interval"), m_notify_interval);
-    ini.WriteBool(_T("other"), _T("taksbar_transparent_color_enable"), m_taksbar_transparent_color_enable);
-    ini.WriteBool(_T("other"), _T("last_light_mode"), m_last_light_mode);
-    ini.WriteBool(_T("other"), _T("show_dot_net_notinstalled_tip"), m_show_dot_net_notinstalled_tip);
-
-    ini.WriteString(L"config", L"plugin_disabled", m_cfg_data.plugin_disabled.ToString());
-
-    ini.WriteString(L"app", L"version", VERSION);
+    ConfigStore store{ m_config_path };
+    ConfigStore::OtherSettings other;
+    other.no_multistart_warning = m_no_multistart_warning;
+    other.exit_when_start_by_restart_manager = m_exit_when_start_by_restart_manager;
+    other.debug_log = m_debug_log;
+    other.notify_interval = m_notify_interval;
+    other.taksbar_transparent_color_enable = m_taksbar_transparent_color_enable;
+    other.last_light_mode = m_last_light_mode;
+    other.show_dot_net_notinstalled_tip = m_show_dot_net_notinstalled_tip;
 
     //检查是否保存成功
-    if (!ini.Save())
+    if (!store.Save(m_general_data, m_taskbar_data, m_cfg_data, other, VERSION))
     {
         if (m_cannot_save_config_warning)
         {
@@ -436,6 +115,7 @@ void CTaskbarMonApp::SaveConfig()
         return;
     }
 }
+
 
 void CTaskbarMonApp::LoadGlobalConfig()
 {
@@ -902,8 +582,21 @@ BOOL CTaskbarMonApp::InitInstance()
     m_str_table.Init();
 
     //检查是否已有实例正在运行
-    CIniHelper ini{ m_config_path };
-    m_no_multistart_warning = ini.GetBool(_T("other"), _T("no_multistart_warning"), false);
+    ConfigStore::OtherSettings other_settings;
+    {
+        ConfigStore store{ m_config_path };
+        ConfigStore::EnvironmentDefaults defaults;
+        defaults.is_windows7 = m_win_version.IsWindows7();
+        defaults.default_light_theme = CWindowsSettingHelper::IsWindows10LightTheme();
+        store.LoadOther(other_settings, defaults);
+    }
+    m_no_multistart_warning = other_settings.no_multistart_warning;
+    m_exit_when_start_by_restart_manager = other_settings.exit_when_start_by_restart_manager;
+    m_debug_log = other_settings.debug_log;
+    m_notify_interval = other_settings.notify_interval;
+    m_taksbar_transparent_color_enable = other_settings.taksbar_transparent_color_enable;
+    m_last_light_mode = other_settings.last_light_mode;
+    m_show_dot_net_notinstalled_tip = other_settings.show_dot_net_notinstalled_tip;
     LPCTSTR mutex_name{};
 #ifdef _DEBUG
     mutex_name = _T("TrafficMonitor-e8Ahk24HP6JC8hDy");
