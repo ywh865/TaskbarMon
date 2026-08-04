@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "TaskbarColorDlg.h"
 #include "afxdialogex.h"
 #include "CMFCColorDialogEx.h"
@@ -62,7 +62,7 @@ BOOL CTaskbarColorDlg::OnInitDialog()
     m_list_ctrl.SetDrawItemRangMargin(theApp.DPI(2));
 
     //向列表中插入行
-    for (auto iter = theApp.m_plugins.AllDisplayItemsWithPlugins().begin(); iter != theApp.m_plugins.AllDisplayItemsWithPlugins().end(); ++iter)
+    for (auto iter = AllDisplayItems.begin(); iter != AllDisplayItems.end(); ++iter)
     {
         CString item_name = iter->GetItemName();
         if (!item_name.IsEmpty())

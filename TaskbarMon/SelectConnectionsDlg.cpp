@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "SelectConnectionsDlg.h"
 #include "afxdialogex.h"
 #include "AdapterCommon.h"

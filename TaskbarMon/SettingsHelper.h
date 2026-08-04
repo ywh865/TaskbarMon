@@ -35,8 +35,5 @@ public:
     void LoadDisplayStr(const wchar_t* AppName, DispStrings& disp_str, bool is_main_window) const;
     void SaveDisplayStr(const wchar_t* AppName, const DispStrings& disp_str);
 
-    void LoadPluginDisplayStr(const wchar_t* AppName, DispStrings& disp_str, bool is_main_window);
-    void SavePluginDisplayStr(const wchar_t* AppName, const DispStrings& disp_str);
-
 };
 

@@ -1,6 +1,6 @@
 ﻿#include "stdafx.h"
 #include "SettingsHelper.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 
 CSettingsHelper::CSettingsHelper()
     : CIniHelper(theApp.m_config_path)
@@ -45,7 +45,7 @@ void CSettingsHelper::LoadMainWndColors(const wchar_t* AppName, const wchar_t* K
     std::vector<wstring> split_result;
     CCommon::StringSplit(str, L',', split_result);
     size_t index = 0;
-    const std::set<CommonDisplayItem>& items{ all_items.empty() ? theApp.m_plugins.AllDisplayItemsWithPlugins() : all_items };
+    const std::set<CommonDisplayItem>& items{ all_items.empty() ? AllDisplayItems : all_items };
     for (auto iter = items.begin(); iter != items.end(); ++iter)
     {
         if (index < split_result.size())
@@ -78,7 +78,7 @@ void CSettingsHelper::LoadTaskbarWndColors(const wchar_t* AppName, const wchar_t
     CCommon::StringSplit(str, L',', split_result);
     size_t index = 0;
     COLORREF default_color = _wtoi(default_str);
-    for (auto iter = theApp.m_plugins.AllDisplayItemsWithPlugins().begin(); iter != theApp.m_plugins.AllDisplayItemsWithPlugins().end(); ++iter)
+    for (auto iter = AllDisplayItems.begin(); iter != AllDisplayItems.end(); ++iter)
     {
         if (index < split_result.size())
             text_colors[*iter].label = _wtoi(split_result[index].c_str());
@@ -132,30 +132,6 @@ void CSettingsHelper::SaveDisplayStr(const wchar_t* AppName, const DispStrings& 
 {
     for (const auto& item : disp_str.GetAllItems())
     {
-        if (!item.first.IsPlugin())
-        {
-            WriteString(AppName, item.first.GetItemIniKeyName(), item.second);
-        }
-    }
-}
-
-void CSettingsHelper::LoadPluginDisplayStr(const wchar_t* AppName, DispStrings& disp_str, bool is_main_window)
-{
-    for (const auto& plugin : theApp.m_plugins.GetPluginItems())
-    {
-        std::wstring str{ plugin->GetItemLableText() };
-        bool exist = GetString(AppName, plugin->GetItemId(), str);
-        //主窗口只读取配置文件中存在的项，任务栏窗口读取所有项
-        if (!is_main_window || exist)
-            disp_str.Load(plugin->GetItemId(), str);
-    }
-}
-
-void CSettingsHelper::SavePluginDisplayStr(const wchar_t* AppName, const DispStrings& disp_str)
-{
-    for (const auto& plugin : theApp.m_plugins.GetPluginItems())
-    {
-        if (disp_str.GetAllItems().find(plugin) != disp_str.GetAllItems().end())
-            WriteString(AppName, plugin->GetItemId(), disp_str.GetConst(plugin));
+        WriteString(AppName, item.first.GetItemIniKeyName(), item.second);
     }
 }

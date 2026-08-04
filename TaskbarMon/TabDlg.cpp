@@ -1,6 +1,6 @@
 ﻿#include "stdafx.h"
 #include "TabDlg.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 
 IMPLEMENT_DYNAMIC(CTabDlg, CBaseDialog)
 

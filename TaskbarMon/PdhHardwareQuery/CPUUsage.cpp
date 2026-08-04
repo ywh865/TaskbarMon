@@ -1,7 +1,7 @@
 ﻿#include "stdafx.h"
 #include "CPUUsage.h"
 #include "Common.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include <powerbase.h>
 #include <sysinfoapi.h>
 

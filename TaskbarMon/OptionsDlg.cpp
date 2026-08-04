@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "OptionsDlg.h"
 #include "afxdialogex.h"
 
@@ -50,14 +50,12 @@ BOOL COptionsDlg::OnInitDialog()
     SetIcon(theApp.GetMenuIcon(IDI_SETTINGS), FALSE);       // 设置小图标
 
     //创建子对话框
-    m_tab1_dlg.Create(IDD_MAIN_WND_SETTINGS_DIALOG, &m_tab);
-    m_tab2_dlg.Create(IDD_TASKBAR_SETTINGS_DIALOG, &m_tab);
-    m_tab3_dlg.Create(IDD_GENERAL_SETTINGS_DIALOG, &m_tab);
+    m_tab1_dlg.Create(IDD_TASKBAR_SETTINGS_DIALOG, &m_tab);
+    m_tab2_dlg.Create(IDD_GENERAL_SETTINGS_DIALOG, &m_tab);
 
     //保存子对话框
     m_tab_vect.push_back(&m_tab1_dlg);
     m_tab_vect.push_back(&m_tab2_dlg);
-    m_tab_vect.push_back(&m_tab3_dlg);
 
     //获取子对话框的初始高度
     for (const auto* pDlg : m_tab_vect)
@@ -68,14 +66,12 @@ BOOL COptionsDlg::OnInitDialog()
     }
 
     //添加对话框
-    m_tab.AddWindow(&m_tab1_dlg, CCommon::LoadText(IDS_MAIN_WINDOW_SETTINGS));
-    m_tab.AddWindow(&m_tab2_dlg, CCommon::LoadText(IDS_TASKBAR_WINDOW_SETTINGS));
-    m_tab.AddWindow(&m_tab3_dlg, CCommon::LoadText(IDS_GENERAL_SETTINGS));
+    m_tab.AddWindow(&m_tab1_dlg, CCommon::LoadText(IDS_TASKBAR_WINDOW_SETTINGS));
+    m_tab.AddWindow(&m_tab2_dlg, CCommon::LoadText(IDS_GENERAL_SETTINGS));
 
     //为每个标签添加图标
     CImageList ImageList;
     ImageList.Create(theApp.DPI(16), theApp.DPI(16), ILC_COLOR32 | ILC_MASK, 2, 2);
-    ImageList.Add(theApp.GetMenuIcon(IDI_MAIN_WINDOW));
     ImageList.Add(theApp.GetMenuIcon(IDI_TASKBAR_WINDOW));
     ImageList.Add(theApp.GetMenuIcon(IDI_SETTINGS));
     m_tab.SetImageList(&ImageList);
@@ -105,7 +101,6 @@ void COptionsDlg::OnOK()
     // TODO: 在此添加专用代码和/或调用基类
     m_tab1_dlg.OnOK();
     m_tab2_dlg.OnOK();
-    m_tab3_dlg.OnOK();
 
     CBaseDialog::OnOK();
 }
@@ -130,7 +125,7 @@ void COptionsDlg::OnSize(UINT nType, int cx, int cy)
 void COptionsDlg::OnCancel()
 {
     // TODO: 在此添加专用代码和/或调用基类
-    m_tab3_dlg.OnCancel();
+    m_tab2_dlg.OnCancel();
 
     CBaseDialog::OnCancel();
 }
@@ -138,7 +133,7 @@ void COptionsDlg::OnCancel()
 
 void COptionsDlg::OnBnClickedApplyButton()
 {
-    m_tab2_dlg.SaveColorSettingToDefaultStyle();
+    m_tab1_dlg.SaveColorSettingToDefaultStyle();
     ::SendMessage(theApp.m_pMainWnd->GetSafeHwnd(), WM_SETTINGS_APPLIED, (WPARAM)this, 0);
     for (size_t i = 0; i < m_tab_vect.size(); i++)
     {

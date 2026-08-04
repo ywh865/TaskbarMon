@@ -2,7 +2,7 @@
 #include "StrTable.h"
 #include "Common.h"
 #include "IniHelper.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 CStrTable::CStrTable()
 {
 }

@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include "PluginInterface.h"
 
 //内置的显示的项目
 enum DisplayItem
@@ -35,19 +34,12 @@ class CommonDisplayItem
 public:
     CommonDisplayItem() {}
     CommonDisplayItem(DisplayItem item);
-    CommonDisplayItem(IPluginItem* item);
 
     bool operator<(const CommonDisplayItem&) const;
     bool operator==(const CommonDisplayItem&) const;
 
-    //是否为插件项目
-    bool IsPlugin() const;
-
     //获取内置的显示项目
     DisplayItem ItemType() const;
-
-    //获取插件显示项目
-    IPluginItem* PluginItem() const;
 
     //获取显示项目的名称
     CString GetItemName() const;
@@ -76,9 +68,7 @@ public:
     bool IsDoubleLineExclusive() const;
 
 private:
-    bool is_plugin{};           //是否为插件项目
     DisplayItem item_type{};    //内置的显示项目
-    IPluginItem* plugin_item{}; //插件显示项目
 };
 
 

@@ -5,7 +5,7 @@
 #include "BaseDialog.h"
 #include "afxdialogex.h"
 #include "IniHelper.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "TrafficMonitorDlg.h"
 
 // CBaseDialog 对话框

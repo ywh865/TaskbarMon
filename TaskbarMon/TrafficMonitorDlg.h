@@ -10,14 +10,11 @@
 #include "StaticEx.h"
 #include "Common.h"
 #include "TaskBarDlg.h"
-#include "SkinDlg.h"
 #include "HistoryTrafficDlg.h"
 #include "OptionsDlg.h"
-#include "PictureStatic.h"
 #include "IconSelectDlg.h"
 #include "DrawCommon.h"
 #include "IniHelper.h"
-#include "LinkStatic.h"
 #include "AdapterCommon.h"
 #include "AboutDlg.h"
 #include "PdhHardwareQuery/CPUUsage.h"
@@ -26,7 +23,7 @@
 #include "PdhHardwareQuery/DiskUsage.h"
 #include "HistoryTrafficFile.h"
 
-// CTrafficMonitorDlg 对话框
+// CTrafficMonitorDlg 对话框（隐藏宿主窗口，仅承载任务栏窗口、托盘与监控调度）
 class CTrafficMonitorDlg : public CDialog
 {
     // 构造
@@ -42,8 +39,6 @@ public:
     enum { IDD = IDD_TRAFFICMONITOR_DIALOG };
 #endif
 
-    const CSkinFile& GetCurSkin() const { return m_skin; }
-
     CPdhDiskUsage& GetPdhDiskUsageHelper() { return m_disk_usage_helper; }
     bool IsGetDiskUsageByPdh() const { return m_get_disk_usage_by_pdh; }
 
@@ -53,7 +48,6 @@ protected:
 
 // 实现
 protected:
-    HICON m_hIcon;
     NOTIFYICONDATA m_ntIcon;    //通知区域图标
     CTaskBarDlg* m_tBarDlg{};     //任务栏窗口的指针
 
@@ -97,12 +91,9 @@ protected:
         }
     };
 
-    //CRect m_screen_rect;        //屏幕的范围（不包含任务栏）
     vector<CRect> m_screen_rects;       //所有屏幕的范围（不包含任务栏）
     vector<CRect> m_last_screen_rects;       //上一次所有屏幕的范围（不包含任务栏）
     CSize m_screen_size;        //屏幕的大小（包含任务栏）
-    CSkinFile m_skin;
-    CommonDisplayItem m_clicked_item;           //鼠标点击的项目
 
     int m_restart_cnt{ -1 };    //重新初始化次数
     unsigned int m_timer_cnt{};     //定时器触发次数（自程序启动以来的秒数）
@@ -114,12 +105,8 @@ protected:
 
     static unsigned int m_WM_TASKBARCREATED;    //任务栏重启消息
 
-    int m_skin_selected{};      //选择的皮肤序号
-
     SYSTEMTIME m_start_time;    //程序启动时的时间
     CHistoryTrafficFile m_history_traffic{ theApp.m_history_traffic_path }; //储存历史流量
-
-    CToolTipCtrl m_tool_tips;
 
     bool m_connection_change_flag{ false };     //如果执行过IniConnection()函数，该flag会置为true
     bool m_is_foreground_fullscreen{ false };   //指示前台窗口是否正在全局显示
@@ -138,19 +125,9 @@ public:
     void ExitMonitorThread();       //停止监控线程
 
 protected:
-    CString GetMouseTipsInfo();     //获取鼠标提示信息
-    void SetTransparency();         //根据m_transparency的值设置窗口透明度
-    void SetTransparency(int transparency);
-public:
-    void SetAlwaysOnTop();          //根据m_always_on_top的值设置窗口置顶
-protected:
-    void SetMousePenetrate();       //根据m_mouse_penetrate的值设置是否鼠标穿透
-    POINT CalculateWindowMoveOffset(CRect rect, bool screen_changed);  //计算当窗口处于屏幕区域外时，移动到屏幕区域需要移动的位置
-    void CheckWindowPos(bool screen_changed = false);          //测试窗口的位置，如窗口的位置在屏幕外，则移动窗口使其全部都在屏幕内，并返回新位置
     void GetScreenSize();           //获取屏幕的大小
 
     void AutoSelect();
-    //void UpdateConnections();
     //自动选择连接
     void IniConnection();   //初始化连接
 
@@ -180,84 +157,46 @@ protected:
 
     void ApplySettings(COptionsDlg& optionsDlg);
 
-    void SetItemPosition();     //设置显示的4个项目的位置
-    bool LoadSkinLayout();      //从当前皮肤获取布局数据
-
-    void LoadBackGroundImage();
-    void SetTextFont();
-
 public:
     bool IsTaskbarWndValid() const;
 protected:
 
     void TaskbarShowHideItem(DisplayItem type);
 
-    //判断一个点在哪个显示项目的区域内，并保存到m_clicked_item
-    void CheckClickedItem(CPoint point);
-
-    //应用一个皮肤
-    void ApplySkin(int skin_index);
-
 public:
-    //void ApplySettings();
     bool IsTemperatureNeeded() const;       //判断是否需要显示温度信息
 
 protected:
     // 生成的消息映射函数
     virtual BOOL OnInitDialog();
-    //  afx_msg void OnPaint();
-    afx_msg HCURSOR OnQueryDragIcon();
     DECLARE_MESSAGE_MAP()
 public:
-    //  afx_msg LRESULT OnNcHitTest(CPoint point);
     afx_msg void OnTimer(UINT_PTR nIDEvent);
-    //  afx_msg void OnRButtonDown(UINT nFlags, CPoint point);
-    afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
-    afx_msg void OnLButtonDown(UINT nFlags, CPoint point);
     afx_msg void OnNetworkInfo();
-    afx_msg void OnAlwaysOnTop();
-    afx_msg void OnTransparency100();
-    afx_msg void OnTransparency80();
-    afx_msg void OnTransparency60();
-    afx_msg void OnTransparency40();
     afx_msg void OnClose();
     virtual BOOL OnCommand(WPARAM wParam, LPARAM lParam);
-    afx_msg void OnInitMenu(CMenu* pMenu);
     virtual BOOL PreTranslateMessage(MSG* pMsg);
-    afx_msg void OnLockWindowPos();
-    afx_msg void OnMove(int x, int y);
 protected:
     afx_msg LRESULT OnNotifyIcon(WPARAM wParam, LPARAM lParam);
 public:
     afx_msg void OnShowNotifyIcon();
     afx_msg void OnDestroy();
-    afx_msg void OnShowCpuMemory();
-    afx_msg void OnMousePenetrate();
-    //afx_msg void OnTextColor();
     afx_msg void OnShowTaskBarWnd();
     afx_msg void OnAppAbout();
     afx_msg void OnShowCpuMemory2();
-    afx_msg void OnShowMainWnd();
-    afx_msg void OnChangeSkin();
     afx_msg LRESULT OnTaskBarCreated(WPARAM wParam, LPARAM lParam);
-    //afx_msg void OnSetFont();
     afx_msg void OnTrafficHistory();
-    afx_msg void OnMouseMove(UINT nFlags, CPoint point);
-    afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
-    afx_msg void OnOptions();
     afx_msg void OnOptions2();
 protected:
     afx_msg LRESULT OnExitmenuloop(WPARAM wParam, LPARAM lParam);
 public:
-    afx_msg void OnChangeNotifyIcon();
-    afx_msg void OnAlowOutOfBorder();
     afx_msg void OnCheckUpdate();
+    afx_msg void OnChangeNotifyIcon();
 protected:
     afx_msg LRESULT OnTaskbarMenuPopedUp(WPARAM wParam, LPARAM lParam);
 public:
     afx_msg void OnShowNetSpeed();
     afx_msg BOOL OnQueryEndSession();
-    afx_msg void OnPaint();
 protected:
     afx_msg LRESULT OnDpichanged(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnTaskbarWndClosed(WPARAM wParam, LPARAM lParam);
@@ -265,22 +204,15 @@ protected:
     afx_msg LRESULT OnDisplaychange(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnReopenTaksbarWnd(WPARAM wParam, LPARAM lParam);
 public:
-    afx_msg void OnExitSizeMove();
-    afx_msg void OnPluginManage();
     afx_msg void OnOpenTaskManager();
 protected:
     afx_msg LRESULT OnSettingsApplied(WPARAM wParam, LPARAM lParam);
 public:
     afx_msg void OnDisplaySettings();
-    afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
     afx_msg void OnRefreshConnectionList();
 protected:
     afx_msg LRESULT OnTabletQuerysystemgesturestatus(WPARAM wParam, LPARAM lParam);
 public:
-    afx_msg void OnPluginOptions();
-    afx_msg void OnPluginDetail();
-    afx_msg void OnPluginOptionsTaksbar();
-    afx_msg void OnPluginDetailTaksbar();
     afx_msg UINT OnPowerBroadcast(UINT nPowerEvent, LPARAM nEventData);
     afx_msg void OnColorizationColorChanged(DWORD dwColorizationColor, BOOL bOpacity);
 };

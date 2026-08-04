@@ -2,7 +2,7 @@
 #include <unordered_map>
 #include "TaskBarDlgDrawCommon.h"
 #include "D2D1Support.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "DrawCommon.h"
 #include "WIC.h"
 

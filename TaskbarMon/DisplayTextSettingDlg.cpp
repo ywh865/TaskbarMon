@@ -2,10 +2,9 @@
 //
 
 #include "stdafx.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "DisplayTextSettingDlg.h"
 #include "TrafficMonitorDlg.h"
-#include "SkinManager.h"
 
 
 // CDisplayTextSettingDlg 对话框
@@ -64,20 +63,6 @@ BOOL CDisplayTextSettingDlg::OnInitDialog()
     m_list_ctrl.InsertColumn(0, CCommon::LoadText(IDS_ITEM), LVCFMT_LEFT, width0);		//插入第0列
     m_list_ctrl.InsertColumn(1, CCommon::LoadText(IDS_VALUE), LVCFMT_LEFT, width1);		//插入第1列
 
-    //如果是主窗口，清除当前皮肤中没有的行
-    if (m_main_window_text)
-    {
-        std::set<CommonDisplayItem> all_skin_items;
-        CTrafficMonitorDlg::Instance()->GetCurSkin().GetSkinDisplayItems(all_skin_items);
-
-        DispStrings temp = m_display_texts;
-        m_display_texts = DispStrings();
-        for (const auto& display_item : all_skin_items)
-        {
-            m_display_texts.Get(display_item) = temp.GetConst(display_item);
-        }
-    }
-
     //向列表中插入行
     for (auto iter = m_display_texts.GetAllItems().begin(); iter != m_display_texts.GetAllItems().end(); ++iter)
     {
@@ -126,27 +111,11 @@ void CDisplayTextSettingDlg::OnBnClickedRestoreDefaultButton()
 {
     // TODO: 在此添加控件通知处理程序代码
     int item_count = m_list_ctrl.GetItemCount();
-    CTrafficMonitorDlg* pMainWnd = CTrafficMonitorDlg::Instance();
-    if (m_main_window_text && pMainWnd != nullptr)
+    for (int i{}; i < item_count; i++)
     {
-        //主窗口恢复默认显示文本时，从皮肤获取
-        SkinSettingData skin_setting_data;
-        CSkinManager::SkinSettingDataFronSkin(skin_setting_data, pMainWnd->GetCurSkin());
-        for (int i{}; i < item_count; i++)
-        {
-            CommonDisplayItem display_item = GetDisplayItem(i);
-            std::wstring default_text = skin_setting_data.disp_str.GetConst(display_item);
-            m_list_ctrl.SetItemText(i, 1, default_text.c_str());
-        }
-    }
-    else
-    {
-        for (int i{}; i < item_count; i++)
-        {
-            CommonDisplayItem display_item = GetDisplayItem(i);
-            std::wstring default_text = display_item.DefaultString(m_main_window_text);
-            m_list_ctrl.SetItemText(i, 1, default_text.c_str());
-        }
+        CommonDisplayItem display_item = GetDisplayItem(i);
+        std::wstring default_text = display_item.DefaultString(m_main_window_text);
+        m_list_ctrl.SetItemText(i, 1, default_text.c_str());
     }
 }
 
@@ -154,22 +123,9 @@ void CDisplayTextSettingDlg::OnRestoreDefault()
 {
     if (m_item_selected >= 0)
     {
-        CTrafficMonitorDlg* pMainWnd = CTrafficMonitorDlg::Instance();
-        if (m_main_window_text && pMainWnd != nullptr)
-        {
-            //主窗口恢复默认显示文本时，从皮肤获取
-            SkinSettingData skin_setting_data;
-            CSkinManager::SkinSettingDataFronSkin(skin_setting_data, pMainWnd->GetCurSkin());
-            CommonDisplayItem display_item = GetDisplayItem(m_item_selected);
-            std::wstring default_text = skin_setting_data.disp_str.GetConst(display_item);
-            m_list_ctrl.SetItemText(m_item_selected, 1, default_text.c_str());
-        }
-        else
-        {
-            CommonDisplayItem display_item = GetDisplayItem(m_item_selected);
-            std::wstring default_text = display_item.DefaultString(m_main_window_text);
-            m_list_ctrl.SetItemText(m_item_selected, 1, default_text.c_str());
-        }
+        CommonDisplayItem display_item = GetDisplayItem(m_item_selected);
+        std::wstring default_text = display_item.DefaultString(m_main_window_text);
+        m_list_ctrl.SetItemText(m_item_selected, 1, default_text.c_str());
     }
 }
 

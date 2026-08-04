@@ -1,6 +1,6 @@
 ﻿#include "stdafx.h"
 #include "Common.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 
 
 CCommon::CCommon()
@@ -1134,24 +1134,24 @@ void CCommon::SetColorMode(ColorMode mode)
         //Win8/8.1下背景色和透明色不使用纯黑色
         if (theApp.m_win_version.IsWindows8Or8point1())
         {
-            CTrafficMonitorApp::self->m_taskbar_data.dft_back_color = RGB(0, 0, 1);
-            CTrafficMonitorApp::self->m_taskbar_data.dft_transparent_color = RGB(0, 0, 1);
+            CTaskbarMonApp::self->m_taskbar_data.dft_back_color = RGB(0, 0, 1);
+            CTaskbarMonApp::self->m_taskbar_data.dft_transparent_color = RGB(0, 0, 1);
         }
         else
         {
-            CTrafficMonitorApp::self->m_taskbar_data.dft_back_color = 0;
-            CTrafficMonitorApp::self->m_taskbar_data.dft_transparent_color = 0;
+            CTaskbarMonApp::self->m_taskbar_data.dft_back_color = 0;
+            CTaskbarMonApp::self->m_taskbar_data.dft_transparent_color = 0;
         }
-        CTrafficMonitorApp::self->m_taskbar_data.dft_status_bar_color = 0x005A5A5A;
-        CTrafficMonitorApp::self->m_taskbar_data.dft_text_colors = 0x00ffffffU;
-        CTrafficMonitorApp::self->m_cfg_data.m_dft_notify_icon = 0;
+        CTaskbarMonApp::self->m_taskbar_data.dft_status_bar_color = 0x005A5A5A;
+        CTaskbarMonApp::self->m_taskbar_data.dft_text_colors = 0x00ffffffU;
+        CTaskbarMonApp::self->m_cfg_data.m_dft_notify_icon = 0;
         break;
     case ColorMode::Light:
-        CTrafficMonitorApp::self->m_taskbar_data.dft_back_color = 0x00D3D2D2;
-        CTrafficMonitorApp::self->m_taskbar_data.dft_transparent_color = 0x00D3D2D2;
-        CTrafficMonitorApp::self->m_taskbar_data.dft_status_bar_color = 0x00A5A5A5;
-        CTrafficMonitorApp::self->m_taskbar_data.dft_text_colors = 0x00000000U;
-        CTrafficMonitorApp::self->m_cfg_data.m_dft_notify_icon = 4;
+        CTaskbarMonApp::self->m_taskbar_data.dft_back_color = 0x00D3D2D2;
+        CTaskbarMonApp::self->m_taskbar_data.dft_transparent_color = 0x00D3D2D2;
+        CTaskbarMonApp::self->m_taskbar_data.dft_status_bar_color = 0x00A5A5A5;
+        CTaskbarMonApp::self->m_taskbar_data.dft_text_colors = 0x00000000U;
+        CTaskbarMonApp::self->m_cfg_data.m_dft_notify_icon = 4;
         break;
     default:
         break;

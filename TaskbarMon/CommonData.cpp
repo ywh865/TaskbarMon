@@ -2,7 +2,7 @@
 #include "CommonData.h"
 #include "Common.h"
 #include "CalendarHelper.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "WindowsSettingHelper.h"
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -82,15 +82,6 @@ bool DispStrings::operator==(const DispStrings& disp_str) const
 bool DispStrings::IsInvalid() const
 {
     return map_str.empty();
-}
-
-void DispStrings::Load(const std::wstring& plugin_id, const std::wstring& disp_str)
-{
-    auto plugin = theApp.m_plugins.GetItemById(plugin_id);
-    if (plugin != nullptr)
-    {
-        map_str[plugin] = disp_str;
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////

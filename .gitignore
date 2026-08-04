@@ -1,0 +1,31 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.ncb
+*.sdf
+*.ipch
+Debug/
+Release/
+Debug (lite)/
+Release (lite)/
+x64/
+Win32/
+ARM64EC/
+*.VC.db
+compile_time.txt
+
+# IDE
+.vscode/
+.idea/
+
+# 编译产物
+*.obj
+*.pch
+*.pdb
+*.ilk
+*.exe
+*.dll
+*.lib
+*.exp
+*.log

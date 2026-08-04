@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "WindowsWebExperienceDetector.h"
 #ifndef DISABLE_WINDOWS_WEB_EXPERIENCE_DETECTOR
 #include <winrt/Windows.Foundation.Collections.h>
@@ -7,7 +7,7 @@
 #include <winrt/Windows.Storage.h>
 #pragma comment(lib, "RuntimeObject.lib")
 #endif
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 
 bool WindowsWebExperienceDetector::IsDetected() noexcept
 {

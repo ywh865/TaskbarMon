@@ -1,7 +1,7 @@
 ﻿#include "stdafx.h"
 #include "TaskbarItemOrderHelper.h"
 #include "Common.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
@@ -13,7 +13,7 @@ CTaskbarItemOrderHelper::CTaskbarItemOrderHelper(bool displayed_only)
 
 void CTaskbarItemOrderHelper::Init()
 {
-    for (const auto& item : theApp.m_plugins.AllDisplayItemsWithPlugins())
+    for (const auto& item : AllDisplayItems)
     {
         m_all_item_in_default_order.push_back(item);
     }
@@ -86,17 +86,14 @@ CString CTaskbarItemOrderHelper::GetItemDisplayName(CommonDisplayItem item)
 bool CTaskbarItemOrderHelper::IsItemDisplayed(CommonDisplayItem item)
 {
     bool displayed = true;
-    if (!item.IsPlugin())
-    {
-        if ((item == TDI_CPU_TEMP) && !theApp.m_general_data.IsHardwareEnable(HI_CPU))
-            displayed = false;
-        if ((item == TDI_GPU_TEMP) && !theApp.m_general_data.IsHardwareEnable(HI_GPU))
-            displayed = false;
-        if ((item == TDI_HDD_TEMP) && !theApp.m_general_data.IsHardwareEnable(HI_HDD))
-            displayed = false;
-        if (item == TDI_MAIN_BOARD_TEMP && !theApp.m_general_data.IsHardwareEnable(HI_MBD))
-            displayed = false;
-    }
+    if ((item == TDI_CPU_TEMP) && !theApp.m_general_data.IsHardwareEnable(HI_CPU))
+        displayed = false;
+    if ((item == TDI_GPU_TEMP) && !theApp.m_general_data.IsHardwareEnable(HI_GPU))
+        displayed = false;
+    if ((item == TDI_HDD_TEMP) && !theApp.m_general_data.IsHardwareEnable(HI_HDD))
+        displayed = false;
+    if (item == TDI_MAIN_BOARD_TEMP && !theApp.m_general_data.IsHardwareEnable(HI_MBD))
+        displayed = false;
 
     return displayed;
 }
@@ -104,7 +101,7 @@ bool CTaskbarItemOrderHelper::IsItemDisplayed(CommonDisplayItem item)
 void CTaskbarItemOrderHelper::NormalizeItemOrder()
 {
     //检查是否有超出范围的序号
-    int item_num = static_cast<int>(theApp.m_plugins.AllDisplayItemsWithPlugins().size());
+    int item_num = static_cast<int>(AllDisplayItems.size());
     for (auto iter = m_item_order.begin(); iter != m_item_order.end();)
     {
         if (*iter < 0 || *iter >= item_num)

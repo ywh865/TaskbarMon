@@ -2,7 +2,7 @@
 //
 
 #include "stdafx.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "SetItemOrderDlg.h"
 #include "afxdialogex.h"
 
@@ -115,32 +115,15 @@ void CSetItemOrderDlg::EnableDlgCtrl(UINT id, bool enable)
 
 bool CSetItemOrderDlg::GetItemChecked(CommonDisplayItem item)
 {
-    if (item.IsPlugin())
-    {
-        if (item.PluginItem() != nullptr)
-            return m_plugin_item.Contains(item.PluginItem()->GetItemId());
-    }
-    else
-    {
-        return m_display_item.Contains(item.ItemType());
-    }
-    return false;
+    return m_display_item.Contains(item.ItemType());
 }
 
 void CSetItemOrderDlg::SaveItemChecked(CommonDisplayItem item, bool checked)
 {
-    if (item.IsPlugin())
-    {
-        if (item.PluginItem() != nullptr)
-            m_plugin_item.SetStrContained(item.PluginItem()->GetItemId(), checked);
-    }
+    if (checked)
+        m_display_item.Add(item.ItemType());
     else
-    {
-        if (checked)
-            m_display_item.Add(item.ItemType());
-        else
-            m_display_item.Remove(item.ItemType());
-    }
+        m_display_item.Remove(item.ItemType());
 }
 
 

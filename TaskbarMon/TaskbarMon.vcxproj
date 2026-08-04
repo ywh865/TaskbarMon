@@ -52,7 +52,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{09483BED-B1E9-4827-8120-A18302C84AA8}</ProjectGuid>
-    <RootNamespace>TrafficMonitor</RootNamespace>
+    <RootNamespace>TaskbarMon</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <Keyword>MFCProj</Keyword>
   </PropertyGroup>
@@ -764,13 +764,11 @@
     </PreLinkEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="compile_time.txt" />
     <Text Include="ReadMe.txt" />
     <Text Include="res\Acknowledgement.txt" />
     <Text Include="res\Acknowledgement_en.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\include\PluginInterface.h" />
     <ClInclude Include="AboutDlg.h" />
     <ClInclude Include="AdapterCommon.h" />
     <ClInclude Include="AppAlreadyRuningDlg.h" />
@@ -810,7 +808,6 @@
     <ClInclude Include="ColorStatic.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="CommonData.h" />
-    <ClInclude Include="CSkinPreviewView.h" />
     <ClInclude Include="DrawCommon.h" />
     <ClInclude Include="GeneralSettingsDlg.h" />
     <ClInclude Include="HistoryTrafficDlg.h" />
@@ -818,8 +815,6 @@
     <ClInclude Include="IniHelper.h" />
     <ClInclude Include="HistoryTrafficListCtrl.h" />
     <ClInclude Include="ListCtrlEx.h" />
-    <ClInclude Include="MainWndColorDlg.h" />
-    <ClInclude Include="MainWndSettingsDlg.h" />
     <ClInclude Include="MessageDlg.h" />
     <ClInclude Include="NetworkInfoDlg.h" />
     <ClInclude Include="Nullable.hpp" />
@@ -830,20 +825,12 @@
     <ClInclude Include="PdhHardwareQuery\DiskUsage.h" />
     <ClInclude Include="PdhHardwareQuery\PdhQuery.h" />
     <ClInclude Include="PictureStatic.h" />
-    <ClInclude Include="PluginInfoDlg.h" />
-    <ClInclude Include="PluginManager.h" />
-    <ClInclude Include="PluginManagerDlg.h" />
-    <ClInclude Include="PluginUpdateHelper.h" />
     <ClInclude Include="RenderAPISupport.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SelectConnectionsDlg.h" />
     <ClInclude Include="SetItemOrderDlg.h" />
     <ClInclude Include="SettingsHelper.h" />
     <ClInclude Include="SimpleXML.h" />
-    <ClInclude Include="SkinAutoAdaptSettingDlg.h" />
-    <ClInclude Include="SkinDlg.h" />
-    <ClInclude Include="SkinFile.h" />
-    <ClInclude Include="SkinManager.h" />
     <ClInclude Include="SpinEdit.h" />
     <ClInclude Include="StaticEx.h" />
     <ClInclude Include="stdafx.h" />
@@ -859,9 +846,8 @@
     <ClInclude Include="TaskbarItemOrderHelper.h" />
     <ClInclude Include="TaskBarSettingsDlg.h" />
     <ClInclude Include="Test.h" />
-    <ClInclude Include="TinyXml2Helper.h" />
     <ClInclude Include="tinyxml2\tinyxml2.h" />
-    <ClInclude Include="TrafficMonitor.h" />
+    <ClInclude Include="TaskbarMon.h" />
     <ClInclude Include="TrafficMonitorDlg.h" />
     <ClInclude Include="UpdateHelper.h" />
     <ClInclude Include="WIC.h" />
@@ -910,7 +896,6 @@
     <ClCompile Include="LinkStatic.cpp" />
     <ClCompile Include="ColorStatic.cpp" />
     <ClCompile Include="Common.cpp" />
-    <ClCompile Include="CSkinPreviewView.cpp" />
     <ClCompile Include="DrawCommon.cpp" />
     <ClCompile Include="GeneralSettingsDlg.cpp" />
     <ClCompile Include="HistoryTrafficDlg.cpp" />
@@ -918,8 +903,6 @@
     <ClCompile Include="IniHelper.cpp" />
     <ClCompile Include="HistoryTrafficListCtrl.cpp" />
     <ClCompile Include="ListCtrlEx.cpp" />
-    <ClCompile Include="MainWndColorDlg.cpp" />
-    <ClCompile Include="MainWndSettingsDlg.cpp" />
     <ClCompile Include="MessageDlg.cpp" />
     <ClCompile Include="NetworkInfoDlg.cpp" />
     <ClCompile Include="OptionsDlg.cpp" />
@@ -929,18 +912,10 @@
     <ClCompile Include="PdhHardwareQuery\DiskUsage.cpp" />
     <ClCompile Include="PdhHardwareQuery\PdhQuery.cpp" />
     <ClCompile Include="PictureStatic.cpp" />
-    <ClCompile Include="PluginInfoDlg.cpp" />
-    <ClCompile Include="PluginManager.cpp" />
-    <ClCompile Include="PluginManagerDlg.cpp" />
-    <ClCompile Include="PluginUpdateHelper.cpp" />
     <ClCompile Include="SelectConnectionsDlg.cpp" />
     <ClCompile Include="SetItemOrderDlg.cpp" />
     <ClCompile Include="SettingsHelper.cpp" />
     <ClCompile Include="SimpleXML.cpp" />
-    <ClCompile Include="SkinAutoAdaptSettingDlg.cpp" />
-    <ClCompile Include="SkinDlg.cpp" />
-    <ClCompile Include="SkinFile.cpp" />
-    <ClCompile Include="SkinManager.cpp" />
     <ClCompile Include="SpinEdit.cpp" />
     <ClCompile Include="StaticEx.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -968,7 +943,6 @@
     <ClCompile Include="TaskbarItemOrderHelper.cpp" />
     <ClCompile Include="TaskBarSettingsDlg.cpp" />
     <ClCompile Include="Test.cpp" />
-    <ClCompile Include="TinyXml2Helper.cpp" />
     <ClCompile Include="tinyxml2\tinyxml2.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
@@ -983,7 +957,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release (lite)|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release (lite)|ARM64EC'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="TrafficMonitor.cpp" />
+    <ClCompile Include="TaskbarMon.cpp" />
     <ClCompile Include="TrafficMonitorDlg.cpp" />
     <ClCompile Include="UpdateHelper.cpp" />
     <ClCompile Include="WIC.cpp" />
@@ -995,7 +969,7 @@
     <ClCompile Include="WinVersionHelper.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="TrafficMonitor.rc" />
+    <ResourceCompile Include="TaskbarMon.rc" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\LICENSE" />
@@ -1003,10 +977,9 @@
     <None Include="language\English.ini" />
     <None Include="language\Simplified_Chinese.ini" />
     <None Include="language\Traditional_Chinese.ini" />
-    <None Include="res\TrafficMonitor.rc2" />
+    <None Include="res\TaskbarMon.rc2" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="res\about_background.bmp" />
     <Image Include="res\about_background_hd.bmp" />
     <Image Include="res\bitmap3.bmp" />
     <Image Include="res\menu_icon\close.ico" />
@@ -1036,14 +1009,14 @@
     <Image Include="res\notifyicon5.ico" />
     <Image Include="res\notify_preview.bmp" />
     <Image Include="res\notify_preview_light.bmp" />
-    <Image Include="res\TrafficMonitor.ico" />
+    <Image Include="res\TaskbarMon.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties RESOURCE_FILE="TrafficMonitor.rc" />
+      <UserProperties RESOURCE_FILE="TaskbarMon.rc" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>

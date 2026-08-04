@@ -6,7 +6,7 @@
 #include <tchar.h>
 #include "MessageDlg.h"
 #include "Common.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include <sstream>
 
 #pragma comment(lib, "Dbghelp.lib")

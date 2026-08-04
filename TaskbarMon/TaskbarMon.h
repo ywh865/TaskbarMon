@@ -1,5 +1,5 @@
 ﻿
-// TrafficMonitor.h : PROJECT_NAME 应用程序的主头文件
+// TaskbarMon.h : PROJECT_NAME 应用程序的主头文件
 //
 
 #pragma once
@@ -15,24 +15,20 @@
 #include "TaskbarDefaultStyle.h"
 #include <map>
 #include "OpenHardwareMonitor/OpenHardwareMonitorApi.h"
-#include "PluginManager.h"
-#include "Nullable.hpp"
 #include "TaskBarDlgDrawCommon.h"
 #include "DllFunctions.h"
 #include "StrTable.h"
-#include "PluginUpdateHelper.h"
-#include "PluginInterface.h"
 
-// CTrafficMonitorApp:
-// 有关此类的实现，请参阅 TrafficMonitor.cpp
+// CTaskbarMonApp:
+// 有关此类的实现，请参阅 TaskbarMon.cpp
 //
 
 
-class CTrafficMonitorApp : public CWinApp, public ITrafficMonitor
+class CTaskbarMonApp : public CWinApp
 {
 public:
     //各种路径
-    static CTrafficMonitorApp* self;
+    static CTaskbarMonApp* self;
     wstring m_module_dir;       //程序exe文件的目录
     wstring m_appdata_dir;
     wstring m_module_path;      //程序exe文件的路径
@@ -40,7 +36,6 @@ public:
     wstring m_config_path;
     wstring m_history_traffic_path;
     wstring m_log_path;
-    wstring m_skin_path;
     wstring m_system_dir;
     wstring m_config_dir;
 
@@ -77,26 +72,18 @@ public:
     bool m_debug_log{};
     bool m_taksbar_transparent_color_enable{};
     bool m_last_light_mode{};
-    bool m_show_mouse_panetrate_tip{};  //是否显示开启“鼠标穿透”时的提示消息。
     bool m_show_dot_net_notinstalled_tip{};
 
-    //bool m_is_windows10_fall_creator;
     CWinVersionHelper m_win_version;        //当前Windows的版本
 
     HICON m_notify_icons[MAX_NOTIFY_ICON];
 
     CTaskbarDefaultStyle m_taskbar_default_style;
-    CPluginManager m_plugins;
     CDllFunctions m_dll_functions;
     CStrTable m_str_table;
-    CPluginUpdateHelper m_plugin_update;
 
-    CMenu m_main_menu;          //主窗口右键菜单
-    CMenu m_main_menu_plugin;   //右击主窗口插件区域的右键菜单
-    CMenu m_main_menu_plugin_sub_menu;
+    CMenu m_main_menu;          //托盘右键菜单
     CMenu m_taskbar_menu;       //任务栏窗口右键菜单
-    CMenu m_taskbar_menu_plugin;    //右击任务栏窗口插件区域的右键菜单
-    CMenu m_taskbar_menu_plugin_sub_menu;
 
 #ifndef WITHOUT_TEMPERATURE
     //OpenHardwareMonitor 接口的指针
@@ -104,16 +91,14 @@ public:
 #endif // !WITHOUT_TEMPERATURE
 
     CCriticalSection m_minitor_lib_critical;        //用于访问OpenHardwareMonitor进行线程同步的临界区对象
-    //CCriticalSection m_lftable_critical;            //用于访问LfTable2进行线程同步的临界区对象
     CLazyConstructable<class CTaskBarDlgDrawCommonSupport> m_d2d_taskbar_draw_common_support{}; // 当使用D2D渲染时自动初始化的全局依赖
 
 public:
-    CTrafficMonitorApp();
+    CTaskbarMonApp();
 
     void LoadLanguageConfig();
     void LoadConfig();
     void SaveConfig();
-    void LoadPluginDisabledSettings();
 
     void LoadGlobalConfig();
     void SaveGlobalConfig();
@@ -142,7 +127,7 @@ public:
     void InitMenuResourse();
 
     //获取一个图标资源，如果资源还未加载，会自动加载。
-    //由于本函数中使用了CTrafficMonitorApp::DPI函数，因此本函数必须确保在CTrafficMonitorApp::DPIFromWindow之后调用
+    //由于本函数中使用了CTaskbarMonApp::DPI函数，因此本函数必须确保在CTaskbarMonApp::DPIFromWindow之后调用
     HICON GetMenuIcon(UINT id);
 
     void AutoSelectNotifyIcon();
@@ -152,28 +137,17 @@ public:
     void InitOpenHardwareLibInThread();     //开启一个后台线程初始化OpenHardwareMonitor
     void UpdateOpenHardwareMonitorEnableState();    //更新硬件监控的启用/禁用状态
 
-    //void UpdateTaskbarWndMenu();      //更新任务栏窗口右键菜单
     bool IsForceShowNotifyIcon();       //是否需要强制显示通知区图标
-
-    std::wstring GetPlauginTooltipInfo() const;
-    bool IsTaksbarItemDisplayed(CommonDisplayItem item) const;
-
-    void SendSettingsToPlugin();    //向所有插件发送当前的选项设置
-
-    //更新插件子菜单
-    //plugin_cmd_start_index: 插件命令在菜单中的起始位置
-    static void UpdatePluginMenu(CMenu* pMenu, ITMPlugin* plugin, int plugin_cmd_start_index);
 
     void CheckWindows11Taskbar();
     bool IsWindows11Taskbar() const { return m_is_windows11_taskbar; }
 
     bool DPIFromRect(const RECT& rect, UINT* out_dpi_x, UINT* out_dpi_y);
 
-    virtual unsigned int GetThemeColor() const override;
+    unsigned int GetThemeColor() const;
     void SetThemeColor(COLORREF color);
 
 private:
-    //int m_no_multistart_warning_time{};       //用于设置在开机后多长时间内不弹出“已经有一个程序正在运行”的警告提示
     bool m_no_multistart_warning{};         //如果为false，则永远都不会弹出“已经有一个程序正在运行”的警告提示
     bool m_exit_when_start_by_restart_manager{ true };      //如果程序被Windows重启管理器重新启动，则退出程序
     int m_dpi{ 96 };
@@ -198,21 +172,6 @@ public:
     afx_msg void OnFrequentyAskedQuestions();
     afx_msg void OnUpdateLog();
     virtual int ExitInstance();
-
-    // 通过 ITrafficMonitor 继承
-private:
-    virtual int GetAPIVersion() override;
-    virtual const wchar_t* GetVersion() override;
-    double GetMonitorValue(MonitorItem item) override;
-    virtual const wchar_t* GetMonitorValueString(MonitorItem item, int is_main_window = false) override;
-    virtual const wchar_t* GetStringRes(const wchar_t* key, const wchar_t* section) override;
-public:
-    void ShowNotifyMessage(const wchar_t* strMsg) override;
-    unsigned short GetLanguageId() const override;
-    const wchar_t* GetPluginConfigDir() const override;
-    int GetDPI(DPIType type) const override;
-    virtual void* GetMainWindowHwnd() override;
-    virtual void* GetTaskbarWindowHwnd() override;
 };
 
-extern CTrafficMonitorApp theApp;
+extern CTaskbarMonApp theApp;

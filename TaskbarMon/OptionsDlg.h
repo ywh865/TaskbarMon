@@ -1,5 +1,4 @@
 ﻿#pragma once
-#include "MainWndSettingsDlg.h"
 #include "TaskBarSettingsDlg.h"
 #include "GeneralSettingsDlg.h"
 #include "afxcmn.h"
@@ -23,9 +22,8 @@ public:
     enum { IDD = IDD_OPTIONS_DIALOG };
 #endif
 
-    CMainWndSettingsDlg m_tab1_dlg{ this };
-    CTaskBarSettingsDlg m_tab2_dlg{ this };
-    CGeneralSettingsDlg m_tab3_dlg{ this };
+    CTaskBarSettingsDlg m_tab1_dlg{ this };
+    CGeneralSettingsDlg m_tab2_dlg{ this };
 
 protected:
     CTabCtrlEx m_tab;

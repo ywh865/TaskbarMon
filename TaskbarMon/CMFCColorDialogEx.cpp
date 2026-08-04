@@ -4,7 +4,7 @@
 #include "stdafx.h"
 #include "CMFCColorDialogEx.h"
 #include "Common.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 
 // CMFCColorDialogEx
 

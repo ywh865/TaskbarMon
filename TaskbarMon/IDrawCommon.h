@@ -1,6 +1,20 @@
 ﻿#pragma once
 #include "CommonData.h"
-#include "PluginInterface.h"
+
+//对齐方式
+enum class Alignment
+{
+    LEFT,
+    CENTER,
+    RIGHT
+};
+
+//位图绘制拉伸方式
+enum class StretchMode
+{
+    STRETCH,    //拉伸
+    TILE        //平铺
+};
 
 class IDrawBuffer
 {
@@ -8,10 +22,9 @@ public:
     virtual ~IDrawBuffer() = default;
 };
 
-class IDrawCommon : public IPluginDrawer
+class IDrawCommon
 {
 public:
-
     virtual void SetBackColor(COLORREF back_color, BYTE alpha = 255) = 0;
     // 设置绘制文本的字体
     virtual void SetFont(CFont* pfont) = 0;
@@ -37,17 +50,6 @@ public:
     virtual CDC* GetDC() = 0;
     //获取文本宽度
     virtual int GetTextWidth(LPCTSTR lpszString) { return 0; }
-
-    // 通过 IPluginDrawer 继承
-    virtual int GetAPIVersion() override;
-    virtual void DrawWindowText(int x, int y, int w, int h, const wchar_t* lpszString, unsigned long color, Alignment align, bool multi_line, unsigned char alpha) override;
-    virtual void SetDrawRect(int x, int y, int w, int h) override;
-    virtual void FillRect(int x, int y, int w, int h, unsigned long color, unsigned char alpha) override;
-    virtual void DrawRectOutLine(int x, int y, int w, int h, unsigned long color, int width, bool dot_line, unsigned char alpha, int radius) override;
-    virtual void DrawBitmap(void* hbitmap, int x, int y, int w, int h, StretchMode stretch_mode, unsigned char alpha) override;
-    virtual void DrawIcon(void* hIcon, int x, int y, int w, int h) override;
-    virtual void DrawLine(int x1, int y1, int x2, int y2, unsigned long color, int width = 1, bool dot_line = false, unsigned char alpha = 255) override;
-    virtual void* GetHDC() override;
 };
 
 namespace DrawCommonHelper

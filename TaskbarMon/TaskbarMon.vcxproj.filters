@@ -39,7 +39,6 @@
     <Filter Include="源文件和头文件\对话框类\NetworkInfoDlg">
       <UniqueIdentifier>{cb7cc4d3-21ca-46e1-ab0e-a35ca66a5603}</UniqueIdentifier>
     </Filter>
-    <Filter Include="源文件和头文件\对话框类\SkinDlg">
       <UniqueIdentifier>{79053472-785c-4667-a4f9-8b06a83ef04f}</UniqueIdentifier>
     </Filter>
     <Filter Include="源文件和头文件\头文件">
@@ -139,10 +138,8 @@
     <Filter Include="源文件和头文件\派生的控件类\ListCtrlEx">
       <UniqueIdentifier>{44872bda-27ce-407a-b5a7-fa9524bfb83c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="源文件和头文件\公共的类\SkinFile">
       <UniqueIdentifier>{f2a40ca2-c391-46a6-8508-b2f8c30c68a2}</UniqueIdentifier>
     </Filter>
-    <Filter Include="源文件和头文件\公共的类\TinyXml2Helper">
       <UniqueIdentifier>{ece2a796-fdd6-49e1-987e-11968b3f56a6}</UniqueIdentifier>
     </Filter>
     <Filter Include="源文件和头文件\公共的类\FilePathHelper">
@@ -169,10 +166,8 @@
     <Filter Include="源文件和头文件\对话框类\选项设置对话框\SetItemOrderDlg">
       <UniqueIdentifier>{bc164584-be21-4a91-9af5-772d61ed9529}</UniqueIdentifier>
     </Filter>
-    <Filter Include="源文件和头文件\公共的类\PluginManager">
       <UniqueIdentifier>{f7dd3288-085a-4de2-9f83-d8ba2f3eff47}</UniqueIdentifier>
     </Filter>
-    <Filter Include="源文件和头文件\对话框类\PluginManagerDlg">
       <UniqueIdentifier>{dbacfb68-1e03-4bcb-a08b-e87ba558985f}</UniqueIdentifier>
     </Filter>
     <Filter Include="源文件和头文件\公共的类\CommonData">
@@ -238,10 +233,8 @@
     <Filter Include="源文件和头文件\公共的类\StrTable">
       <UniqueIdentifier>{357eeb5d-af51-4701-83c9-e13a17c7f771}</UniqueIdentifier>
     </Filter>
-    <Filter Include="源文件和头文件\公共的类\SkinManager">
       <UniqueIdentifier>{28301057-fd34-4d04-a86a-0520143fdc14}</UniqueIdentifier>
     </Filter>
-    <Filter Include="源文件和头文件\公共的类\PluginUpdateHelper">
       <UniqueIdentifier>{4d4d9bb2-17eb-4f13-978b-c204a1b227db}</UniqueIdentifier>
     </Filter>
     <Filter Include="源文件和头文件\公共的类\DisplayItem">
@@ -254,12 +247,8 @@
   <ItemGroup>
     <Text Include="ReadMe.txt" />
     <Text Include="res\Acknowledgement.txt">
-      <Filter>资源文件</Filter>
     </Text>
-    <Text Include="compile_time.txt" />
     <Text Include="res\Acknowledgement_en.txt">
-      <Filter>资源文件</Filter>
-    </Text>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="targetver.h">
@@ -274,7 +263,7 @@
     <ClInclude Include="TaskBarDlg.h">
       <Filter>源文件和头文件\TaskBarDlg</Filter>
     </ClInclude>
-    <ClInclude Include="TrafficMonitor.h">
+    <ClInclude Include="TaskbarMon.h">
       <Filter>源文件和头文件\TrafficMonitor</Filter>
     </ClInclude>
     <ClInclude Include="TrafficMonitorDlg.h">
@@ -283,8 +272,6 @@
     <ClInclude Include="stdafx.h">
       <Filter>源文件和头文件\stdafx</Filter>
     </ClInclude>
-    <ClInclude Include="MainWndSettingsDlg.h">
-      <Filter>源文件和头文件\对话框类\选项设置对话框</Filter>
     </ClInclude>
     <ClInclude Include="TaskBarSettingsDlg.h">
       <Filter>源文件和头文件\对话框类\选项设置对话框</Filter>
@@ -301,20 +288,14 @@
     <ClInclude Include="NetworkInfoDlg.h">
       <Filter>源文件和头文件\对话框类\NetworkInfoDlg</Filter>
     </ClInclude>
-    <ClInclude Include="SkinDlg.h">
-      <Filter>源文件和头文件\对话框类\SkinDlg</Filter>
     </ClInclude>
     <ClInclude Include="IconSelectDlg.h">
-      <Filter>源文件和头文件\对话框类\IconSelectDlg</Filter>
     </ClInclude>
     <ClInclude Include="PictureStatic.h">
       <Filter>源文件和头文件\派生的控件类\PictureStatic</Filter>
     </ClInclude>
-    <ClInclude Include="CSkinPreviewView.h">
-      <Filter>源文件和头文件\对话框类\SkinDlg</Filter>
     </ClInclude>
     <ClInclude Include="Common.h">
-      <Filter>源文件和头文件\公共的类\Common</Filter>
     </ClInclude>
     <ClInclude Include="DrawCommon.h">
       <Filter>源文件和头文件\公共的类\DrawCommon</Filter>
@@ -331,8 +312,6 @@
     <ClInclude Include="IniHelper.h">
       <Filter>源文件和头文件\公共的类\IniHelper</Filter>
     </ClInclude>
-    <ClInclude Include="MainWndColorDlg.h">
-      <Filter>源文件和头文件\对话框类\颜色设置对话框</Filter>
     </ClInclude>
     <ClInclude Include="LinkStatic.h">
       <Filter>源文件和头文件\派生的控件类\LinkStatic</Filter>
@@ -409,14 +388,9 @@
     <ClInclude Include="ListCtrlEx.h">
       <Filter>源文件和头文件\派生的控件类\ListCtrlEx</Filter>
     </ClInclude>
-    <ClInclude Include="SkinFile.h">
-      <Filter>源文件和头文件\公共的类\SkinFile</Filter>
     </ClInclude>
-    <ClInclude Include="TinyXml2Helper.h">
-      <Filter>源文件和头文件\公共的类\TinyXml2Helper</Filter>
     </ClInclude>
     <ClInclude Include="FilePathHelper.h">
-      <Filter>源文件和头文件\公共的类\FilePathHelper</Filter>
     </ClInclude>
     <ClInclude Include="auto_start_helper.h">
       <Filter>源文件和头文件\公共的类\auto_start_helper</Filter>
@@ -439,20 +413,10 @@
     <ClInclude Include="SetItemOrderDlg.h">
       <Filter>源文件和头文件\对话框类\选项设置对话框\SetItemOrderDlg</Filter>
     </ClInclude>
-    <ClInclude Include="..\include\PluginInterface.h">
-      <Filter>源文件和头文件\头文件</Filter>
     </ClInclude>
-    <ClInclude Include="PluginManager.h">
-      <Filter>源文件和头文件\公共的类\PluginManager</Filter>
     </ClInclude>
-    <ClInclude Include="PluginManagerDlg.h">
-      <Filter>源文件和头文件\对话框类\PluginManagerDlg</Filter>
-    </ClInclude>
-    <ClInclude Include="PluginInfoDlg.h">
-      <Filter>源文件和头文件\对话框类\PluginManagerDlg</Filter>
     </ClInclude>
     <ClInclude Include="CommonData.h">
-      <Filter>源文件和头文件\公共的类\CommonData</Filter>
     </ClInclude>
     <ClInclude Include="AppAlreadyRuningDlg.h">
       <Filter>源文件和头文件\对话框类\AppAlreadyRuningDlg</Filter>
@@ -508,11 +472,8 @@
     <ClInclude Include="WindowsWebExperienceDetector.h">
       <Filter>源文件和头文件\公共的类\WindowsWebExperienceDetector</Filter>
     </ClInclude>
-    <ClInclude Include="SkinAutoAdaptSettingDlg.h">
-      <Filter>源文件和头文件\对话框类\SkinDlg</Filter>
     </ClInclude>
     <ClInclude Include="Win11TaskbarSettingDlg.h">
-      <Filter>源文件和头文件\对话框类\选项设置对话框\Win11TaskbarSettingDlg</Filter>
     </ClInclude>
     <ClInclude Include="FileDialogEx.h">
       <Filter>源文件和头文件\公共的类\FileDialogEx</Filter>
@@ -532,17 +493,11 @@
     <ClInclude Include="TaskbarHelper.h">
       <Filter>源文件和头文件\TaskBarDlg</Filter>
     </ClInclude>
-    <ClInclude Include="SkinManager.h">
-      <Filter>源文件和头文件\公共的类\SkinManager</Filter>
     </ClInclude>
     <ClInclude Include="SettingsHelper.h">
-      <Filter>源文件和头文件\公共的类\IniHelper</Filter>
     </ClInclude>
-    <ClInclude Include="PluginUpdateHelper.h">
-      <Filter>源文件和头文件\公共的类\PluginUpdateHelper</Filter>
     </ClInclude>
     <ClInclude Include="DisplayItem.h">
-      <Filter>源文件和头文件\公共的类\DisplayItem</Filter>
     </ClInclude>
     <ClInclude Include="WineTaskbarDlg.h">
       <Filter>源文件和头文件\TaskBarDlg</Filter>
@@ -573,7 +528,7 @@
     <ClCompile Include="TaskBarDlg.cpp">
       <Filter>源文件和头文件\TaskBarDlg</Filter>
     </ClCompile>
-    <ClCompile Include="TrafficMonitor.cpp">
+    <ClCompile Include="TaskbarMon.cpp">
       <Filter>源文件和头文件\TrafficMonitor</Filter>
     </ClCompile>
     <ClCompile Include="TrafficMonitorDlg.cpp">
@@ -585,8 +540,6 @@
     <ClCompile Include="GeneralSettingsDlg.cpp">
       <Filter>源文件和头文件\对话框类\选项设置对话框</Filter>
     </ClCompile>
-    <ClCompile Include="MainWndSettingsDlg.cpp">
-      <Filter>源文件和头文件\对话框类\选项设置对话框</Filter>
     </ClCompile>
     <ClCompile Include="TaskBarSettingsDlg.cpp">
       <Filter>源文件和头文件\对话框类\选项设置对话框</Filter>
@@ -600,20 +553,14 @@
     <ClCompile Include="NetworkInfoDlg.cpp">
       <Filter>源文件和头文件\对话框类\NetworkInfoDlg</Filter>
     </ClCompile>
-    <ClCompile Include="SkinDlg.cpp">
-      <Filter>源文件和头文件\对话框类\SkinDlg</Filter>
     </ClCompile>
     <ClCompile Include="IconSelectDlg.cpp">
-      <Filter>源文件和头文件\对话框类\IconSelectDlg</Filter>
     </ClCompile>
     <ClCompile Include="PictureStatic.cpp">
       <Filter>源文件和头文件\派生的控件类\PictureStatic</Filter>
     </ClCompile>
-    <ClCompile Include="CSkinPreviewView.cpp">
-      <Filter>源文件和头文件\对话框类\SkinDlg</Filter>
     </ClCompile>
     <ClCompile Include="Common.cpp">
-      <Filter>源文件和头文件\公共的类\Common</Filter>
     </ClCompile>
     <ClCompile Include="DrawCommon.cpp">
       <Filter>源文件和头文件\公共的类\DrawCommon</Filter>
@@ -630,8 +577,6 @@
     <ClCompile Include="IniHelper.cpp">
       <Filter>源文件和头文件\公共的类\IniHelper</Filter>
     </ClCompile>
-    <ClCompile Include="MainWndColorDlg.cpp">
-      <Filter>源文件和头文件\对话框类\颜色设置对话框</Filter>
     </ClCompile>
     <ClCompile Include="LinkStatic.cpp">
       <Filter>源文件和头文件\派生的控件类\LinkStatic</Filter>
@@ -708,14 +653,9 @@
     <ClCompile Include="ListCtrlEx.cpp">
       <Filter>源文件和头文件\派生的控件类\ListCtrlEx</Filter>
     </ClCompile>
-    <ClCompile Include="SkinFile.cpp">
-      <Filter>源文件和头文件\公共的类\SkinFile</Filter>
     </ClCompile>
-    <ClCompile Include="TinyXml2Helper.cpp">
-      <Filter>源文件和头文件\公共的类\TinyXml2Helper</Filter>
     </ClCompile>
     <ClCompile Include="FilePathHelper.cpp">
-      <Filter>源文件和头文件\公共的类\FilePathHelper</Filter>
     </ClCompile>
     <ClCompile Include="auto_start_helper.cpp">
       <Filter>源文件和头文件\公共的类\auto_start_helper</Filter>
@@ -735,17 +675,10 @@
     <ClCompile Include="SetItemOrderDlg.cpp">
       <Filter>源文件和头文件\对话框类\选项设置对话框\SetItemOrderDlg</Filter>
     </ClCompile>
-    <ClCompile Include="PluginManager.cpp">
-      <Filter>源文件和头文件\公共的类\PluginManager</Filter>
     </ClCompile>
-    <ClCompile Include="PluginManagerDlg.cpp">
-      <Filter>源文件和头文件\对话框类\PluginManagerDlg</Filter>
     </ClCompile>
-    <ClCompile Include="PluginInfoDlg.cpp">
-      <Filter>源文件和头文件\对话框类\PluginManagerDlg</Filter>
     </ClCompile>
     <ClCompile Include="CommonData.cpp">
-      <Filter>源文件和头文件\公共的类\CommonData</Filter>
     </ClCompile>
     <ClCompile Include="AppAlreadyRuningDlg.cpp">
       <Filter>源文件和头文件\对话框类\AppAlreadyRuningDlg</Filter>
@@ -792,11 +725,8 @@
     <ClCompile Include="WindowsWebExperienceDetector.cpp">
       <Filter>源文件和头文件\公共的类\WindowsWebExperienceDetector</Filter>
     </ClCompile>
-    <ClCompile Include="SkinAutoAdaptSettingDlg.cpp">
-      <Filter>源文件和头文件\对话框类\SkinDlg</Filter>
     </ClCompile>
     <ClCompile Include="Win11TaskbarSettingDlg.cpp">
-      <Filter>源文件和头文件\对话框类\选项设置对话框\Win11TaskbarSettingDlg</Filter>
     </ClCompile>
     <ClCompile Include="FileDialogEx.cpp">
       <Filter>源文件和头文件\公共的类\FileDialogEx</Filter>
@@ -813,17 +743,11 @@
     <ClCompile Include="TaskbarHelper.cpp">
       <Filter>源文件和头文件\TaskBarDlg</Filter>
     </ClCompile>
-    <ClCompile Include="SkinManager.cpp">
-      <Filter>源文件和头文件\公共的类\SkinManager</Filter>
     </ClCompile>
     <ClCompile Include="SettingsHelper.cpp">
-      <Filter>源文件和头文件\公共的类\IniHelper</Filter>
     </ClCompile>
-    <ClCompile Include="PluginUpdateHelper.cpp">
-      <Filter>源文件和头文件\公共的类\PluginUpdateHelper</Filter>
     </ClCompile>
     <ClCompile Include="DisplayItem.cpp">
-      <Filter>源文件和头文件\公共的类\DisplayItem</Filter>
     </ClCompile>
     <ClCompile Include="WineTaskbarDlg.cpp">
       <Filter>源文件和头文件\TaskBarDlg</Filter>
@@ -851,12 +775,12 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="TrafficMonitor.rc">
+    <ResourceCompile Include="TaskbarMon.rc">
       <Filter>资源文件</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="res\TrafficMonitor.rc2">
+    <None Include="res\TaskbarMon.rc2">
       <Filter>资源文件</Filter>
     </None>
     <None Include="..\LICENSE" />
@@ -947,11 +871,8 @@
     <Image Include="res\menu_icon\taskbar_window.ico">
       <Filter>资源文件\icons</Filter>
     </Image>
-    <Image Include="res\TrafficMonitor.ico">
+    <Image Include="res\TaskbarMon.ico">
       <Filter>资源文件\icons</Filter>
-    </Image>
-    <Image Include="res\about_background.bmp">
-      <Filter>资源文件\bitmaps</Filter>
     </Image>
     <Image Include="res\about_background_hd.bmp">
       <Filter>资源文件\bitmaps</Filter>

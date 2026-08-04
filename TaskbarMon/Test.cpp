@@ -1,10 +1,8 @@
 ﻿#include "stdafx.h"
 #include "Test.h"
 #include "Common.h"
-#include "SkinFile.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "IniHelper.h"
-#include "PluginUpdateHelper.h"
 #include "MessageDlg.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,27 +28,12 @@ static void TestGetLicense()
     }
 }
 
-static void TestSkin()
-{
-    CSkinFile skin;
-    skin.Load(L"0默认皮肤");
-    int a = 0;
-}
-
 static void TestCrash()
 {
     CString* pStr = nullptr;
     int a = pStr->GetLength();
     printf("%d", a);
 
-}
-
-static void TestPlugin()
-{
-    if (!theApp.m_plugins.GetPlugins().empty())
-    {
-        theApp.m_plugins.GetPlugins()[0].plugin->ShowOptionsDialog(theApp.m_pMainWnd->m_hWnd);
-    }
 }
 
 static void TestDate()
@@ -71,18 +54,6 @@ static void TestIni()
     int a = 0;
 }
 
-static void TestPluginVersion()
-{
-    ASSERT(PluginVersion(L"1.0.0") == PluginVersion(L"1.00"));
-    ASSERT(PluginVersion(L"1.2") < PluginVersion(L"1.20"));
-    ASSERT(PluginVersion(L"0.8.0") < PluginVersion(L"1.00"));
-    ASSERT(PluginVersion(L"1.0.3") < PluginVersion(L"1.03"));
-
-    //CPluginUpdateHelper helper;
-    //helper.CheckForUpdate();
-    //int a = 0;
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 CTest::CTest()
 {
@@ -100,17 +71,14 @@ void CTest::Test()
     //TestCrash();
     //TestDate();
     //TestIni();
-    TestPluginVersion();
 }
 
 void CTest::TestCommand()
 {
-    //TestPlugin();
-
     //测试消息对话框
     CMessageDlg dlg;
     dlg.SetWindowTitle(_T("System Info"));
-    dlg.SetInfoText(_T("System Information for TrafficMonitor."));
+    dlg.SetInfoText(_T("System Information for TaskbarMon."));
     dlg.SetMessageText(theApp.GetSystemInfoString().GetString());
     dlg.SetStandarnMessageIcon(CMessageDlg::SI_INFORMATION);
     dlg.DoModal();

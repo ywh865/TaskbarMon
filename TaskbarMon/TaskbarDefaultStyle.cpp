@@ -1,7 +1,7 @@
 ﻿#include "stdafx.h"
 #include "TaskbarDefaultStyle.h"
 #include "SettingsHelper.h"
-#include "TrafficMonitor.h"
+#include "TaskbarMon.h"
 #include "WindowsSettingHelper.h"
 
 CTaskbarDefaultStyle::CTaskbarDefaultStyle()

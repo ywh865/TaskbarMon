@@ -71,9 +71,6 @@ public:
 
     bool operator==(const DispStrings& disp_str) const;
 
-    //载入一个插件项目的显示文本
-    void Load(const std::wstring& plugin_id, const std::wstring& disp_str);
-
     //是否无效
     bool IsInvalid() const;
 };
