@@ -57,6 +57,8 @@ public:
     unsigned __int64 m_today_up_traffic{};  //今天已使用的上传流量
     unsigned __int64 m_today_down_traffic{};    //今天已使用的下载流量
 
+    uint64_t m_monitor_revision{};      //监控数据修订号（每次采样递增，UI 用于脏检测）
+
     bool m_cannot_save_config_warning{ true };  //指示是否会在无法保存设置时弹出提示框
     bool m_cannot_save_global_config_warning{ true };   //指示是否会在无法保存设置时弹出提示框
 

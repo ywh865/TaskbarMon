@@ -92,6 +92,8 @@ protected:
 
     unsigned int m_timer_cnt{};     //定时器触发次数（自程序启动以来的秒数）
     unsigned int m_taskbar_timer_cnt{0}; //适用于TaskBarDlg的定时器触发次数（自程序启动以来的秒数）
+    uint64_t m_last_drawn_revision{ UINT64_MAX };   //上次重绘时的数据修订号（R1 脏标记）
+    ULONGLONG m_last_paint_time{};  //上次重绘时间（R5 节流）
     int m_insert_to_taskbar_cnt{};  //用来统计尝试嵌入任务栏的次数
     int m_cannot_insert_to_task_bar_warning{ true };   //指示是否会在无法嵌入任务栏时弹出提示框
 

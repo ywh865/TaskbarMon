@@ -143,6 +143,10 @@ protected:
     std::map<CommonDisplayItem, std::list<int>> m_map_history_data;  //保存各项数据历史数据的链表，链表保存按照时间顺序，越靠近头部数据越新
     std::map<CommonDisplayItem, int> m_history_data_count;            //统计添加到历史数据链表的次数
 
+    //R2: 数值文本缓存（按数据修订号失效）
+    std::map<CommonDisplayItem, std::wstring> m_value_text_cache;
+    uint64_t m_value_cache_revision{ UINT64_MAX };
+
     bool m_connot_insert_to_task_bar{ false };	//如果窗口无法嵌入任务栏，则为true
     bool m_taskbar_on_top_or_bottom{ true };		//如果任务栏在屏幕顶部或底部，则为ture
     int m_error_code{};

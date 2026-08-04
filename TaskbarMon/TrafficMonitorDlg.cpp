@@ -761,6 +761,8 @@ void CTrafficMonitorDlg::DoMonitorAcquisition()
     theApp.m_hdd_usage = snapshot.hdd_usage;
     theApp.m_today_up_traffic = snapshot.today_up_traffic;
     theApp.m_today_down_traffic = snapshot.today_down_traffic;
+    //数据修订号（供 UI 脏检测）
+    theApp.m_monitor_revision = m_monitor_service.Revision();
 
     //发送监控信息更新消息
     SendMessage(WM_MONITOR_INFO_UPDATED);
@@ -1116,7 +1118,19 @@ void CTrafficMonitorDlg::OnTimer(UINT_PTR nIDEvent)
             }
 
             m_tBarDlg->AdjustWindowPos();
-            m_tBarDlg->Invalidate(FALSE);
+
+            //R1+R5: 数据修订号变化时才重绘，并做最小间隔节流（合并绘制）
+            //后台/全屏/远程会话时降低重绘频率以省电
+            ULONGLONG min_interval = 150;
+            if (m_is_foreground_fullscreen || (GetSystemMetrics(SM_REMOTESESSION) != 0))
+                min_interval = 1000;
+            ULONGLONG now = GetTickCount64();
+            if (m_last_drawn_revision != theApp.m_monitor_revision && now - m_last_paint_time >= min_interval)
+            {
+                m_tBarDlg->Invalidate(FALSE);
+                m_last_drawn_revision = theApp.m_monitor_revision;
+                m_last_paint_time = now;
+            }
         }
     }
 

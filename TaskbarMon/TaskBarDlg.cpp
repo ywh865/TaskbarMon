@@ -301,12 +301,23 @@ void CTaskBarDlg::DrawDisplayItem(IDrawCommon& drawer, DisplayItem type, CRect r
         drawer.DrawWindowText(rect_label, str_label.c_str(), label_color, (vertical ? IDrawCommon::Alignment::CENTER : IDrawCommon::Alignment::LEFT));
     }
 
-    //绘制数值
+    //绘制数值（R2: 按数据修订号缓存格式化结果，避免每帧重复 Format）
     IDrawCommon::Alignment value_alignment{ theApp.m_taskbar_data.value_right_align ? IDrawCommon::Alignment::RIGHT : IDrawCommon::Alignment::LEFT };      //数值的对齐方式
     if (vertical)
         value_alignment = IDrawCommon::Alignment::CENTER;
-    CString str_value = CommonDisplayItem(type).GetItemValueText(false);
-    drawer.DrawWindowText(rect_value, str_value, text_color, value_alignment);
+    if (m_value_cache_revision != theApp.m_monitor_revision)
+    {
+        m_value_text_cache.clear();
+        m_value_cache_revision = theApp.m_monitor_revision;
+    }
+    auto iter = m_value_text_cache.find(type);
+    if (iter == m_value_text_cache.end())
+    {
+        CString str_value = CommonDisplayItem(type).GetItemValueText(false);
+        m_value_text_cache[type] = str_value.GetString();
+        iter = m_value_text_cache.find(type);
+    }
+    drawer.DrawWindowText(rect_value, iter->second.c_str(), text_color, value_alignment);
 }
 
 
@@ -343,8 +354,10 @@ void CTaskBarDlg::TryDrawStatusBar(IDrawCommon& drawer, const CRect& rect_bar, i
     COLORREF graph_color = theApp.m_taskbar_data.GetUsageGraphColor();
     CSize fill_size = CSize(rect_bar.Width() * usage_percent / 100, rect_bar.Height());
     CRect rect_fill(rect_bar.TopLeft(), fill_size);
+    const int radius = DPI(2);
     if (theApp.m_taskbar_data.show_graph_dashed_box)
-        drawer.DrawRectOutLine(rect_bar, graph_color, 1, true);
+        drawer.DrawRectOutLine(rect_bar, graph_color, 1, true, 255, radius);
+    //填充已使用部分；不足一个圆角半径时直接填充，避免出现残缺圆角
     drawer.FillRect(rect_fill, graph_color);
 }
 
