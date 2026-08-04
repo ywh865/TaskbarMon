@@ -1,21 +1,6 @@
 ﻿#pragma once
 #include "CommonData.h"
 
-//对齐方式
-enum class Alignment
-{
-    LEFT,
-    CENTER,
-    RIGHT
-};
-
-//位图绘制拉伸方式
-enum class StretchMode
-{
-    STRETCH,    //拉伸
-    TILE        //平铺
-};
-
 class IDrawBuffer
 {
 public:
@@ -25,6 +10,22 @@ public:
 class IDrawCommon
 {
 public:
+    //对齐方式
+    enum Alignment
+    {
+        LEFT,       //左对齐
+        RIGHT,      //右对齐
+        CENTER      //居中
+    };
+
+    //位图绘制拉伸方式
+    enum StretchMode
+    {
+        STRETCH,    //拉伸，不改变比例
+        FILL,       //填充，不保持比例
+        FIT         //适应，保持比例
+    };
+
     virtual void SetBackColor(COLORREF back_color, BYTE alpha = 255) = 0;
     // 设置绘制文本的字体
     virtual void SetFont(CFont* pfont) = 0;
@@ -50,6 +51,8 @@ public:
     virtual CDC* GetDC() = 0;
     //获取文本宽度
     virtual int GetTextWidth(LPCTSTR lpszString) { return 0; }
+    //获取文本尺寸
+    virtual void GetTextExtent(const wchar_t* lpszString, int& w, int& h) = 0;
 };
 
 namespace DrawCommonHelper

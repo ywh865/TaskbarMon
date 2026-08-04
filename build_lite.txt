@@ -1,0 +1,2 @@
+
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj.metaproj : error MSB4025: 未能加载项目文件。未能找到文件“F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj.metaproj”。

@@ -1,48 +1,47 @@
-// MonitorTypes.h : ç›‘æ§æ•°æ®æ ¸å¿ƒç±»å‹å®šä¹‰ï¼ˆcore å±‚ï¼Œæ—  UI ä¾èµ–ï¼‰
+// MonitorTypes.h : ¼à¿ØÊı¾İºËĞÄÀàĞÍ¶¨Òå£¨core ²ã£¬ÎŞ UI ÒÀÀµ£©
 #pragma once
 #include <cstdint>
 #include <map>
 #include <string>
 
-// ä¸€æ¬¡é‡‡æ ·å¾—åˆ°çš„å®Œæ•´ç›‘æ§æ•°æ®å¿«ç…§
+// Ò»´Î²ÉÑùµÃµ½µÄÍêÕû¼à¿ØÊı¾İ¿ìÕÕ
 struct MonitorSnapshot
 {
-    uint64_t in_speed{};            // ä¸‹è½½é€Ÿåº¦ï¼ˆå­—èŠ‚/ç§’ï¼‰
-    uint64_t out_speed{};           // ä¸Šä¼ é€Ÿåº¦ï¼ˆå­—èŠ‚/ç§’ï¼‰
-    int cpu_usage{ -1 };            // CPUåˆ©ç”¨ç‡
-    int memory_usage{ -1 };         // å†…å­˜åˆ©ç”¨ç‡
-    int used_memory{};              // å·²ç”¨ç‰©ç†å†…å­˜ï¼ˆKBï¼‰
-    int total_memory{};             // ç‰©ç†å†…å­˜æ€»é‡ï¼ˆKBï¼‰
-    float cpu_temperature{ -1 };    // CPUæ¸©åº¦
-    float cpu_freq{ -1 };           // CPUé¢‘ç‡ï¼ˆGHzï¼‰
-    float gpu_temperature{ -1 };    // æ˜¾å¡æ¸©åº¦
-    float hdd_temperature{ -1 };    // ç¡¬ç›˜æ¸©åº¦
-    float main_board_temperature{ -1 }; // ä¸»æ¿æ¸©åº¦
-    int gpu_usage{ -1 };            // æ˜¾å¡åˆ©ç”¨ç‡
-    int hdd_usage{ -1 };            // ç¡¬ç›˜åˆ©ç”¨ç‡
-    uint64_t today_up_traffic{};    // ä»Šå¤©å·²ä½¿ç”¨ä¸Šä¼ æµé‡ï¼ˆå­—èŠ‚ï¼‰
-    uint64_t today_down_traffic{};  // ä»Šå¤©å·²ä½¿ç”¨ä¸‹è½½æµé‡ï¼ˆå­—èŠ‚ï¼‰
+    uint64_t in_speed{};            // ÏÂÔØËÙ¶È£¨×Ö½Ú/Ãë£©
+    uint64_t out_speed{};           // ÉÏ´«ËÙ¶È£¨×Ö½Ú/Ãë£©
+    int cpu_usage{ -1 };            // CPUÀûÓÃÂÊ
+    int memory_usage{ -1 };         // ÄÚ´æÀûÓÃÂÊ
+    int used_memory{};              // ÒÑÓÃÎïÀíÄÚ´æ£¨KB£©
+    int total_memory{};             // ÎïÀíÄÚ´æ×ÜÁ¿£¨KB£©
+    float cpu_temperature{ -1 };    // CPUÎÂ¶È
+    float cpu_freq{ -1 };           // CPUÆµÂÊ£¨GHz£©
+    float gpu_temperature{ -1 };    // ÏÔ¿¨ÎÂ¶È
+    float hdd_temperature{ -1 };    // Ó²ÅÌÎÂ¶È
+    float main_board_temperature{ -1 }; // Ö÷°åÎÂ¶È
+    int gpu_usage{ -1 };            // ÏÔ¿¨ÀûÓÃÂÊ
+    int hdd_usage{ -1 };            // Ó²ÅÌÀûÓÃÂÊ
+    uint64_t today_up_traffic{};    // ½ñÌìÒÑÊ¹ÓÃÉÏ´«Á÷Á¿£¨×Ö½Ú£©
+    uint64_t today_down_traffic{};  // ½ñÌìÒÑÊ¹ÓÃÏÂÔØÁ÷Á¿£¨×Ö½Ú£©
 };
 
-// ç¡¬ä»¶æ•°æ®æä¾›è€…æ¥å£ï¼ˆç”± UI å±‚æ³¨å…¥ OpenHardwareMonitor è®¿é—®ï¼‰
+// Ó²¼şÊı¾İÌá¹©Õß½Ó¿Ú£¨ÓÉ UI ²ã×¢Èë OpenHardwareMonitor ·ÃÎÊ£©
 class IHardwareDataProvider
 {
 public:
     virtual ~IHardwareDataProvider() = default;
 
-    // ç¡¬ä»¶ç›‘æ§æ˜¯å¦å·²åˆå§‹åŒ–ä¸”è‡³å°‘å¯ç”¨ä¸€é¡¹
+    // Ó²¼ş¼à¿ØÊÇ·ñÒÑ³õÊ¼»¯ÇÒÖÁÉÙÆôÓÃÒ»Ïî
     virtual bool IsAvailable() const = 0;
-    // æ‰§è¡Œä¸€æ¬¡ç¡¬ä»¶æ•°æ®é‡‡é›†ï¼ˆå†…éƒ¨éœ€åŠ é”ï¼‰
+    // Ö´ĞĞÒ»´ÎÓ²¼şÊı¾İ²É¼¯£¨ÄÚ²¿Ğè¼ÓËø£©
     virtual void Acquire() = 0;
-    // é‡‡é›†åè¯»å–æ•°æ®
+    // ²É¼¯ºó¶ÁÈ¡Êı¾İ
     virtual float CpuTemperature() const = 0;
     virtual float CpuFreq() const = 0;
     virtual float GpuTemperature() const = 0;
     virtual float HddTemperature() const = 0;
     virtual float MainboardTemperature() const = 0;
     virtual int GpuUsage() const = 0;
-    virtual int HddUsage() const = 0;
     virtual std::map<std::wstring, float> AllCpuTemperature() const = 0;
     virtual std::map<std::wstring, float> AllHddTemperature() const = 0;
-    virtual std::map<std::wstring, int> AllHddUsage() const = 0;
+    virtual std::map<std::wstring, float> AllHddUsage() const = 0;
 };

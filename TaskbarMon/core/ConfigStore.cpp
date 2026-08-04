@@ -1,4 +1,4 @@
-ï»¿// ConfigStore.cpp : é…ç½®è¯»å†™å®ç°
+// ConfigStore.cpp : ÅäÖÃ¶ÁĞ´ÊµÏÖ
 #include "stdafx.h"
 #include "ConfigStore.h"
 #include "Common.h"
@@ -16,7 +16,7 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
 {
     CSettingsHelper ini;
 
-    //å¸¸è§„è®¾ç½®
+    //³£¹æÉèÖÃ
     general.check_update_when_start = ini.GetBool(_T("general"), _T("check_update_when_start"), true);
     general.update_source = ini.GetInt(L"general", L"update_source", defaults.update_source_default);
     general.show_all_interface = ini.GetBool(L"general", L"show_all_interface", false);
@@ -29,7 +29,7 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     ini.GetStringList(L"general", L"connections_hide", connections_hide, std::vector<std::wstring>{});
     general.connections_hide.FromVector(connections_hide);
 
-    //ç½‘ç»œè¿æ¥è®¾ç½®
+    //ÍøÂçÁ¬½ÓÉèÖÃ
     config.m_show_task_bar_wnd = ini.GetBool(_T("config"), _T("show_task_bar_wnd"), false);
     config.m_auto_select = ini.GetBool(_T("connection"), _T("auto_select"), true);
     config.m_select_all = ini.GetBool(_T("connection"), _T("select_all"), false);
@@ -38,7 +38,7 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     config.m_notify_icon_selected = ini.GetInt(_T("config"), _T("notify_icon_selected"), (defaults.is_windows7_or_8 ? 2 : defaults.default_notify_icon));
     config.m_notify_icon_auto_adapt = ini.GetBool(_T("config"), _T("notify_icon_auto_adapt"), true);
 
-    //é€šçŸ¥æ¶ˆæ¯è®¾ç½®
+    //Í¨ÖªÏûÏ¢ÉèÖÃ
     general.traffic_tip_enable = ini.GetBool(L"notify_tip", L"traffic_tip_enable", false);
     general.traffic_tip_value = ini.GetInt(L"notify_tip", L"traffic_tip_value", 200);
     general.traffic_tip_unit = ini.GetInt(L"notify_tip", L"traffic_tip_unit", 0);
@@ -53,10 +53,10 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     general.mainboard_temp_tip.enable = ini.GetBool(L"notify_tip", L"mainboard_temperature_tip_enable", false);
     general.mainboard_temp_tip.tip_value = ini.GetInt(L"notify_tip", L"mainboard_temperature_tip_value", 80);
 
-    //ä»»åŠ¡æ çª—å£è®¾ç½®
+    //ÈÎÎñÀ¸´°¿ÚÉèÖÃ
     taskbar.back_color = ini.GetInt(_T("task_bar"), _T("task_bar_back_color"), taskbar.dft_back_color);
     taskbar.transparent_color = ini.GetInt(_T("task_bar"), _T("transparent_color"), taskbar.dft_transparent_color);
-    if (taskbar.IsTaskbarTransparent()) //å¦‚æœä»»åŠ¡æ èƒŒæ™¯é€æ˜ï¼Œåˆ™éœ€è¦å°†é¢œè‰²è½¬æ¢ä¸€ä¸‹
+    if (taskbar.IsTaskbarTransparent()) //Èç¹ûÈÎÎñÀ¸±³¾°Í¸Ã÷£¬ÔòĞèÒª½«ÑÕÉ«×ª»»Ò»ÏÂ
     {
         CCommon::TransparentColorConvert(taskbar.back_color);
         CCommon::TransparentColorConvert(taskbar.transparent_color);
@@ -68,7 +68,7 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     taskbar.show_taskbar_wnd_in_secondary_display = ini.GetBool(L"task_bar", L"show_taskbar_wnd_in_secondary_display", false);
     taskbar.secondary_display_index = ini.GetInt(L"task_bar", L"secondary_display_index", 0);
 
-    if (taskbar.back_color == 0 && !taskbar.text_colors.empty() && taskbar.text_colors.begin()->second.label == 0)     //ä¸‡ä¸€è¯»å–åˆ°çš„èƒŒæ™¯è‰²å’Œæ–‡æœ¬é¢œè‰²éƒ½ä¸º0ï¼ˆé»‘è‰²ï¼‰ï¼Œåˆ™å°†æ–‡æœ¬è‰²å’ŒèƒŒæ™¯è‰²è®¾ç½®æˆé»˜è®¤é¢œè‰²
+    if (taskbar.back_color == 0 && !taskbar.text_colors.empty() && taskbar.text_colors.begin()->second.label == 0)     //ÍòÒ»¶ÁÈ¡µ½µÄ±³¾°É«ºÍÎÄ±¾ÑÕÉ«¶¼Îª0£¨ºÚÉ«£©£¬Ôò½«ÎÄ±¾É«ºÍ±³¾°É«ÉèÖÃ³ÉÄ¬ÈÏÑÕÉ«
     {
         taskbar.back_color = taskbar.dft_back_color;
         taskbar.text_colors.begin()->second.label = taskbar.dft_text_colors;
@@ -79,7 +79,7 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     default_font.size = 9;
     ini.LoadFontData(_T("task_bar"), taskbar.font, default_font);
 
-    //è½½å…¥æ˜¾ç¤ºæ–‡æœ¬è®¾ç½®
+    //ÔØÈëÏÔÊ¾ÎÄ±¾ÉèÖÃ
     ini.LoadDisplayStr(L"task_bar", taskbar.disp_str, false);
 
     taskbar.tbar_wnd_on_left = ini.GetBool(_T("task_bar"), _T("task_bar_wnd_on_left"), false);
@@ -108,7 +108,7 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     taskbar.taskbar_left_space_win11 = ini.GetInt(L"task_bar", L"taskbar_left_space_win11", 160);
     taskbar.taskbar_right_space_win11 = ini.GetInt(L"task_bar", L"taskbar_right_space_win11", 280);
 
-    if (defaults.is_windows10_or_later)     //åªæœ‰Win10æ‰æ”¯æŒè‡ªåŠ¨é€‚åº”ç³»ç»Ÿæ·±è‰²/æµ…è‰²ä¸»é¢˜
+    if (defaults.is_windows10_or_later)     //Ö»ÓĞWin10²ÅÖ§³Ö×Ô¶¯ÊÊÓ¦ÏµÍ³ÉîÉ«/Ç³É«Ö÷Ìâ
         taskbar.auto_adapt_light_theme = ini.GetBool(L"task_bar", L"auto_adapt_light_theme", false);
     else
         taskbar.auto_adapt_light_theme = false;
@@ -136,7 +136,7 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
         taskbar.disable_d2d = true;
     taskbar.enable_colorful_emoji = ini.GetBool(L"task_bar", L"enable_colorful_emoji", true);
 
-    //å…¶ä»–è®¾ç½®
+    //ÆäËûÉèÖÃ
     config.m_use_log_scale = ini.GetBool(_T("histroy_traffic"), _T("use_log_scale"), true);
     config.m_sunday_first = ini.GetBool(_T("histroy_traffic"), _T("sunday_first"), true);
     config.m_view_type = static_cast<HistoryTrafficViewType>(ini.GetInt(_T("histroy_traffic"), _T("view_type"), static_cast<int>(HistoryTrafficViewType::HV_DAY)));
@@ -147,7 +147,7 @@ bool ConfigStore::Save(const GeneralSettingData& general, const TaskBarSettingDa
 {
     CSettingsHelper ini;
 
-    //å¸¸è§„è®¾ç½®
+    //³£¹æÉèÖÃ
     ini.WriteBool(_T("general"), _T("check_update_when_start"), general.check_update_when_start);
     ini.WriteString(_T("general"), _T("language"), general.language.toConfigString());
     ini.WriteInt(L"general", L"update_source", general.update_source);
@@ -159,7 +159,7 @@ bool ConfigStore::Save(const GeneralSettingData& general, const TaskBarSettingDa
     ini.WriteInt(L"general", L"hardware_monitor_item", general.hardware_monitor_item);
     ini.WriteStringList(L"general", L"connections_hide", general.connections_hide.ToVector());
 
-    //ç½‘ç»œè¿æ¥è®¾ç½®
+    //ÍøÂçÁ¬½ÓÉèÖÃ
     ini.WriteBool(L"config", L"show_notify_icon", general.show_notify_icon);
     ini.WriteBool(L"config", L"show_task_bar_wnd", config.m_show_task_bar_wnd);
     ini.WriteBool(L"connection", L"auto_select", config.m_auto_select);
@@ -183,7 +183,7 @@ bool ConfigStore::Save(const GeneralSettingData& general, const TaskBarSettingDa
     ini.WriteBool(L"notify_tip", L"mainboard_temperature_tip_enable", general.mainboard_temp_tip.enable);
     ini.WriteInt(L"notify_tip", L"mainboard_temperature_tip_value", general.mainboard_temp_tip.tip_value);
 
-    //ä»»åŠ¡æ çª—å£è®¾ç½®
+    //ÈÎÎñÀ¸´°¿ÚÉèÖÃ
     ini.WriteInt(L"task_bar", L"task_bar_back_color", taskbar.back_color);
     ini.WriteInt(L"task_bar", L"transparent_color", taskbar.transparent_color);
     ini.WriteInt(L"task_bar", L"status_bar_color", taskbar.status_bar_color);
@@ -239,7 +239,7 @@ bool ConfigStore::Save(const GeneralSettingData& general, const TaskBarSettingDa
     ini.WriteBool(L"task_bar", L"disable_d2d", taskbar.disable_d2d);
     ini.WriteBool(L"task_bar", L"enable_colorful_emoji", taskbar.enable_colorful_emoji);
 
-    //å…¶ä»–è®¾ç½®
+    //ÆäËûÉèÖÃ
     ini.WriteBool(L"histroy_traffic", L"use_log_scale", config.m_use_log_scale);
     ini.WriteBool(L"histroy_traffic", L"sunday_first", config.m_sunday_first);
     ini.WriteInt(L"histroy_traffic", L"view_type", static_cast<int>(config.m_view_type));
@@ -264,7 +264,7 @@ void ConfigStore::LoadOther(OtherSettings& other, const EnvironmentDefaults& def
     other.exit_when_start_by_restart_manager = ini.GetBool(_T("other"), _T("exit_when_start_by_restart_manager"), true);
     other.debug_log = ini.GetBool(_T("other"), _T("debug_log"), false);
     other.notify_interval = ini.GetInt(_T("other"), _T("notify_interval"), 60);
-    //ç”±äºWin7ç³»ç»Ÿä¸­è®¾ç½®ä»»åŠ¡æ çª—å£é€æ˜è‰²ä¼šå¯¼è‡´ä»»åŠ¡æ çª—å£ä¸å¯è§ï¼Œå› æ­¤é»˜è®¤åœ¨Win7ä¸­ç¦ç”¨é€æ˜è‰²çš„è®¾å®š
+    //ÓÉÓÚWin7ÏµÍ³ÖĞÉèÖÃÈÎÎñÀ¸´°¿ÚÍ¸Ã÷É«»áµ¼ÖÂÈÎÎñÀ¸´°¿Ú²»¿É¼û£¬Òò´ËÄ¬ÈÏÔÚWin7ÖĞ½ûÓÃÍ¸Ã÷É«µÄÉè¶¨
     other.taksbar_transparent_color_enable = ini.GetBool(L"other", L"taksbar_transparent_color_enable", !defaults.is_windows7);
     other.last_light_mode = ini.GetBool(L"other", L"last_light_mode", defaults.default_light_theme);
     other.show_dot_net_notinstalled_tip = ini.GetBool(L"other", L"show_dot_net_notinstalled_tip", true);
@@ -291,16 +291,16 @@ void ConfigStore::LoadLanguage(LanguageInfo& language)
 
 void ConfigStore::Validate(GeneralSettingData& general, TaskBarSettingData& taskbar)
 {
-    //ç›‘æ§æ—¶é—´é—´éš”é’³åˆ¶
+    //¼à¿ØÊ±¼ä¼ä¸ôÇ¯ÖÆ
     if (general.monitor_time_span < MONITOR_TIME_SPAN_MIN || general.monitor_time_span > MONITOR_TIME_SPAN_MAX)
         general.monitor_time_span = 1000;
 
-    //ä»»åŠ¡æ çª—å£å¸ƒå±€å‚æ•°æ ¡éªŒ
+    //ÈÎÎñÀ¸´°¿Ú²¼¾Ö²ÎÊıĞ£Ñé
     taskbar.ValidItemSpace();
     taskbar.ValidWindowOffsetTop();
     taskbar.ValidWindowOffsetLeft();
 
-    //ä¸å«æ¸©åº¦ç›‘æ§çš„ç‰ˆæœ¬ï¼Œä¸æ˜¾ç¤ºæ¸©åº¦ç›‘æ§ç›¸å…³é¡¹ç›®
+    //²»º¬ÎÂ¶È¼à¿ØµÄ°æ±¾£¬²»ÏÔÊ¾ÎÂ¶È¼à¿ØÏà¹ØÏîÄ¿
 #ifdef WITHOUT_TEMPERATURE
     taskbar.display_item.Remove(TDI_CPU_TEMP);
     taskbar.display_item.Remove(TDI_GPU_TEMP);
@@ -308,7 +308,7 @@ void ConfigStore::Validate(GeneralSettingData& general, TaskBarSettingData& task
     taskbar.display_item.Remove(TDI_MAIN_BOARD_TEMP);
 #endif
 
-    //å¦‚æœé€‰é¡¹è®¾ç½®ä¸­å…³é—­äº†æŸä¸ªç¡¬ä»¶ç›‘æ§ï¼Œåˆ™ä¸æ˜¾ç¤ºå¯¹åº”çš„æ¸©åº¦ç›‘æ§ç›¸å…³é¡¹ç›®
+    //Èç¹ûÑ¡ÏîÉèÖÃÖĞ¹Ø±ÕÁËÄ³¸öÓ²¼ş¼à¿Ø£¬Ôò²»ÏÔÊ¾¶ÔÓ¦µÄÎÂ¶È¼à¿ØÏà¹ØÏîÄ¿
     if (!general.IsHardwareEnable(HI_CPU))
         taskbar.display_item.Remove(TDI_CPU_TEMP);
     if (!general.IsHardwareEnable(HI_GPU))

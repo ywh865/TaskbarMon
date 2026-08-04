@@ -1,5 +1,5 @@
-ï»¿
-// TrafficMonitorDlg.h : å¤´æ–‡ä»¶
+
+// TrafficMonitorDlg.h : Í·ÎÄ¼ş
 //
 
 #pragma once
@@ -19,23 +19,29 @@
 #include "AboutDlg.h"
 #include "core/MonitorService.h"
 
-// CTrafficMonitorDlg å¯¹è¯æ¡†ï¼ˆéšè—å®¿ä¸»çª—å£ï¼Œä»…æ‰¿è½½ä»»åŠ¡æ çª—å£ã€æ‰˜ç›˜ä¸ç›‘æ§è°ƒåº¦ï¼‰
+// CTrafficMonitorDlg ¶Ô»°¿ò£¨Òş²ØËŞÖ÷´°¿Ú£¬½ö³ĞÔØÈÎÎñÀ¸´°¿Ú¡¢ÍĞÅÌÓë¼à¿Øµ÷¶È£©
 class CTrafficMonitorDlg : public CDialog
 {
-    // æ„é€ 
+    // ¹¹Ôì
 public:
-    CTrafficMonitorDlg(CWnd* pParent = NULL);   // æ ‡å‡†æ„é€ å‡½æ•°
+    CTrafficMonitorDlg(CWnd* pParent = NULL);   // ±ê×¼¹¹Ôìº¯Êı
     ~CTrafficMonitorDlg();
     CTaskBarDlg* GetTaskbarWindow() const;
 
     static CTrafficMonitorDlg* Instance();
 
-    // å¯¹è¯æ¡†æ•°æ®
+    // ¶Ô»°¿òÊı¾İ
 #ifdef AFX_DESIGN_TIME
     enum { IDD = IDD_TRAFFICMONITOR_DIALOG };
 #endif
 
-    // ç¡¬ä»¶æ•°æ®æä¾›è€…ï¼ˆå°è£… OpenHardwareMonitor è®¿é—®ï¼Œä¾› MonitorService é‡‡æ ·ï¼‰
+    // ´ÅÅÌÀûÓÃÂÊÊÇ·ñÓÉ PDH »ñÈ¡£¨¹©Ñ¡Ïî¶Ô»°¿òµÄÓ²ÅÌÑ¡Ôñ£©
+    bool IsGetDiskUsageByPdh() const { return m_monitor_service.GetDiskUsageByPdh(); }
+    // PDH Ó²ÅÌÃû³ÆÁĞ±í£¨¹©Ñ¡Ïî¶Ô»°¿òµÄÓ²ÅÌÑ¡Ôñ£©
+    const std::vector<CString>& GetDiskNames() const { return m_monitor_service.GetDiskNames(); }
+
+#ifndef WITHOUT_TEMPERATURE
+    // Ó²¼şÊı¾İÌá¹©Õß£¨·â×° OpenHardwareMonitor ·ÃÎÊ£¬¹© MonitorService ²ÉÑù£©
     class CHardwareDataProvider : public IHardwareDataProvider
     {
     public:
@@ -47,22 +53,22 @@ public:
         float HddTemperature() const override;
         float MainboardTemperature() const override;
         int GpuUsage() const override;
-        int HddUsage() const override;
         std::map<std::wstring, float> AllCpuTemperature() const override;
         std::map<std::wstring, float> AllHddTemperature() const override;
-        std::map<std::wstring, int> AllHddUsage() const override;
+        std::map<std::wstring, float> AllHddUsage() const override;
     };
+#endif
 
 protected:
-    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV æ”¯æŒ
+    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV Ö§³Ö
 
 
-// å®ç°
+// ÊµÏÖ
 protected:
-    NOTIFYICONDATA m_ntIcon;    //é€šçŸ¥åŒºåŸŸå›¾æ ‡
-    CTaskBarDlg* m_tBarDlg{};     //ä»»åŠ¡æ çª—å£çš„æŒ‡é’ˆ
+    NOTIFYICONDATA m_ntIcon;    //Í¨ÖªÇøÓòÍ¼±ê
+    CTaskBarDlg* m_tBarDlg{};     //ÈÎÎñÀ¸´°¿ÚµÄÖ¸Õë
 
-    bool m_first_start{ true };     //åˆå§‹æ—¶ä¸ºtrueï¼Œåœ¨å®šæ—¶å™¨ç¬¬ä¸€æ¬¡å¯åŠ¨åç½®ä¸ºflase
+    bool m_first_start{ true };     //³õÊ¼Ê±Îªtrue£¬ÔÚ¶¨Ê±Æ÷µÚÒ»´ÎÆô¶¯ºóÖÃÎªflase
 
     // https://www.jianshu.com/p/9d4b68cdbd99
     struct Monitors
@@ -86,63 +92,66 @@ protected:
         }
     };
 
-    vector<CRect> m_screen_rects;       //æ‰€æœ‰å±å¹•çš„èŒƒå›´ï¼ˆä¸åŒ…å«ä»»åŠ¡æ ï¼‰
-    vector<CRect> m_last_screen_rects;       //ä¸Šä¸€æ¬¡æ‰€æœ‰å±å¹•çš„èŒƒå›´ï¼ˆä¸åŒ…å«ä»»åŠ¡æ ï¼‰
-    CSize m_screen_size;        //å±å¹•çš„å¤§å°ï¼ˆåŒ…å«ä»»åŠ¡æ ï¼‰
+    vector<CRect> m_screen_rects;       //ËùÓĞÆÁÄ»µÄ·¶Î§£¨²»°üº¬ÈÎÎñÀ¸£©
+    vector<CRect> m_last_screen_rects;       //ÉÏÒ»´ÎËùÓĞÆÁÄ»µÄ·¶Î§£¨²»°üº¬ÈÎÎñÀ¸£©
+    CSize m_screen_size;        //ÆÁÄ»µÄ´óĞ¡£¨°üº¬ÈÎÎñÀ¸£©
 
-    unsigned int m_timer_cnt{};     //å®šæ—¶å™¨è§¦å‘æ¬¡æ•°ï¼ˆè‡ªç¨‹åºå¯åŠ¨ä»¥æ¥çš„ç§’æ•°ï¼‰
-    unsigned int m_taskbar_timer_cnt{0}; //é€‚ç”¨äºTaskBarDlgçš„å®šæ—¶å™¨è§¦å‘æ¬¡æ•°ï¼ˆè‡ªç¨‹åºå¯åŠ¨ä»¥æ¥çš„ç§’æ•°ï¼‰
-    uint64_t m_last_drawn_revision{ UINT64_MAX };   //ä¸Šæ¬¡é‡ç»˜æ—¶çš„æ•°æ®ä¿®è®¢å·ï¼ˆR1 è„æ ‡è®°ï¼‰
-    ULONGLONG m_last_paint_time{};  //ä¸Šæ¬¡é‡ç»˜æ—¶é—´ï¼ˆR5 èŠ‚æµï¼‰
-    int m_insert_to_taskbar_cnt{};  //ç”¨æ¥ç»Ÿè®¡å°è¯•åµŒå…¥ä»»åŠ¡æ çš„æ¬¡æ•°
-    int m_cannot_insert_to_task_bar_warning{ true };   //æŒ‡ç¤ºæ˜¯å¦ä¼šåœ¨æ— æ³•åµŒå…¥ä»»åŠ¡æ æ—¶å¼¹å‡ºæç¤ºæ¡†
+    unsigned int m_timer_cnt{};     //¶¨Ê±Æ÷´¥·¢´ÎÊı£¨×Ô³ÌĞòÆô¶¯ÒÔÀ´µÄÃëÊı£©
+    unsigned int m_taskbar_timer_cnt{0}; //ÊÊÓÃÓÚTaskBarDlgµÄ¶¨Ê±Æ÷´¥·¢´ÎÊı£¨×Ô³ÌĞòÆô¶¯ÒÔÀ´µÄÃëÊı£©
+    uint64_t m_last_drawn_revision{ UINT64_MAX };   //ÉÏ´ÎÖØ»æÊ±µÄÊı¾İĞŞ¶©ºÅ£¨R1 Ôà±ê¼Ç£©
+    ULONGLONG m_last_paint_time{};  //ÉÏ´ÎÖØ»æÊ±¼ä£¨R5 ½ÚÁ÷£©
+    int m_insert_to_taskbar_cnt{};  //ÓÃÀ´Í³¼Æ³¢ÊÔÇ¶ÈëÈÎÎñÀ¸µÄ´ÎÊı
+    int m_cannot_insert_to_task_bar_warning{ true };   //Ö¸Ê¾ÊÇ·ñ»áÔÚÎŞ·¨Ç¶ÈëÈÎÎñÀ¸Ê±µ¯³öÌáÊ¾¿ò
 
-    static unsigned int m_WM_TASKBARCREATED;    //ä»»åŠ¡æ é‡å¯æ¶ˆæ¯
+    static unsigned int m_WM_TASKBARCREATED;    //ÈÎÎñÀ¸ÖØÆôÏûÏ¢
 
-    SYSTEMTIME m_start_time;    //ç¨‹åºå¯åŠ¨æ—¶çš„æ—¶é—´
+    SYSTEMTIME m_start_time;    //³ÌĞòÆô¶¯Ê±µÄÊ±¼ä
 
-    bool m_is_foreground_fullscreen{ false };   //æŒ‡ç¤ºå‰å°çª—å£æ˜¯å¦æ­£åœ¨å…¨å±€æ˜¾ç¤º
-    bool m_menu_popuped{ false };               //æŒ‡ç¤ºå½“å‰æ˜¯å¦æœ‰èœå•å¤„äºå¼¹å‡ºçŠ¶æ€
+    bool m_is_foreground_fullscreen{ false };   //Ö¸Ê¾Ç°Ì¨´°¿ÚÊÇ·ñÕıÔÚÈ«¾ÖÏÔÊ¾
+    bool m_menu_popuped{ false };               //Ö¸Ê¾µ±Ç°ÊÇ·ñÓĞ²Ëµ¥´¦ÓÚµ¯³ö×´Ì¬
 
     HDC m_desktop_dc;
 
-    // ç»Ÿä¸€é‡‡æ ·å¼•æ“
+    // Í³Ò»²ÉÑùÒıÇæ
     MonitorService m_monitor_service;
+#ifndef WITHOUT_TEMPERATURE
     CHardwareDataProvider m_hardware_provider;
+#endif
 
-    // ä»å…¨å±€è®¾ç½®æå–é‡‡æ ·é…ç½®
+    // ´ÓÈ«¾ÖÉèÖÃÌáÈ¡²ÉÑùÅäÖÃ
     MonitorService::Config GetMonitorConfig() const;
 
-    static UINT MonitorThreadCallback(LPVOID dwUser);   //è·å–ç›‘æ§ä¿¡æ¯çš„çº¿ç¨‹å‡½æ•°
-    bool m_monitor_data_required{ false };          //çº¿ç¨‹ä¸­éœ€è¦è·å–ç›‘æ§æ•°æ®æ ‡å¿—ï¼Œå½“éœ€è¦è·å–ç›‘æ§æ•°æ®æ—¶ç½®ä¸ºtrueï¼Œè·å–åˆ°ä¸€æ¬¡ç›‘æ§æ•°æ®æ—¶ç½®ä¸ºfalse
-    bool m_is_thread_exit{ false }; //çº¿ç¨‹é€€å‡ºæ ‡å¿—
-    CEvent m_threadExitEvent;       //ç”¨äºé€šçŸ¥ä¸»çº¿ç¨‹å·¥ä½œçº¿ç¨‹å·²é€€å‡º
+    void DoMonitorAcquisition();    //»ñÈ¡Ò»´Î¼à¿ØĞÅÏ¢²¢Í¬²½µ½È«¾Ö³ÉÔ±
+    static UINT MonitorThreadCallback(LPVOID dwUser);   //»ñÈ¡¼à¿ØĞÅÏ¢µÄÏß³Ìº¯Êı
+    bool m_monitor_data_required{ false };          //Ïß³ÌÖĞĞèÒª»ñÈ¡¼à¿ØÊı¾İ±êÖ¾£¬µ±ĞèÒª»ñÈ¡¼à¿ØÊı¾İÊ±ÖÃÎªtrue£¬»ñÈ¡µ½Ò»´Î¼à¿ØÊı¾İÊ±ÖÃÎªfalse
+    bool m_is_thread_exit{ false }; //Ïß³ÌÍË³ö±êÖ¾
+    CEvent m_threadExitEvent;       //ÓÃÓÚÍ¨ÖªÖ÷Ïß³Ì¹¤×÷Ïß³ÌÒÑÍË³ö
 public:
-    void ExitMonitorThread();       //åœæ­¢ç›‘æ§çº¿ç¨‹
+    void ExitMonitorThread();       //Í£Ö¹¼à¿ØÏß³Ì
 
 protected:
-    void GetScreenSize();           //è·å–å±å¹•çš„å¤§å°
+    void GetScreenSize();           //»ñÈ¡ÆÁÄ»µÄ´óĞ¡
 
-    void IniConnectionMenu(CMenu* pMenu);   //åˆå§‹åŒ–â€œé€‰æ‹©ç½‘ç»œè¿æ¥â€èœå•
-    void IniTaskBarConnectionMenu();        //åˆå§‹åŒ–ä»»åŠ¡æ çª—å£çš„â€œé€‰æ‹©ç½‘ç»œè¿æ¥â€èœå•
-    void SetConnectionMenuState(CMenu* pMenu);      //è®¾ç½®â€œé€‰æ‹©ç½‘ç»œè¿æ¥â€èœå•ä¸­é€‰ä¸­çš„é¡¹ç›®
+    void IniConnectionMenu(CMenu* pMenu);   //³õÊ¼»¯¡°Ñ¡ÔñÍøÂçÁ¬½Ó¡±²Ëµ¥
+    void IniTaskBarConnectionMenu();        //³õÊ¼»¯ÈÎÎñÀ¸´°¿ÚµÄ¡°Ñ¡ÔñÍøÂçÁ¬½Ó¡±²Ëµ¥
+    void SetConnectionMenuState(CMenu* pMenu);      //ÉèÖÃ¡°Ñ¡ÔñÍøÂçÁ¬½Ó¡±²Ëµ¥ÖĞÑ¡ÖĞµÄÏîÄ¿
 
-    void CloseTaskBarWnd(); //å…³é—­ä»»åŠ¡æ çª—å£
-    void OpenTaskBarWnd();  //æ‰“å¼€ä»»åŠ¡æ çª—å£
+    void CloseTaskBarWnd(); //¹Ø±ÕÈÎÎñÀ¸´°¿Ú
+    void OpenTaskBarWnd();  //´ò¿ªÈÎÎñÀ¸´°¿Ú
 
-    void AddNotifyIcon();       //æ·»åŠ é€šçŸ¥åŒºå›¾æ ‡
+    void AddNotifyIcon();       //Ìí¼ÓÍ¨ÖªÇøÍ¼±ê
     void DeleteNotifyIcon();
 public:
-    void ShowNotifyTip(const wchar_t* title, const wchar_t* message);       //æ˜¾ç¤ºé€šçŸ¥åŒºæç¤º
+    void ShowNotifyTip(const wchar_t* title, const wchar_t* message);       //ÏÔÊ¾Í¨ÖªÇøÌáÊ¾
 protected:
-    void UpdateNotifyIconTip();     //æ›´æ–°é€šçŸ¥åŒºå›¾æ ‡çš„é¼ æ ‡æç¤º
+    void UpdateNotifyIconTip();     //¸üĞÂÍ¨ÖªÇøÍ¼±êµÄÊó±êÌáÊ¾
 
-    void SaveHistoryTraffic();        // å¢é‡ä¿å­˜ï¼Œåªæ›´æ–°ç¬¬ä¸€è¡Œå’Œä»Šå¤©çš„è®°å½•
-    void SaveHistoryTrafficFull();    // å®Œæ•´ä¿å­˜ï¼Œç”¨äºç¨‹åºé€€å‡ºæ—¶ç¡®ä¿æ‰€æœ‰æ•°æ®éƒ½ä¿å­˜
+    void SaveHistoryTraffic();        // ÔöÁ¿±£´æ£¬Ö»¸üĞÂµÚÒ»ĞĞºÍ½ñÌìµÄ¼ÇÂ¼
+    void SaveHistoryTrafficFull();    // ÍêÕû±£´æ£¬ÓÃÓÚ³ÌĞòÍË³öÊ±È·±£ËùÓĞÊı¾İ¶¼±£´æ
     void LoadHistoryTraffic();
     void BackupHistoryTrafficFile();
 
-    void _OnOptions(int tab, CWnd* pParent);   //æ‰“å¼€â€œé€‰é¡¹â€å¯¹è¯æ¡†çš„å¤„ç†ï¼Œtabï¼šæ‰“å¼€æ—¶åˆ‡æ¢çš„æ ‡ç­¾
+    void _OnOptions(int tab, CWnd* pParent);   //´ò¿ª¡°Ñ¡Ïî¡±¶Ô»°¿òµÄ´¦Àí£¬tab£º´ò¿ªÊ±ÇĞ»»µÄ±êÇ©
 
     void ApplySettings(COptionsDlg& optionsDlg);
 
@@ -153,10 +162,10 @@ protected:
     void TaskbarShowHideItem(DisplayItem type);
 
 public:
-    bool IsTemperatureNeeded() const;       //åˆ¤æ–­æ˜¯å¦éœ€è¦æ˜¾ç¤ºæ¸©åº¦ä¿¡æ¯
+    bool IsTemperatureNeeded() const;       //ÅĞ¶ÏÊÇ·ñĞèÒªÏÔÊ¾ÎÂ¶ÈĞÅÏ¢
 
 protected:
-    // ç”Ÿæˆçš„æ¶ˆæ¯æ˜ å°„å‡½æ•°
+    // Éú³ÉµÄÏûÏ¢Ó³Éäº¯Êı
     virtual BOOL OnInitDialog();
     DECLARE_MESSAGE_MAP()
 public:

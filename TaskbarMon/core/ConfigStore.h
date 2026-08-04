@@ -1,31 +1,31 @@
-// ConfigStore.h : é…ç½®æŒä¹…åŒ–ï¼ˆcore å±‚ï¼‰
-// èŒè´£ï¼šconfig.ini çš„ç±»å‹åŒ–è¯»å†™ä¸æ ¡éªŒ
+// ConfigStore.h : ÅäÖÃ³Ö¾Ã»¯£¨core ²ã£©
+// Ö°Ôğ£ºconfig.ini µÄÀàĞÍ»¯¶ÁĞ´ÓëĞ£Ñé
 #pragma once
 #include <string>
 #include "CommonData.h"
 
-// é…ç½®è¯»å†™
+// ÅäÖÃ¶ÁĞ´
 class ConfigStore
 {
 public:
     explicit ConfigStore(const std::wstring& path);
 
-    // ä¸è¿è¡Œç¯å¢ƒç›¸å…³çš„é»˜è®¤å€¼ï¼ˆç”± UI å±‚æä¾›ï¼‰
+    // ÓëÔËĞĞ»·¾³Ïà¹ØµÄÄ¬ÈÏÖµ£¨ÓÉ UI ²ãÌá¹©£©
     struct EnvironmentDefaults
     {
-        std::wstring default_font_name;     // å½“å‰è¯­è¨€çš„é»˜è®¤å­—ä½“
-        std::wstring system_dir;            // ç³»ç»Ÿç›®å½•ï¼ˆåŒå‡»åŠ¨ä½œé»˜è®¤ç¨‹åºè·¯å¾„ï¼‰
-        int default_notify_icon{ 0 };       // ç³»ç»Ÿç›¸å…³çš„é€šçŸ¥å›¾æ ‡é»˜è®¤å€¼ï¼ˆWin7/8 ä¸º 2ï¼‰
-        int update_source_default{ 0 };     // æ›´æ–°æºé»˜è®¤å€¼ï¼ˆç®€ä½“ä¸­æ–‡é»˜è®¤ 1=Giteeï¼‰
+        std::wstring default_font_name;     // µ±Ç°ÓïÑÔµÄÄ¬ÈÏ×ÖÌå
+        std::wstring system_dir;            // ÏµÍ³Ä¿Â¼£¨Ë«»÷¶¯×÷Ä¬ÈÏ³ÌĞòÂ·¾¶£©
+        int default_notify_icon{ 0 };       // ÏµÍ³Ïà¹ØµÄÍ¨ÖªÍ¼±êÄ¬ÈÏÖµ£¨Win7/8 Îª 2£©
+        int update_source_default{ 0 };     // ¸üĞÂÔ´Ä¬ÈÏÖµ£¨¼òÌåÖĞÎÄÄ¬ÈÏ 1=Gitee£©
         bool is_windows7_or_8{};
         bool is_windows8_or_later{ true };
         bool is_windows10_or_later{ true };
         bool is_windows7{};
-        bool default_light_theme{};         // ç³»ç»Ÿå½“å‰æ˜¯å¦ä¸ºæµ…è‰²ä¸»é¢˜
-        bool d2d_supported{ true };         // æ˜¯å¦æ”¯æŒ D2D æ¸²æŸ“
+        bool default_light_theme{};         // ÏµÍ³µ±Ç°ÊÇ·ñÎªÇ³É«Ö÷Ìâ
+        bool d2d_supported{ true };         // ÊÇ·ñÖ§³Ö D2D äÖÈ¾
     };
 
-    // å…¶ä»–æ‚é¡¹è®¾ç½®ï¼ˆApp ç§æœ‰æˆå‘˜ï¼‰
+    // ÆäËûÔÓÏîÉèÖÃ£¨App Ë½ÓĞ³ÉÔ±£©
     struct OtherSettings
     {
         bool no_multistart_warning{};
@@ -37,25 +37,25 @@ public:
         bool show_dot_net_notinstalled_tip{ true };
     };
 
-    // è¯»å–é…ç½®
+    // ¶ÁÈ¡ÅäÖÃ
     void Load(GeneralSettingData& general, TaskBarSettingData& taskbar, MainConfigData& config,
               const EnvironmentDefaults& defaults);
 
-    // ä¿å­˜é…ç½®
-    // version: å½“å‰ç¨‹åºç‰ˆæœ¬ï¼Œå†™å…¥ [app]/version
-    // è¿”å›æ˜¯å¦ä¿å­˜æˆåŠŸ
+    // ±£´æÅäÖÃ
+    // version: µ±Ç°³ÌĞò°æ±¾£¬Ğ´Èë [app]/version
+    // ·µ»ØÊÇ·ñ±£´æ³É¹¦
     bool Save(const GeneralSettingData& general, const TaskBarSettingData& taskbar,
               const MainConfigData& config, const OtherSettings& other, const wchar_t* version);
 
-    // è¯»å–æ‚é¡¹è®¾ç½®
+    // ¶ÁÈ¡ÔÓÏîÉèÖÃ
     void LoadOther(OtherSettings& other, const EnvironmentDefaults& defaults);
-    // ä¿å­˜æ‚é¡¹è®¾ç½®
+    // ±£´æÔÓÏîÉèÖÃ
     bool SaveOther(const OtherSettings& other);
 
-    // è¯»å–è¯­è¨€è®¾ç½®ï¼ˆç‹¬ç«‹äº Loadï¼Œéœ€åœ¨è¯­è¨€åˆå§‹åŒ–å‰è°ƒç”¨ï¼‰
+    // ¶ÁÈ¡ÓïÑÔÉèÖÃ£¨¶ÀÁ¢ÓÚ Load£¬ĞèÔÚÓïÑÔ³õÊ¼»¯Ç°µ÷ÓÃ£©
     void LoadLanguage(LanguageInfo& language);
 
-    // æ ¡éªŒå¹¶ä¿®æ­£é…ç½®å€¼ï¼ˆè¯»å–åè°ƒç”¨ï¼‰
+    // Ğ£Ñé²¢ĞŞÕıÅäÖÃÖµ£¨¶ÁÈ¡ºóµ÷ÓÃ£©
     static void Validate(GeneralSettingData& general, TaskBarSettingData& taskbar);
 
 private:

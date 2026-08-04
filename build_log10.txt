@@ -1,0 +1,5 @@
+
+  OpenHardwareMonitorApi.vcxproj -> F:\DeepSeek_Workspace\TaskbarMon\Bin\x64\Release\OpenHardwareMonitorApi.dll
+  
+TaskbarMon.rc(461): error RC2121: BEGIN expected in menu [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  

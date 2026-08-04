@@ -1,0 +1,370 @@
+
+  stdafx.cpp
+  AboutDlg.cpp
+  AdapterCommon.cpp
+  AppAlreadyRuningDlg.cpp
+  auto_start_helper.cpp
+  BaseDialog.cpp
+  CalendarHelper.cpp
+  CAutoAdaptSettingsDlg.cpp
+  ClassicalTaskbarDlg.cpp
+  CMFCColorDialogEx.cpp
+  ColorSettingListCtrl.cpp
+  ComboBox2.cpp
+  CommonData.cpp
+  crashtool.cpp
+  CTabCtrlEx.cpp
+  CVariant.cpp
+  D2D1Support.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\CTabCtrlEx.cpp(26,62): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/CTabCtrlEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\CTabCtrlEx.cpp(26,31): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/CTabCtrlEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\CTabCtrlEx.cpp(40,15): warning C4267: “初始化”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/CTabCtrlEx.cpp”)
+  
+  D3D10Support1.cpp
+  DCompositionSupport.cpp
+  DisplayItem.cpp
+  DisplayTextSettingDlg.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\AdapterCommon.cpp(107,22): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/AdapterCommon.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\AdapterCommon.cpp(130,11): warning C4267: “return”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/AdapterCommon.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\AdapterCommon.cpp(159,17): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/AdapterCommon.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\AdapterCommon.cpp(147,11): warning C4267: “return”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/AdapterCommon.cpp”)
+  
+  DllFunctions.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/ColorSettingListCtrl.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\ColorSettingListCtrl.cpp(77,48): warning C4244: “参数”: 从“DWORD_PTR”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/ColorSettingListCtrl.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\ColorSettingListCtrl.cpp(80,36): warning C4244: “参数”: 从“DWORD_PTR”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/ColorSettingListCtrl.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\ColorSettingListCtrl.cpp(98,32): warning C4244: “参数”: 从“DWORD_PTR”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/ColorSettingListCtrl.cpp”)
+  
+  DrawCommonEx.cpp
+  DrawCommonFactory.cpp
+  DrawCommonHelper.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.cpp(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  DrawTextManager.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonHelper.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(193,24): warning C4244: “=”: 从“double”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(194,25): warning C4244: “=”: 从“double”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(231,80): warning C4244: “参数”: 从“Gdiplus::REAL”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(231,62): warning C4244: “参数”: 从“Gdiplus::REAL”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(231,45): warning C4244: “参数”: 从“Gdiplus::REAL”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(231,30): warning C4244: “参数”: 从“Gdiplus::REAL”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(236,73): warning C4244: “参数”: 从“int”转换到“Gdiplus::REAL”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(236,58): warning C4244: “参数”: 从“int”转换到“Gdiplus::REAL”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(236,42): warning C4244: “参数”: 从“LONG”转换到“Gdiplus::REAL”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonEx.cpp(236,31): warning C4244: “参数”: 从“LONG”转换到“Gdiplus::REAL”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonEx.cpp”)
+  
+  Dxgi1Support2.cpp
+  FileDialogEx.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\FileDialogEx.cpp(38,57): warning C4267: “参数”: 从“size_t”转换到“UINT”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/FileDialogEx.cpp”)
+  
+  FilePathHelper.cpp
+  HistoryTrafficCalendarDlg.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\FilePathHelper.cpp(48,34): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/FilePathHelper.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\FilePathHelper.cpp(52,35): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/FilePathHelper.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\CommonData.cpp(278,35): warning C4244: “=”: 从“LCID”转换到“WORD”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/CommonData.cpp”)
+  
+  HistoryTrafficFile.cpp
+  HistoryTrafficListDlg.cpp
+  HResultException.cpp
+  IDrawCommon.cpp
+  Image2DEffect.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommonFactory.cpp”)
+  
+  LinkStatic.cpp
+  ColorStatic.cpp
+  Common.cpp
+  DrawCommon.cpp
+  GeneralSettingsDlg.cpp
+  HistoryTrafficDlg.cpp
+  IconSelectDlg.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DrawCommon.cpp”)
+  
+  IniHelper.cpp
+  HistoryTrafficListCtrl.cpp
+  ListCtrlEx.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/HistoryTrafficCalendarDlg.cpp”)
+  
+  MessageDlg.cpp
+  NetworkInfoDlg.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/HistoryTrafficListCtrl.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\HistoryTrafficListCtrl.cpp(53,24): warning C4244: “参数”: 从“DWORD_PTR”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/HistoryTrafficListCtrl.cpp”)
+  
+  OptionsDlg.cpp
+  CPUUsage.cpp
+  CpuFreq.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\HistoryTrafficListDlg.cpp(337,47): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/HistoryTrafficListDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\PdhHardwareQuery\CpuFreq.cpp(27,66): warning C4267: “参数”: 从“size_t”转换到“ULONG”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/PdhHardwareQuery/CpuFreq.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\PdhHardwareQuery\CpuFreq.cpp(39,28): warning C4244: “=”: 从“double”转换到“float”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/PdhHardwareQuery/CpuFreq.cpp”)
+  
+  GpuUsage.cpp
+  DiskUsage.cpp
+  PdhQuery.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(533,18): warning C4267: “初始化”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/Common.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(1034,61): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/Common.cpp”)
+  
+  PictureStatic.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(98,32): warning C4244: “参数”: 从“wchar_t”转换到“const _Elem”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(98,32): warning C4244:         with [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(98,32): warning C4244:         [ [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(98,32): warning C4244:             _Elem=char [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(98,32): warning C4244:         ] [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/Common.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(98,32):
+      模板实例化上下文(最早的实例化上下文)为
+          F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.cpp(112,5):
+          查看对正在编译的函数 模板 实例化“void _StringSplit<std::string>(const T &,wchar_t,std::vector<std::string,std::allocator<std::string>> &,bool,bool)”的引用
+          with
+          [
+              T=std::string
+          ]
+  
+  SelectConnectionsDlg.cpp
+  SetItemOrderDlg.cpp
+  SettingsHelper.cpp
+  SimpleXML.cpp
+  SpinEdit.cpp
+  StaticEx.cpp
+  StrTable.cpp
+  SupportedRenderEnums.cpp
+  TabDlg.cpp
+  TaskbarColorDlg.cpp
+  TaskbarDefaultStyle.cpp
+  TaskBarDlg.cpp
+  TaskBarDlgDrawCommon.cpp
+  TaskbarHelper.cpp
+  TaskbarItemOrderHelper.cpp
+  TaskBarSettingsDlg.cpp
+  Test.cpp
+  TaskbarMon.cpp
+  TrafficMonitorDlg.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\StrTable.cpp(94,53): warning C4244: “=”: 从“LCID”转换到“WORD”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/StrTable.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TabDlg.cpp(233,37): warning C4018: “<”: 有符号/无符号不匹配 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TabDlg.cpp”)
+  
+  UpdateHelper.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(252,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(255,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(258,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(261,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(1186,34): warning C4244: “=”: 从“unsigned __int64”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+  WIC.cpp
+  MonitorService.cpp
+  ConfigStore.cpp
+  Win11TaskbarDlg.cpp
+  Win11TaskbarSettingDlg.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(117,41): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+  WindowsSettingHelper.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(143,40): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(150,41): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(234,44): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+  WindowsWebExperienceDetector.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarSettingsDlg.cpp(422,59): warning C4311: “类型强制转换”: 从“HMENU”到“UINT”的指针截断 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarSettingsDlg.cpp(422,59): warning C4302: “类型强制转换”: 从“HMENU”到“UINT”截断 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarSettingsDlg.cpp”)
+  
+  WineTaskbarDlg.cpp
+  WinVersionHelper.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(587,54): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(592,16): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(599,20): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(611,20): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(611,52): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(616,20): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(616,52): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(621,20): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(621,52): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(626,20): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(626,52): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(631,20): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(631,52): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(636,20): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(636,52): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(642,16): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(644,19): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(649,16): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(651,19): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(656,16): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(658,19): error C2039: "m_pMonitor": 不是 "CTaskbarMonApp" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.h(27,7):
+      参见“CTaskbarMonApp”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(909,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(915,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(921,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(927,72): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  

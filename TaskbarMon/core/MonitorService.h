@@ -1,6 +1,6 @@
-// MonitorService.h : ç»Ÿä¸€é‡‡æ ·å¼•æ“ï¼ˆcore å±‚ï¼‰
-// èŒè´£ï¼šç½‘ç»œè¿æ¥ç®¡ç†ã€ç½‘é€Ÿ/CPU/å†…å­˜/ç¡¬ä»¶é‡‡æ ·ã€å†å²æµé‡ç»Ÿè®¡
-// ä¸ä¾èµ– MFC æ¶ˆæ¯ä¸ UIï¼Œé‡‡æ ·ç»“æœå†™å…¥ MonitorSnapshotï¼ˆå¸¦ä¿®è®¢å·ï¼‰
+// MonitorService.h : Í³Ò»²ÉÑùÒıÇæ£¨core ²ã£©
+// Ö°Ôğ£ºÍøÂçÁ¬½Ó¹ÜÀí¡¢ÍøËÙ/CPU/ÄÚ´æ/Ó²¼ş²ÉÑù¡¢ÀúÊ·Á÷Á¿Í³¼Æ
+// ²»ÒÀÀµ MFC ÏûÏ¢Óë UI£¬²ÉÑù½á¹ûĞ´Èë MonitorSnapshot£¨´øĞŞ¶©ºÅ£©
 #pragma once
 #include "MonitorTypes.h"
 #include "AdapterCommon.h"
@@ -15,86 +15,89 @@
 class MonitorService
 {
 public:
-    // é‡‡æ ·é…ç½®å¿«ç…§ï¼ˆç”± UI å±‚ä»å…¨å±€è®¾ç½®æå–åä¼ å…¥ï¼‰
+    // ²ÉÑùÅäÖÃ¿ìÕÕ£¨ÓÉ UI ²ã´ÓÈ«¾ÖÉèÖÃÌáÈ¡ºó´«Èë£©
     struct Config
     {
-        int monitor_time_span{ 1000 };      // é‡‡æ ·é—´éš”ï¼ˆæ¯«ç§’ï¼‰
-        bool select_all{};                  // ç»Ÿè®¡æ‰€æœ‰è¿æ¥
-        bool auto_select{};                 // è‡ªåŠ¨é€‰æ‹©è¿æ¥
-        bool show_all_interface{};          // æ˜¾ç¤ºæ‰€æœ‰ç½‘ç»œæ¥å£
-        std::string connection_name;        // ä¸Šæ¬¡é€‰æ‹©çš„è¿æ¥åç§°
-        std::set<std::wstring> connections_hide;    // è¦ä»è¿æ¥åˆ—è¡¨ä¸­éšè—çš„è¿æ¥
-        bool cpu_usage_by_time{};           // CPUåˆ©ç”¨ç‡è·å–æ–¹å¼ï¼štrue=ä½¿ç”¨æ—¶é—´ï¼Œfalse=æ€§èƒ½è®¡æ•°å™¨
-        unsigned int hardware_monitor_item{};   // å¯ç”¨çš„ç¡¬ä»¶ç›‘æ§é¡¹ï¼ˆHardwareItem ä½æ ‡å¿—ï¼‰
-        std::wstring hard_disk_name;        // è¦ç›‘æ§çš„ç¡¬ç›˜åç§°
-        std::wstring cpu_core_name;         // è¦ç›‘æ§çš„ CPU æ ¸å¿ƒåç§°
-        std::wstring history_traffic_path;  // å†å²æµé‡æ–‡ä»¶è·¯å¾„
-        std::wstring log_path;              // æ—¥å¿—æ–‡ä»¶è·¯å¾„
-        std::wstring config_dir;            // é…ç½®ç›®å½•ï¼ˆç”¨äº connections.logï¼‰
+        int monitor_time_span{ 1000 };      // ²ÉÑù¼ä¸ô£¨ºÁÃë£©
+        bool select_all{};                  // Í³¼ÆËùÓĞÁ¬½Ó
+        bool auto_select{};                 // ×Ô¶¯Ñ¡ÔñÁ¬½Ó
+        bool show_all_interface{};          // ÏÔÊ¾ËùÓĞÍøÂç½Ó¿Ú
+        std::string connection_name;        // ÉÏ´ÎÑ¡ÔñµÄÁ¬½ÓÃû³Æ
+        std::set<std::wstring> connections_hide;    // Òª´ÓÁ¬½ÓÁĞ±íÖĞÒş²ØµÄÁ¬½Ó
+        bool cpu_usage_by_time{};           // CPUÀûÓÃÂÊ»ñÈ¡·½Ê½£ºtrue=Ê¹ÓÃÊ±¼ä£¬false=ĞÔÄÜ¼ÆÊıÆ÷
+        unsigned int hardware_monitor_item{};   // ÆôÓÃµÄÓ²¼ş¼à¿ØÏî£¨HardwareItem Î»±êÖ¾£©
+        std::wstring hard_disk_name;        // Òª¼à¿ØµÄÓ²ÅÌÃû³Æ
+        std::wstring cpu_core_name;         // Òª¼à¿ØµÄ CPU ºËĞÄÃû³Æ
+        std::wstring history_traffic_path;  // ÀúÊ·Á÷Á¿ÎÄ¼şÂ·¾¶
+        std::wstring log_path;              // ÈÕÖ¾ÎÄ¼şÂ·¾¶
+        std::wstring config_dir;            // ÅäÖÃÄ¿Â¼£¨ÓÃÓÚ connections.log£©
         bool debug_log{};
     };
 
     explicit MonitorService(const Config& config);
     ~MonitorService();
 
-    // æ›´æ–°é…ç½®ï¼ˆè®¾ç½®å˜åŒ–æ—¶è°ƒç”¨ï¼‰
+    // ¸üĞÂÅäÖÃ£¨ÉèÖÃ±ä»¯Ê±µ÷ÓÃ£©
     void ApplyConfig(const Config& config);
 
-    // ---- è¿æ¥ç®¡ç† ----
-    void InitConnections();             // åˆå§‹åŒ–/åˆ·æ–°è¿æ¥åˆ—è¡¨
-    void AutoSelect();                  // è‡ªåŠ¨é€‰æ‹©æµé‡æœ€å¤§çš„æ­£å¸¸è¿æ¥
-    // é‡æ–°åˆå§‹åŒ–è¿æ¥åï¼Œæ˜¯å¦éœ€è¦å»¶è¿Ÿæ•°ç§’åå†è‡ªåŠ¨é€‰æ‹©ï¼ˆåŸ DELAY_TIMER è¯­ä¹‰ï¼‰ã€‚
-    // è°ƒç”¨ InitConnections åæ£€æŸ¥ä¸€æ¬¡ï¼Œè¿”å› true åˆ™ UI å±‚åº”å¯åŠ¨å»¶è¿Ÿå®šæ—¶å™¨å¹¶åœ¨åˆ°æ—¶åè°ƒç”¨ AutoSelect()
+    // ---- Á¬½Ó¹ÜÀí ----
+    void InitConnections();             // ³õÊ¼»¯/Ë¢ĞÂÁ¬½ÓÁĞ±í
+    void AutoSelect();                  // ×Ô¶¯Ñ¡ÔñÁ÷Á¿×î´óµÄÕı³£Á¬½Ó
+    // ÖØĞÂ³õÊ¼»¯Á¬½Óºó£¬ÊÇ·ñĞèÒªÑÓ³ÙÊıÃëºóÔÙ×Ô¶¯Ñ¡Ôñ£¨Ô­ DELAY_TIMER ÓïÒå£©¡£
+    // µ÷ÓÃ InitConnections ºó¼ì²éÒ»´Î£¬·µ»Ø true Ôò UI ²ãÓ¦Æô¶¯ÑÓ³Ù¶¨Ê±Æ÷²¢ÔÚµ½Ê±ºóµ÷ÓÃ AutoSelect()
     bool ConsumeDelayedAutoSelectPending();
-    const std::vector<NetWorkConection>& Connections() const { return m_connections; }
-    // å½“å‰ MIB æ¥å£è¡¨ï¼ˆç”¨äºç½‘ç»œè¯¦æƒ…å¯¹è¯æ¡†ï¼‰
-    const MIB_IFTABLE* IfTable() const { return m_pIfTable; }
+    std::vector<NetWorkConection>& Connections() { return m_connections; }
+    // µ±Ç° MIB ½Ó¿Ú±í£¨ÓÃÓÚÍøÂçÏêÇé¶Ô»°¿ò£©
+    MIB_IFTABLE* IfTable() { return m_pIfTable; }
     int SelectedIndex() const { return m_connection_selected; }
-    std::string SelectedConnectionName() const;     // å½“å‰é€‰ä¸­è¿æ¥çš„åç§°
-    void SelectConnection(int index);               // æ‰‹åŠ¨é€‰æ‹©è¿æ¥
+    std::string SelectedConnectionName() const;     // µ±Ç°Ñ¡ÖĞÁ¬½ÓµÄÃû³Æ
+    void SelectConnection(int index);               // ÊÖ¶¯Ñ¡ÔñÁ¬½Ó
     void SetSelectAll(bool select_all);
     bool IsConnectionChanged() const { return m_connection_change_flag; }
     void ClearConnectionChanged() { m_connection_change_flag = false; }
     int RestartCount() const { return m_restart_cnt; }
 
-    // ---- ç¡¬ä»¶æ•°æ®æä¾›è€…ï¼ˆUI å±‚æ³¨å…¥ï¼‰ ----
+    // ---- Ó²¼şÊı¾İÌá¹©Õß£¨UI ²ã×¢Èë£© ----
     void SetHardwareProvider(IHardwareDataProvider* provider) { m_hardware_provider = provider; }
+    // ---- ´ÅÅÌĞÅÏ¢£¨¹©Ñ¡Ïî¶Ô»°¿òµÄÓ²ÅÌÑ¡Ôñ£© ----
+    bool GetDiskUsageByPdh() const { return m_get_disk_usage_by_pdh; }
+    const std::vector<CString>& GetDiskNames() const { return m_disk_usage_helper.GetDiskNames(); }
 
-    // ---- å†å²æµé‡ ----
+    // ---- ÀúÊ·Á÷Á¿ ----
     CHistoryTrafficFile& HistoryFile() { return m_history_traffic; }
     uint64_t TodayUpTraffic() const { return m_today_up_traffic; }
     uint64_t TodayDownTraffic() const { return m_today_down_traffic; }
-    // å†å²æµé‡æ–‡ä»¶ä¿å­˜å›è°ƒï¼ˆç”± UI å±‚è®¾ç½®ï¼Œé¿å…æ ¸å¿ƒå±‚ç›´æ¥å†™æ–‡ä»¶ï¼‰
+    // ÀúÊ·Á÷Á¿ÎÄ¼ş±£´æ»Øµ÷£¨ÓÉ UI ²ãÉèÖÃ£¬±ÜÃâºËĞÄ²ãÖ±½ÓĞ´ÎÄ¼ş£©
     std::function<void()> on_history_save;
 
-    // ---- é‡‡æ · ----
-    // æ‰§è¡Œä¸€æ¬¡å®Œæ•´é‡‡æ ·ï¼ˆçº¿ç¨‹å®‰å…¨ï¼šåº”åœ¨åŒä¸€å·¥ä½œçº¿ç¨‹ä¸­è°ƒç”¨ï¼‰
+    // ---- ²ÉÑù ----
+    // Ö´ĞĞÒ»´ÎÍêÕû²ÉÑù£¨Ïß³Ì°²È«£ºÓ¦ÔÚÍ¬Ò»¹¤×÷Ïß³ÌÖĞµ÷ÓÃ£©
     void Sample();
 
-    // ---- å¿«ç…§ ----
+    // ---- ¿ìÕÕ ----
     const MonitorSnapshot& Snapshot() const { return m_snapshot; }
-    // ä¿®è®¢å·ï¼šæ¯æ¬¡é‡‡æ ·é€’å¢ï¼ŒUI ç”¨äºè„æ£€æµ‹
+    // ĞŞ¶©ºÅ£ºÃ¿´Î²ÉÑùµİÔö£¬UI ÓÃÓÚÔà¼ì²â
     uint64_t Revision() const { return m_revision; }
 
 private:
     MIB_IFROW GetConnectIfTable(int connection_index) const;
 
-    // é‡‡æ ·å­æ­¥éª¤
-    void AcquireNetSpeed();             // ç½‘é€Ÿï¼ˆåŸ DoMonitorAcquisition ç½‘é€Ÿéƒ¨åˆ†ï¼‰
-    void AcquireCpuMemory();            // CPU/å†…å­˜
-    void AcquireHardwareData();         // æ¸©åº¦/GPU/HDDï¼ˆå« PDH ä¼˜å…ˆé€»è¾‘ï¼‰
-    void UpdateHistoryTraffic(uint64_t cur_in_speed, uint64_t cur_out_speed);   // å†å²æµé‡ç»Ÿè®¡ä¸ä¿å­˜
-    void CheckConnectionsChanged();     // è¿æ¥æ•°é‡/åç§°å˜åŒ–æ£€æµ‹
+    // ²ÉÑù×Ó²½Öè
+    void AcquireNetSpeed();             // ÍøËÙ£¨Ô­ DoMonitorAcquisition ÍøËÙ²¿·Ö£©
+    void AcquireCpuMemory();            // CPU/ÄÚ´æ
+    void AcquireHardwareData();         // ÎÂ¶È/GPU/HDD£¨º¬ PDH ÓÅÏÈÂß¼­£©
+    void UpdateHistoryTraffic(uint64_t cur_in_speed, uint64_t cur_out_speed);   // ÀúÊ·Á÷Á¿Í³¼ÆÓë±£´æ
+    void CheckConnectionsChanged();     // Á¬½ÓÊıÁ¿/Ãû³Æ±ä»¯¼ì²â
 
-    // é…ç½®
+    // ÅäÖÃ
     Config m_config;
-    // ç¡¬ä»¶æ•°æ®æä¾›è€…
+    // Ó²¼şÊı¾İÌá¹©Õß
     IHardwareDataProvider* m_hardware_provider{};
-    // å¿«ç…§
+    // ¿ìÕÕ
     MonitorSnapshot m_snapshot;
     uint64_t m_revision{};
 
-    // è¿æ¥æ•°æ®
+    // Á¬½ÓÊı¾İ
     std::vector<NetWorkConection> m_connections;
     MIB_IFTABLE* m_pIfTable{};
     DWORD m_dwSize{ sizeof(MIB_IFTABLE) };
@@ -103,19 +106,19 @@ private:
     unsigned __int64 m_out_bytes{};
     unsigned __int64 m_last_in_bytes{};
     unsigned __int64 m_last_out_bytes{};
-    std::string m_connection_name_preferd;  // ç”¨æˆ·æ‰‹åŠ¨é€‰æ‹©çš„è¿æ¥åç§°
+    std::string m_connection_name_preferd;  // ÓÃ»§ÊÖ¶¯Ñ¡ÔñµÄÁ¬½ÓÃû³Æ
     int m_zero_speed_cnt{};
     int m_restart_cnt{ -1 };
     bool m_connection_change_flag{};
-    bool m_delayed_auto_select_pending{};   // æ˜¯å¦éœ€è¦å»¶è¿Ÿè‡ªåŠ¨é€‰æ‹©
+    bool m_delayed_auto_select_pending{};   // ÊÇ·ñĞèÒªÑÓ³Ù×Ô¶¯Ñ¡Ôñ
 
-    // å†å²æµé‡
+    // ÀúÊ·Á÷Á¿
     CHistoryTrafficFile m_history_traffic;
     uint64_t m_today_up_traffic{};
     uint64_t m_today_down_traffic{};
     unsigned int m_monitor_time_cnt{};
 
-    // é‡‡æ ·è¾…åŠ©
+    // ²ÉÑù¸¨Öú
     CCPUUsage m_cpu_usage_helper;
     CPdhCpuFreq m_cpu_freq_helper;
     CPdhGPUUsage m_gpu_usage_helper;

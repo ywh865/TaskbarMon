@@ -1,4 +1,4 @@
-ï»¿// TaskbarColorDlg.cpp : å®žçŽ°æ–‡ä»¶
+// TaskbarColorDlg.cpp : ÊµÏÖÎÄ¼þ
 //
 
 #include "stdafx.h"
@@ -8,7 +8,7 @@
 #include "CMFCColorDialogEx.h"
 
 
-// CTaskbarColorDlg å¯¹è¯æ¡†
+// CTaskbarColorDlg ¶Ô»°¿ò
 
 IMPLEMENT_DYNAMIC(CTaskbarColorDlg, CBaseDialog)
 
@@ -38,18 +38,18 @@ BEGIN_MESSAGE_MAP(CTaskbarColorDlg, CBaseDialog)
 END_MESSAGE_MAP()
 
 
-// CTaskbarColorDlg æ¶ˆæ¯å¤„ç†ç¨‹åº
+// CTaskbarColorDlg ÏûÏ¢´¦Àí³ÌÐò
 
 
 BOOL CTaskbarColorDlg::OnInitDialog()
 {
 	CBaseDialog::OnInitDialog();
 
-	// TODO:  åœ¨æ­¤æ·»åŠ é¢å¤–çš„åˆå§‹åŒ–
+	// TODO:  ÔÚ´ËÌí¼Ó¶îÍâµÄ³õÊ¼»¯
 
-    SetIcon(theApp.GetMenuIcon(IDI_TASKBAR_WINDOW), FALSE);		// è®¾ç½®å°å›¾æ ‡
+    SetIcon(theApp.GetMenuIcon(IDI_TASKBAR_WINDOW), FALSE);		// ÉèÖÃÐ¡Í¼±ê
 
-    //åˆå§‹åŒ–åˆ—è¡¨æŽ§ä»¶
+    //³õÊ¼»¯ÁÐ±í¿Ø¼þ
     CRect rect;
     m_list_ctrl.GetClientRect(rect);
     m_list_ctrl.SetExtendedStyle(LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP);
@@ -61,10 +61,10 @@ BOOL CTaskbarColorDlg::OnInitDialog()
     m_list_ctrl.InsertColumn(2, CCommon::LoadText(IDS_COLOR_VALUE), LVCFMT_LEFT, width2);
     m_list_ctrl.SetDrawItemRangMargin(theApp.DPI(2));
 
-    //å‘åˆ—è¡¨ä¸­æ’å…¥è¡Œ
+    //ÏòÁÐ±íÖÐ²åÈëÐÐ
     for (auto iter = AllDisplayItems.begin(); iter != AllDisplayItems.end(); ++iter)
     {
-        CString item_name = iter->GetItemName();
+        CString item_name = CommonDisplayItem(*iter).GetItemName();
         if (!item_name.IsEmpty())
         {
             int index = m_list_ctrl.GetItemCount();
@@ -76,7 +76,7 @@ BOOL CTaskbarColorDlg::OnInitDialog()
     }
 
 	return TRUE;  // return TRUE unless you set the focus to a control
-				  // å¼‚å¸¸: OCX å±žæ€§é¡µåº”è¿”å›ž FALSE
+				  // Òì³£: OCX ÊôÐÔÒ³Ó¦·µ»Ø FALSE
 }
 
 
@@ -84,7 +84,7 @@ BOOL CTaskbarColorDlg::OnInitDialog()
 void CTaskbarColorDlg::OnNMDblclkList1(NMHDR *pNMHDR, LRESULT *pResult)
 {
     LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
-    // TODO: åœ¨æ­¤æ·»åŠ æŽ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼þÍ¨Öª´¦Àí³ÌÐò´úÂë
     int index = pNMItemActivate->iItem;
     int col = pNMItemActivate->iSubItem;
     if (col == 1 || col == 2)

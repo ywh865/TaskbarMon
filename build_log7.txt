@@ -1,0 +1,8 @@
+
+  OpenHardwareMonitorApi.vcxproj -> F:\DeepSeek_Workspace\TaskbarMon\Bin\x64\Release\OpenHardwareMonitorApi.dll
+  
+TaskbarMon.rc(135): error RC2112: BEGIN expected in dialog [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  
+  
+TaskbarMon.rc(135): error RC2135: file not found: 0 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  

@@ -1,0 +1,75 @@
+
+  OpenHardwareMonitorApi.vcxproj -> F:\DeepSeek_Workspace\TaskbarMon\Bin\x64\Release\OpenHardwareMonitorApi.dll
+  BaseDialog.cpp
+  DisplayTextSettingDlg.cpp
+  GeneralSettingsDlg.cpp
+  TaskBarDlg.cpp
+  TaskBarSettingsDlg.cpp
+  TaskbarMon.cpp
+  TrafficMonitorDlg.cpp
+  MonitorService.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(117,41): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(143,40): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(150,41): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(234,44): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(497,40): warning C4244: “=”: 从“_Ty2”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(497,40): warning C4244:         with [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(497,40): warning C4244:         [ [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(497,40): warning C4244:             _Ty2=float [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(497,40): warning C4244:         ] [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(636,43): warning C4244: “return”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(909,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(915,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(921,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(927,72): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarSettingsDlg.cpp(422,59): warning C4311: “类型强制转换”: 从“HMENU”到“UINT”的指针截断 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarSettingsDlg.cpp(422,59): warning C4302: “类型强制转换”: 从“HMENU”到“UINT”截断 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(252,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(255,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(258,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(261,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(1186,34): warning C4244: “=”: 从“unsigned __int64”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+  tinyxml2.cpp
+  
+TaskbarMon.rc(72): error RC2135: file not found: res\TrafficMonitor.ico [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  
+  
+TaskbarMon.rc(434): error RC2135: file not found: FONT [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  

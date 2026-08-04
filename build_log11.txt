@@ -1,0 +1,4 @@
+
+  OpenHardwareMonitorApi.vcxproj -> F:\DeepSeek_Workspace\TaskbarMon\Bin\x64\Release\OpenHardwareMonitorApi.dll
+TrafficMonitorDlg.obj : error LNK2001: 无法解析的外部符号 "public: void __cdecl CTrafficMonitorDlg::OnChangeNotifyIcon(void)" (?OnChangeNotifyIcon@CTrafficMonitorDlg@@QEAAXXZ) [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+F:\DeepSeek_Workspace\TaskbarMon\Bin\x64\Release\TaskbarMon.exe : fatal error LNK1120: 1 个无法解析的外部命令 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]

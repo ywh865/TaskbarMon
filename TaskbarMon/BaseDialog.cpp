@@ -1,4 +1,4 @@
-ï»¿// BaseDialog.cpp : å®ç°æ–‡ä»¶
+// BaseDialog.cpp : ÊµÏÖÎÄ¼ş
 //
 
 #include "stdafx.h"
@@ -8,7 +8,7 @@
 #include "TaskbarMon.h"
 #include "TrafficMonitorDlg.h"
 
-// CBaseDialog å¯¹è¯æ¡†
+// CBaseDialog ¶Ô»°¿ò
 std::map<CString, HWND> CBaseDialog::m_unique_hwnd;
 
 IMPLEMENT_DYNAMIC(CBaseDialog, CDialog)
@@ -74,7 +74,7 @@ void CBaseDialog::LoadConfig()
     if (!GetDialogName().IsEmpty() && m_remember_dlg_size)
     {
         CIniHelper ini{ theApp.m_config_path };
-        //è½½å…¥çª—å£å¤§å°è®¾ç½®
+        //ÔØÈë´°¿Ú´óĞ¡ÉèÖÃ
         m_window_size.cx = ini.GetInt(_T("window_size"), GetDialogName() + _T("_width"), -1);
         m_window_size.cy = ini.GetInt(_T("window_size"), GetDialogName() + _T("_height"), -1);
     }
@@ -85,7 +85,7 @@ void CBaseDialog::SaveConfig() const
     if (!GetDialogName().IsEmpty() && m_remember_dlg_size)
     {
         CIniHelper ini{ theApp.m_config_path };
-        //ä¿å­˜çª—å£å¤§å°è®¾ç½®
+        //±£´æ´°¿Ú´óĞ¡ÉèÖÃ
         ini.WriteInt(_T("window_size"), GetDialogName() + _T("_width"), m_window_size.cx);
         ini.WriteInt(_T("window_size"), GetDialogName() + _T("_height"), m_window_size.cy);
         ini.Save();
@@ -97,18 +97,18 @@ void CBaseDialog::IterateControls(CWnd* pParent, std::function<void(CWnd*)> func
     if (pParent == nullptr)
         return;
 
-    // è·å–ç¬¬ä¸€ä¸ªå­æ§ä»¶
+    // »ñÈ¡µÚÒ»¸ö×Ó¿Ø¼ş
     CWnd* pChild = pParent->GetWindow(GW_CHILD);
 
-    // éå†æ‰€æœ‰å­æ§ä»¶
+    // ±éÀúËùÓĞ×Ó¿Ø¼ş
     while (pChild != nullptr)
     {
         func(pChild);
 
-        // é€’å½’éå†å­æ§ä»¶çš„å­æ§ä»¶ï¼ˆå¤„ç†åµŒå¥—æ§ä»¶ï¼‰
+        // µİ¹é±éÀú×Ó¿Ø¼şµÄ×Ó¿Ø¼ş£¨´¦ÀíÇ¶Ì×¿Ø¼ş£©
         IterateControls(pChild, func);
 
-        // è·å–ä¸‹ä¸€ä¸ªå…„å¼Ÿæ§ä»¶
+        // »ñÈ¡ÏÂÒ»¸öĞÖµÜ¿Ø¼ş
         pChild = pChild->GetWindow(GW_HWNDNEXT);
     }
 }
@@ -141,19 +141,19 @@ int CBaseDialog::DPI(int pixel) const
 
 CRect CBaseDialog::GetTextExtent(const CString& text)
 {
-    ASSERT(m_pDC != nullptr);   // m_pDCç”±OnInitDialogè´Ÿè´£ç”³è¯·é‡Šæ”¾
+    ASSERT(m_pDC != nullptr);   // m_pDCÓÉOnInitDialog¸ºÔğÉêÇëÊÍ·Å
     if (m_pDC == nullptr)
         return CRect();
     if (text.IsEmpty())
         return CRect();
     CRect text_size;
-    m_pDC->DrawTextW(text, &text_size, DT_CALCRECT);    // ä½¿ç”¨CDC::DrawTextWæµ‹é‡æ–‡æœ¬å®½åº¦ï¼ˆCDC::GetTextExtentæ˜¯ç†è®ºå®½åº¦ï¼Œä¸å‡†ç¡®ï¼‰
+    m_pDC->DrawTextW(text, &text_size, DT_CALCRECT);    // Ê¹ÓÃCDC::DrawTextW²âÁ¿ÎÄ±¾¿í¶È£¨CDC::GetTextExtentÊÇÀíÂÛ¿í¶È£¬²»×¼È·£©
     return text_size;
 }
 
 void CBaseDialog::RepositionTextBasedControls(const vector<CtrlTextInfo>& items, CtrlTextInfo::Width center_min_width)
 {
-    ASSERT(m_pDC != nullptr);   // æ­¤æ–¹æ³•ä»…åœ¨InitializeControlsæœŸé—´å¯ç”¨
+    ASSERT(m_pDC != nullptr);   // ´Ë·½·¨½öÔÚInitializeControlsÆÚ¼ä¿ÉÓÃ
     if (m_pDC == nullptr)
         return;
     int center_width = theApp.DPI(center_min_width);
@@ -171,7 +171,7 @@ void CBaseDialog::RepositionTextBasedControls(const vector<CtrlTextInfo>& items,
     {
         ASSERT(item.col_index != CtrlTextInfo::UN_USE);
         ASSERT(item.id != 0);
-        // è·å–æ‰€æœ‰åˆ—æ‰€éœ€dxï¼Œä»¥åŠå·¦è´´é å…ƒç´ çš„å³è¾¹ç¼˜center_leftï¼Œå³è´´é å…ƒç´ çš„å·¦è¾¹ç¼˜center_right
+        // »ñÈ¡ËùÓĞÁĞËùĞèdx£¬ÒÔ¼°×óÌù¿¿ÔªËØµÄÓÒ±ßÔµcenter_left£¬ÓÒÌù¿¿ÔªËØµÄ×ó±ßÔµcenter_right
         CWnd* pItem = GetDlgItem(item.id);
         if (pItem == nullptr)
             continue;
@@ -181,14 +181,14 @@ void CBaseDialog::RepositionTextBasedControls(const vector<CtrlTextInfo>& items,
         CString text;
         pItem->GetWindowTextW(text);
         int dx = GetTextExtent(text).Width() + theApp.DPI(item.ext_width) - rect.Width();
-        if (dx < 0) dx = 0;                                     // æ–‡å­—åªå¢åŠ æ§ä»¶å®½åº¦
-        if (col_info[item.col_index].first < dx)                // å–æ­¤åˆ—å…ƒç´ ä¸­å®½åº¦å¢é•¿æœ€å¤šçš„
+        if (dx < 0) dx = 0;                                     // ÎÄ×ÖÖ»Ôö¼Ó¿Ø¼ş¿í¶È
+        if (col_info[item.col_index].first < dx)                // È¡´ËÁĞÔªËØÖĞ¿í¶ÈÔö³¤×î¶àµÄ
             col_info[item.col_index].first = dx;
         if (item.col_index < 0 && center_left < rect.right)
             center_left = rect.right;
         if (item.col_index > 0 && center_right > rect.left)
             center_right = rect.left;
-        if (item.col_index == 0)    // col_indexä¸º0çš„æ§ä»¶å¯èƒ½æœ‰å¤šä¸ª
+        if (item.col_index == 0)    // col_indexÎª0µÄ¿Ø¼ş¿ÉÄÜÓĞ¶à¸ö
         {
             if (center_left < rect.left)
                 center_left = rect.left;
@@ -198,21 +198,21 @@ void CBaseDialog::RepositionTextBasedControls(const vector<CtrlTextInfo>& items,
         items_info.emplace_back(itemInfo{ item.col_index, pItem, std::move(rect) });
     }
 
-    if (center_right == INT_MAX)    // å¦‚æœæ§ä»¶å…¨éƒ¨éƒ½æ˜¯å·¦è´´é çš„é‚£ä¹ˆä»¥çª—å£å³è¾¹ç¼˜ä½œä¸ºå‰©ä½™ç©ºé—´çš„å³è¾¹ç¼˜
+    if (center_right == INT_MAX)    // Èç¹û¿Ø¼şÈ«²¿¶¼ÊÇ×óÌù¿¿µÄÄÇÃ´ÒÔ´°¿ÚÓÒ±ßÔµ×÷ÎªÊ£Óà¿Õ¼äµÄÓÒ±ßÔµ
     {
         CRect dlg_rect{};
         GetClientRect(&dlg_rect);
         center_right = dlg_rect.Width();
     }
-    // æ­¤æ–­è¨€è§¦å‘è¯´æ˜èµ„æºæ–‡ä»¶ä¸­çš„åŸå§‹å¸ƒå±€æ²¡æœ‰ç»™ä¸­é—´æ§ä»¶/ç©ºé—²ç©ºé—´ç•™å¤Ÿå®½åº¦
+    // ´Ë¶ÏÑÔ´¥·¢ËµÃ÷×ÊÔ´ÎÄ¼şÖĞµÄÔ­Ê¼²¼¾ÖÃ»ÓĞ¸øÖĞ¼ä¿Ø¼ş/¿ÕÏĞ¿Õ¼äÁô¹»¿í¶È
     ASSERT(center_right - center_left >= center_width);
     int dx_sum_left{}, dx_sum_right{};
-    // å› ä¸ºåŒä¸€col_indexå¯ä»¥æœ‰å¤šä¸ªæ§ä»¶&æ²¡æœ‰è¦æ±‚é¡ºåºæ‰€ä»¥æ§ä»¶çš„æœ€ç»ˆä½ç½®å¿…é¡»å¯ä»¥æ— çŠ¶æ€çš„è®¡ç®—å‡ºæ¥
+    // ÒòÎªÍ¬Ò»col_index¿ÉÒÔÓĞ¶à¸ö¿Ø¼ş&Ã»ÓĞÒªÇóË³ĞòËùÒÔ¿Ø¼şµÄ×îÖÕÎ»ÖÃ±ØĞë¿ÉÒÔÎŞ×´Ì¬µÄ¼ÆËã³öÀ´
     for (auto& a : col_info)
     {
         if (a.first < 0)
         {
-            a.second.second = dx_sum_left;    // å­˜å‚¨æ­¤åˆ—ä¹‹å‰æ§ä»¶çš„æ€»dxï¼Œå³æ­¤åˆ—æ§ä»¶çš„å³ç§»è·ç¦»
+            a.second.second = dx_sum_left;    // ´æ´¢´ËÁĞÖ®Ç°¿Ø¼şµÄ×Üdx£¬¼´´ËÁĞ¿Ø¼şµÄÓÒÒÆ¾àÀë
             dx_sum_left += a.second.first;
         }
         else if (a.first > 0)
@@ -225,8 +225,8 @@ void CBaseDialog::RepositionTextBasedControls(const vector<CtrlTextInfo>& items,
     if (center_right - center_left - dx_sum_left - dx_sum_right < center_width)
     {
         // ASSERT(false);
-        // ç°åœ¨åŠ è½½çš„æ–‡æœ¬ä½¿æ­¤è¡Œçš„ä¸­é—´æ§ä»¶/ç©ºé—²ç©ºé—´è¢«æŒ¤å‹çš„å¤ªå°
-        // è¿™éœ€è¦é‡æ–°è®¾è®¡çª—å£æ§ä»¶æ’å¸ƒä»¥é€‚åº”å½“å‰ç¿»è¯‘é•¿åº¦ï¼Œè¿™é‡Œå…ˆç®€å•çš„æŠŠç¼ºå°‘çš„ç©ºé—´åˆ†æ‘Šç»™å„dx
+        // ÏÖÔÚ¼ÓÔØµÄÎÄ±¾Ê¹´ËĞĞµÄÖĞ¼ä¿Ø¼ş/¿ÕÏĞ¿Õ¼ä±»¼·Ñ¹µÄÌ«Ğ¡
+        // ÕâĞèÒªÖØĞÂÉè¼Æ´°¿Ú¿Ø¼şÅÅ²¼ÒÔÊÊÓ¦µ±Ç°·­Òë³¤¶È£¬ÕâÀïÏÈ¼òµ¥µÄ°ÑÈ±ÉÙµÄ¿Õ¼ä·ÖÌ¯¸ø¸÷dx
         scale = static_cast<float>(center_right - center_left - center_width) / (dx_sum_left + dx_sum_right);
         dx_sum_left = static_cast<int>(dx_sum_left * scale + 0.5f);
         dx_sum_right = static_cast<int>(dx_sum_right * scale + 0.5f);
@@ -299,7 +299,7 @@ BEGIN_MESSAGE_MAP(CBaseDialog, CDialog)
 END_MESSAGE_MAP()
 
 
-// CBaseDialog æ¶ˆæ¯å¤„ç†ç¨‹åº
+// CBaseDialog ÏûÏ¢´¦Àí³ÌĞò
 
 
 BOOL CBaseDialog::OnInitDialog()
@@ -307,9 +307,9 @@ BOOL CBaseDialog::OnInitDialog()
     m_unique_hwnd[GetDialogName()] = m_hWnd;
     CDialog::OnInitDialog();
 
-    // TODO:  åœ¨æ­¤æ·»åŠ é¢å¤–çš„åˆå§‹åŒ–
+    // TODO:  ÔÚ´ËÌí¼Ó¶îÍâµÄ³õÊ¼»¯
 
-    //åˆå§‹åŒ–å­—ä½“
+    //³õÊ¼»¯×ÖÌå
     CRect rect;
     GetWindowRect(rect);
     FontInfo font_info;
@@ -321,7 +321,7 @@ BOOL CBaseDialog::OnInitDialog()
 
     font_info.Create(m_dlg_font, m_dpi);
 
-    //è·å–åˆå§‹æ—¶çª—å£çš„å¤§å°
+    //»ñÈ¡³õÊ¼Ê±´°¿ÚµÄ´óĞ¡
     if (m_min_size.cx <= 0 || m_min_size.cy <= 0)
     {
         CRect rect;
@@ -330,28 +330,28 @@ BOOL CBaseDialog::OnInitDialog()
         m_min_size.cy = rect.Height() * 96 / theApp.GetDpi();
     }
 
-    //è½½å…¥è®¾ç½®
+    //ÔØÈëÉèÖÃ
     LoadConfig();
 
-    SetWindowPos(&wndNoTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);       //å–æ¶ˆç½®é¡¶
+    SetWindowPos(&wndNoTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);       //È¡ÏûÖÃ¶¥
 
-    //å¤„ç†å¯¹è¯æ¡†ä¸­çš„æ–‡æœ¬ç¿»è¯‘ 
+    //´¦Àí¶Ô»°¿òÖĞµÄÎÄ±¾·­Òë 
     IterateControls([&](CWnd* pWnd) {
-        //è®¾ç½®æ§ä»¶å­—ä½“
+        //ÉèÖÃ¿Ø¼ş×ÖÌå
         if (m_dlg_font.GetSafeHandle() != NULL)
             pWnd->SetFont(&m_dlg_font);
-        //è·å–æ§ä»¶æ–‡æœ¬
+        //»ñÈ¡¿Ø¼şÎÄ±¾
         CString str;
         pWnd->GetWindowText(str);
         UINT id = pWnd->GetDlgCtrlID();
         if (str.Left(4) == _T("TXT_"))
         {
-            //è®¾ç½®æ§ä»¶æ–‡æœ¬
+            //ÉèÖÃ¿Ø¼şÎÄ±¾
             const std::wstring& str_translated = theApp.m_str_table.LoadText(str.GetString());
             if (!str_translated.empty())
                 pWnd->SetWindowTextW(str_translated.c_str());
         }
-        //å¤„ç†æ ‡å‡†æŒ‰é’®
+        //´¦Àí±ê×¼°´Å¥
         else
         {
             if (id == IDOK)
@@ -363,26 +363,26 @@ BOOL CBaseDialog::OnInitDialog()
         }
     });
 
-    // åœ¨è¿˜åŸçª—å£å¤§å°ä¹‹å‰ï¼ˆå½“å‰çª—å£çŠ¶æ€ä¸èµ„æºä¸€è‡´ï¼‰ï¼Œæ´¾ç”Ÿç±»æ‰§è¡Œæ§ä»¶æ–‡æœ¬åˆå§‹åŒ–åŠè°ƒæ•´æ§ä»¶æ’å¸ƒ
-    // ä¸å®é™…çª—å£å¤§å°ç›¸å…³çš„åˆå§‹åŒ–ï¼ˆæ¯”å¦‚è¡¨æ ¼åˆ—å®½ï¼‰åº”åœ¨æ´¾ç”Ÿç±»çš„OnInitDialogè¿›è¡Œ
+    // ÔÚ»¹Ô­´°¿Ú´óĞ¡Ö®Ç°£¨µ±Ç°´°¿Ú×´Ì¬Óë×ÊÔ´Ò»ÖÂ£©£¬ÅÉÉúÀàÖ´ĞĞ¿Ø¼şÎÄ±¾³õÊ¼»¯¼°µ÷Õû¿Ø¼şÅÅ²¼
+    // ÓëÊµ¼Ê´°¿Ú´óĞ¡Ïà¹ØµÄ³õÊ¼»¯£¨±ÈÈç±í¸ñÁĞ¿í£©Ó¦ÔÚÅÉÉúÀàµÄOnInitDialog½øĞĞ
     m_pDC = GetDC();
     m_pDC->SelectObject(&m_dlg_font);
     bool rtn = InitializeControls();
     ReleaseDC(m_pDC);
     m_pDC = nullptr;
-    // å¦‚æœæ›´æ”¹äº†æ§ä»¶æ’å¸ƒé‚£ä¹ˆåº”å½“è¿”å›trueä»¥å‘å¸ƒå±€ç®¡ç†å™¨åº”ç”¨æ§ä»¶è°ƒæ•´ï¼ˆé‡æ–°åŠ è½½åŠ¨æ€å¸ƒå±€è®¾ç½®ï¼‰
+    // Èç¹û¸ü¸ÄÁË¿Ø¼şÅÅ²¼ÄÇÃ´Ó¦µ±·µ»ØtrueÒÔÏò²¼¾Ö¹ÜÀíÆ÷Ó¦ÓÃ¿Ø¼şµ÷Õû£¨ÖØĞÂ¼ÓÔØ¶¯Ì¬²¼¾ÖÉèÖÃ£©
     if (rtn)
         ReLoadLayoutResource();
 
 
-    //åˆå§‹åŒ–çª—å£å¤§å°
+    //³õÊ¼»¯´°¿Ú´óĞ¡
     if (m_window_size.cx > 0 && m_window_size.cy > 0)
     {
         SetWindowPos(nullptr, 0, 0, m_window_size.cx, m_window_size.cy, SWP_NOZORDER | SWP_NOMOVE);
     }
 
     return TRUE;  // return TRUE unless you set the focus to a control
-                  // å¼‚å¸¸: OCX å±æ€§é¡µåº”è¿”å› FALSE
+                  // Òì³£: OCX ÊôĞÔÒ³Ó¦·µ»Ø FALSE
 }
 
 
@@ -390,23 +390,18 @@ void CBaseDialog::OnDestroy()
 {
     CDialog::OnDestroy();
 
-    // TODO: åœ¨æ­¤å¤„æ·»åŠ æ¶ˆæ¯å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´Ë´¦Ìí¼ÓÏûÏ¢´¦Àí³ÌĞò´úÂë
     m_unique_hwnd[GetDialogName()] = NULL;
     SaveConfig();
-
-    //å½“æ‰€æœ‰å¯¹è¯æ¡†å…³é—­æ—¶é‡æ–°è®¾ç½®ä¸»çª—å£ç½®é¡¶
-    CTrafficMonitorDlg* pDlg = dynamic_cast<CTrafficMonitorDlg*>(theApp.m_pMainWnd);
-    if (pDlg != nullptr && IsAllDialogClosed())
-        pDlg->SetAlwaysOnTop();
 }
 
 
 void CBaseDialog::OnGetMinMaxInfo(MINMAXINFO* lpMMI)
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ¶ˆæ¯å¤„ç†ç¨‹åºä»£ç å’Œ/æˆ–è°ƒç”¨é»˜è®¤å€¼
-    //é™åˆ¶çª—å£æœ€å°å¤§å°
-    lpMMI->ptMinTrackSize.x = theApp.DPI(m_min_size.cx);		//è®¾ç½®æœ€å°å®½åº¦
-    lpMMI->ptMinTrackSize.y = theApp.DPI(m_min_size.cy);		//è®¾ç½®æœ€å°é«˜åº¦
+    // TODO: ÔÚ´ËÌí¼ÓÏûÏ¢´¦Àí³ÌĞò´úÂëºÍ/»òµ÷ÓÃÄ¬ÈÏÖµ
+    //ÏŞÖÆ´°¿Ú×îĞ¡´óĞ¡
+    lpMMI->ptMinTrackSize.x = theApp.DPI(m_min_size.cx);		//ÉèÖÃ×îĞ¡¿í¶È
+    lpMMI->ptMinTrackSize.y = theApp.DPI(m_min_size.cy);		//ÉèÖÃ×îĞ¡¸ß¶È
 
     CDialog::OnGetMinMaxInfo(lpMMI);
 }
@@ -416,7 +411,7 @@ void CBaseDialog::OnSize(UINT nType, int cx, int cy)
 {
     CDialog::OnSize(nType, cx, cy);
 
-    // TODO: åœ¨æ­¤å¤„æ·»åŠ æ¶ˆæ¯å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´Ë´¦Ìí¼ÓÏûÏ¢´¦Àí³ÌĞò´úÂë
     if (nType != SIZE_MAXIMIZED && nType != SIZE_MINIMIZED)
     {
         //m_window_width = cx;
@@ -433,7 +428,7 @@ void CBaseDialog::OnSize(UINT nType, int cx, int cy)
 INT_PTR CBaseDialog::DoModal()
 {
     HWND unique_hwnd{ m_unique_hwnd[GetDialogName()] };
-    if (unique_hwnd != NULL && !GetDialogName().IsEmpty())      ///å¦‚æœå¯¹è¯æ¡†å·²å­˜åœ¨ï¼Œåˆ™æ˜¾ç¤ºå·²å­˜åœ¨çš„å¯¹è¯æ¡†
+    if (unique_hwnd != NULL && !GetDialogName().IsEmpty())      ///Èç¹û¶Ô»°¿òÒÑ´æÔÚ£¬ÔòÏÔÊ¾ÒÑ´æÔÚµÄ¶Ô»°¿ò
     {
         ::ShowWindow(unique_hwnd, SW_RESTORE);
         ::SetForegroundWindow(unique_hwnd);
@@ -445,7 +440,7 @@ INT_PTR CBaseDialog::DoModal()
 
 BOOL CBaseDialog::OnEraseBkgnd(CDC* pDC)
 {
-    // ä¿®æ”¹çª—å£èƒŒæ™¯ï¼ˆCDialogExï¼‰
+    // ĞŞ¸Ä´°¿Ú±³¾°£¨CDialogEx£©
     if (m_brBkgr.GetSafeHandle() != NULL)
     {
         ASSERT_VALID(pDC);
@@ -460,14 +455,14 @@ BOOL CBaseDialog::OnEraseBkgnd(CDC* pDC)
 
 HBRUSH CBaseDialog::OnCtlColor(CDC* pDC, CWnd* pWnd, UINT nCtlColor)
 {
-    // ä¿®æ”¹çª—å£èƒŒæ™¯ï¼ˆCDialogExï¼‰
+    // ĞŞ¸Ä´°¿Ú±³¾°£¨CDialogEx£©
     if (m_brBkgr.GetSafeHandle() != NULL)
     {
 #define AFX_MAX_CLASS_NAME 255
 #define AFX_STATIC_CLASS _T("Static")
 #define AFX_BUTTON_CLASS _T("Button")
-#define AFX_SLIDER_CLASS _T("msctls_trackbar32")    // æ»‘åŠ¨æ¡æ§ä»¶CSliderCtrlåŠå…¶æ´¾ç”Ÿç±»
-#define AFX_SYSLINK_CLASS _T("SysLink")             // è¶…é“¾æ¥æ§ä»¶CSysLinkåŠå…¶æ´¾ç”Ÿç±»
+#define AFX_SLIDER_CLASS _T("msctls_trackbar32")    // »¬¶¯Ìõ¿Ø¼şCSliderCtrl¼°ÆäÅÉÉúÀà
+#define AFX_SYSLINK_CLASS _T("SysLink")             // ³¬Á´½Ó¿Ø¼şCSysLink¼°ÆäÅÉÉúÀà
 
         if (nCtlColor == CTLCOLOR_STATIC)
         {

@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "TaskbarMon.h"
 #include "TrafficMonitorDlg.h"
+#include "core/ConfigStore.h"
 #include "crashtool.h"
 #include "UpdateHelper.h"
 #include "Test.h"

@@ -1,0 +1,195 @@
+
+  OpenHardwareMonitorApi.vcxproj -> F:\DeepSeek_Workspace\TaskbarMon\Bin\x64\Release\OpenHardwareMonitorApi.dll
+  BaseDialog.cpp
+  DisplayTextSettingDlg.cpp
+  GeneralSettingsDlg.cpp
+  TaskbarColorDlg.cpp
+  TaskBarDlg.cpp
+  TaskBarSettingsDlg.cpp
+  TaskbarMon.cpp
+  TrafficMonitorDlg.cpp
+  MonitorService.cpp
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(117,41): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(143,40): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(150,41): warning C4267: “=”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(234,44): warning C4267: “参数”: 从“size_t”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(309,41): error C2664: “CString CCommon::LoadTextFormat(const wchar_t *,const std::initializer_list<CVariant> &)”: 无法将参数 2 从“initializer list”转换为“const std::initializer_list<CVariant> &” [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/core/MonitorService.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(309,84):
+      原因如下: 无法从“initializer list”转换为“const std::initializer_list<CVariant>”
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(309,84):
+      元素“1”: 没有从“DWORD”到“CVariant”的转换
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(309,84):
+      元素“2”: 没有从“DWORD”到“CVariant”的转换
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\Common.h(161,20):
+      参见“CCommon::LoadTextFormat”的声明
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\core\MonitorService.cpp(309,41):
+      尝试匹配参数列表“(const wchar_t [27], initializer list)”时
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarColorDlg.cpp(67,29): error C2839: 重载的“operator ->”的无效返回类型“const DisplayItem *” [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskbarColorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarColorDlg.cpp(67,35): error C2039: "GetItemName": 不是 "std::_Tree_const_iterator<std::_Tree_val<std::_Tree_simple_types<DisplayItem>>>" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskbarColorDlg.cpp”)
+      F:\VS2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xtree(165,7):
+      参见“std::_Tree_const_iterator<std::_Tree_val<std::_Tree_simple_types<DisplayItem>>>”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(55,13): error C3668: “CTrafficMonitorDlg::CHardwareDataProvider::HddUsage”: 包含重写说明符“override”的方法没有重写任何基类方法 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(55,13): error C3668: “CTrafficMonitorDlg::CHardwareDataProvider::HddUsage”: 包含重写说明符“override”的方法没有重写任何基类方法 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(55,13): error C3668: “CTrafficMonitorDlg::CHardwareDataProvider::HddUsage”: 包含重写说明符“override”的方法没有重写任何基类方法 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/DisplayTextSettingDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(55,13): error C3668: “CTrafficMonitorDlg::CHardwareDataProvider::HddUsage”: 包含重写说明符“override”的方法没有重写任何基类方法 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(55,13): error C3668: “CTrafficMonitorDlg::CHardwareDataProvider::HddUsage”: 包含重写说明符“override”的方法没有重写任何基类方法 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(55,13): error C3668: “CTrafficMonitorDlg::CHardwareDataProvider::HddUsage”: 包含重写说明符“override”的方法没有重写任何基类方法 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/BaseDialog.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\DrawCommonHelper.h(1,1): warning C4819: 该文件包含不能在当前代码页(936)中表示的字符。请将该文件保存为 Unicode 格式以防止数据丢失 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(590,49): error C2712: 无法在要求对象展开的函数中使用 __try [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(633,43): warning C4244: “return”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(389,66): error C2039: "GetPdhDiskUsageHelper": 不是 "CTrafficMonitorDlg" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(23,7):
+      参见“CTrafficMonitorDlg”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(389,32): error C2530: “disk_names”: 必须初始化引用 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(390,37): error C3536: “disk_names”: 初始化之前无法使用 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(390,37): error C3312: 找不到类型 "<error type>" 的可调用 "begin" 函数 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(390,37): error C3312: 找不到类型 "<error type>" 的可调用 "end" 函数 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(390,26): error C2530: “hdd_name”: 必须初始化引用 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(390,26): error C3531: “hdd_name”: 类型包含“auto”的符号必须具有初始值设定项 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(390,35): error C2143: 语法错误: 缺少“;”(在“:”的前面) [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(390,47): error C2143: 语法错误: 缺少“;”(在“)”的前面) [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(391,31): error C2664: “int CComboBox::AddString(LPCTSTR)”: 无法将参数 1 从“<error type>”转换为“LPCTSTR” [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/GeneralSettingsDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(391,41):
+      从整型类型转换为指针类型需要 reinterpret_cast、C 样式转换或带圆括号的函数样式强制转换
+      F:\VS2022\BuildTools\VC\Tools\MSVC\14.44.35207\atlmfc\include\afxwin2.inl(794,31):
+      参见“CComboBox::AddString”的声明
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\GeneralSettingsDlg.cpp(391,31):
+      尝试匹配参数列表“(<error type>)”时
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarSettingsDlg.cpp(422,59): warning C4311: “类型强制转换”: 从“HMENU”到“UINT”的指针截断 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarSettingsDlg.cpp(422,59): warning C4302: “类型强制转换”: 从“HMENU”到“UINT”截断 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarSettingsDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(655,5): error C2440: “return”: 无法从“const std::map<std::wstring,float,std::less<std::wstring>,std::allocator<std::pair<const std::wstring,float>>>”转换为“std::map<std::wstring,int,std::less<std::wstring>,std::allocator<std::pair<const std::wstring,int>>>” [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(655,5):
+      没有可用于执行该转换的用户定义的转换运算符，或者无法调用该运算符
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(738,26): error C2039: "DoMonitorAcquisition": 不是 "CTrafficMonitorDlg" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(23,7):
+      参见“CTrafficMonitorDlg”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(741,5): error C2065: “m_monitor_service”: 未声明的标识符 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(744,39): error C2065: “m_monitor_service”: 未声明的标识符 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(744,37): error C2530: “snapshot”: 必须初始化引用 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(761,33): error C2065: “m_monitor_service”: 未声明的标识符 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(764,5): error C2660: “SendMessageW”: 函数不接受 1 个参数 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um\winuser.h(3709,1):
+      参见“SendMessageW”的声明
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(764,5):
+      尝试匹配参数列表“(int)”时
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(775,20): error C2039: "DoMonitorAcquisition": 不是 "CTrafficMonitorDlg" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(23,7):
+      参见“CTrafficMonitorDlg”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(906,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(912,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(918,66): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(924,72): warning C4244: “参数”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\BaseDialog.cpp(400,15): error C2039: "SetAlwaysOnTop": 不是 "CTrafficMonitorDlg" 的成员 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/BaseDialog.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(23,7):
+      参见“CTrafficMonitorDlg”的声明
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.h(55,13): error C3668: “CTrafficMonitorDlg::CHardwareDataProvider::HddUsage”: 包含重写说明符“override”的方法没有重写任何基类方法 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskbarMon.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(1151,25): error C2665: “CNetworkInfoDlg::CNetworkInfoDlg”: 没有重载函数可以转换所有参数类型 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TrafficMonitorDlg.cpp”)
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\NetworkInfoDlg.h(15,5):
+      可能是“CNetworkInfoDlg::CNetworkInfoDlg(std::vector<NetWorkConection,std::allocator<NetWorkConection>> &,MIB_IFROW *,int,CWnd *)”
+          F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(1151,25):
+          “CNetworkInfoDlg::CNetworkInfoDlg(std::vector<NetWorkConection,std::allocator<NetWorkConection>> &,MIB_IFROW *,int,CWnd *)”: 无法将参数 1 从“const std::vector<NetWorkConection,std::allocator<NetWorkConection>>”转换为“std::vector<NetWorkConection,std::allocator<NetWorkConection>> &”
+              F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(1151,55):
+              转换丢失限定符
+      F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TrafficMonitorDlg.cpp(1151,25):
+      尝试匹配参数列表“(const std::vector<NetWorkConection,std::allocator<NetWorkConection>>, const MIB_IFROW [1], int)”时
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(252,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(255,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(258,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(261,34): warning C4244: “=”: 从“float”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  
+F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskBarDlg.cpp(1186,34): warning C4244: “=”: 从“unsigned __int64”转换到“int”，可能丢失数据 [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  (编译源文件“/TaskBarDlg.cpp”)
+  

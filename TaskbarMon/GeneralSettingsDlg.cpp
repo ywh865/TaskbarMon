@@ -1,4 +1,4 @@
-ï»¿// GeneralSettingsDlg.cpp : implementation file
+// GeneralSettingsDlg.cpp : implementation file
 //
 
 #include "stdafx.h"
@@ -26,7 +26,7 @@ CGeneralSettingsDlg::~CGeneralSettingsDlg()
 
 void CGeneralSettingsDlg::CheckTaskbarDisplayItem()
 {
-    //å¦‚æœé€‰é¡¹è®¾ç½®ä¸­å…³é—­äº†æŸä¸ªç¡¬ä»¶ç›‘æ§ï¼Œåˆ™ä¸æ˜¾ç¤ºå¯¹åº”çš„æ¸©åº¦ç›‘æ§ç›¸å…³é¡¹ç›®
+    //Èç¹ûÑ¡ÏîÉèÖÃÖĞ¹Ø±ÕÁËÄ³¸öÓ²¼ş¼à¿Ø£¬Ôò²»ÏÔÊ¾¶ÔÓ¦µÄÎÂ¶È¼à¿ØÏà¹ØÏîÄ¿
     if (!theApp.m_general_data.IsHardwareEnable(HI_CPU))
     {
         theApp.m_taskbar_data.display_item.Remove(TDI_CPU_TEMP);
@@ -60,7 +60,7 @@ void CGeneralSettingsDlg::SetControlMouseWheelEnable(bool enable)
 
 void CGeneralSettingsDlg::OnSettingsApplied()
 {
-    //å½“è®¾ç½®è¢«åº”ç”¨æ—¶ï¼Œé‡ç½®xxxx_oriçš„å€¼
+    //µ±ÉèÖÃ±»Ó¦ÓÃÊ±£¬ÖØÖÃxxxx_oriµÄÖµ
     m_monitor_time_span_ori = m_data.monitor_time_span;
     m_update_source_ori = m_data.update_source;
 }
@@ -84,14 +84,14 @@ bool CGeneralSettingsDlg::InitializeControls()
         { CtrlTextInfo::L3, IDC_LANGUAGE_COMBO }
         });
 
-    //è°ƒæ•´â€œä»Šæ—¥ä½¿ç”¨æµé‡å·²è¾¾åˆ°â€è¿™ä¸€è¡Œæ§ä»¶çš„æ°´å¹³ä½ç½®
+    //µ÷Õû¡°½ñÈÕÊ¹ÓÃÁ÷Á¿ÒÑ´ïµ½¡±ÕâÒ»ĞĞ¿Ø¼şµÄË®Æ½Î»ÖÃ
     RepositionTextBasedControls({
         { CtrlTextInfo::L4, IDC_TODAY_TRAFFIC_TIP_CHECK, CtrlTextInfo::W24 },
         { CtrlTextInfo::L3, IDC_TODAY_TRAFFIC_TIP_EDIT },
         { CtrlTextInfo::L2, IDC_TODAY_TRAFFIC_TIP_COMBO },
         { CtrlTextInfo::L1, IDC_TODAY_TRAFFIC_BACK_STATIC}
         });
-    //è°ƒæ•´â€œå†…å­˜ä½¿ç”¨ç‡å·²è¾¾åˆ°â€ã€â€œæ¸©åº¦å·²è¾¾åˆ°â€è¿™å‡ è¡Œæ§ä»¶çš„æ°´å¹³ä½ç½®
+    //µ÷Õû¡°ÄÚ´æÊ¹ÓÃÂÊÒÑ´ïµ½¡±¡¢¡°ÎÂ¶ÈÒÑ´ïµ½¡±Õâ¼¸ĞĞ¿Ø¼şµÄË®Æ½Î»ÖÃ
     RepositionTextBasedControls({
         { CtrlTextInfo::L4, IDC_MEMORY_USAGE_TIP_CHECK, CtrlTextInfo::W24 },
         { CtrlTextInfo::L3, IDC_MEMORY_USAGE_TIP_EDIT },
@@ -133,7 +133,7 @@ bool CGeneralSettingsDlg::InitializeControls()
 
 bool CGeneralSettingsDlg::ShowHardwareMonitorWarning()
 {
-    //å¦‚æœå·²ç»æœ‰ç¡¬ä»¶ç›‘æ§é¡¹ç›®è¢«å‹¾é€‰äº†ï¼Œåˆ™ä¸å†å¼¹å‡ºæç¤º
+    //Èç¹ûÒÑ¾­ÓĞÓ²¼ş¼à¿ØÏîÄ¿±»¹´Ñ¡ÁË£¬Ôò²»ÔÙµ¯³öÌáÊ¾
     if (m_data.hardware_monitor_item != 0)
         return true;
 
@@ -249,14 +249,14 @@ BEGIN_MESSAGE_MAP(CGeneralSettingsDlg, CTabDlg)
 END_MESSAGE_MAP()
 
 
-// CGeneralSettingsDlg æ¶ˆæ¯å¤„ç†ç¨‹åº
+// CGeneralSettingsDlg ÏûÏ¢´¦Àí³ÌĞò
 
 
 BOOL CGeneralSettingsDlg::OnInitDialog()
 {
     CTabDlg::OnInitDialog();
 
-    // TODO:  åœ¨æ­¤æ·»åŠ é¢å¤–çš„åˆå§‹åŒ–
+    // TODO:  ÔÚ´ËÌí¼Ó¶îÍâµÄ³õÊ¼»¯
 
     ((CButton*)GetDlgItem(IDC_CHECK_UPDATE_CHECK))->SetCheck(m_data.check_update_when_start);
     if (theApp.IsForceShowNotifyIcon())
@@ -271,7 +271,7 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
     else
         CheckDlgButton(IDC_GITEE_RADIO, TRUE);
 
-    //æ£€æŸ¥å¼€å§‹èœå•çš„â€œå¯åŠ¨â€ç›®å½•ä¸‹æœ‰æ²¡æœ‰ç¨‹åºçš„å¿«æ·æ–¹å¼ï¼Œå¦‚æœæœ‰åˆ™è®¾ç½®å¼€æœºè‡ªå¯åŠ¨ï¼Œç„¶ååˆ é™¤å¿«æ·æ–¹å¼
+    //¼ì²é¿ªÊ¼²Ëµ¥µÄ¡°Æô¶¯¡±Ä¿Â¼ÏÂÓĞÃ»ÓĞ³ÌĞòµÄ¿ì½İ·½Ê½£¬Èç¹ûÓĞÔòÉèÖÃ¿ª»ú×ÔÆô¶¯£¬È»ºóÉ¾³ı¿ì½İ·½Ê½
     wstring start_up_path = CCommon::GetStartUpPath();
     bool shortcut_exist = CCommon::FileExist((start_up_path + L"\\TrafficMonitor.lnk").c_str());
     m_data.auto_run = false;
@@ -288,7 +288,7 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
         DeleteFile((start_up_path + L"\\TrafficMonitor.lnk").c_str());
         CheckDlgButton(IDC_AUTO_RUN_METHOD_REGESTRY_RADIO, TRUE);
     }
-    //æ£€æŸ¥å¼€æœºè‡ªåŠ¨è¿è¡Œçš„è®¾ç½®æ˜¯é€šè¿‡æ³¨å†Œè¡¨è¿˜æ˜¯ä»»åŠ¡è®¡åˆ’ç¨‹åºå®ç°çš„ï¼Œå¹¶è®¾ç½®ç›¸åº”çš„é€‰é¡¹
+    //¼ì²é¿ª»ú×Ô¶¯ÔËĞĞµÄÉèÖÃÊÇÍ¨¹ı×¢²á±í»¹ÊÇÈÎÎñ¼Æ»®³ÌĞòÊµÏÖµÄ£¬²¢ÉèÖÃÏàÓ¦µÄÑ¡Ïî
     else
     {
         bool auto_run_by_registry = theApp.GetAutoRun(&m_auto_run_path, false);
@@ -350,7 +350,7 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
     SetControlEnable();
 
     m_language_combo.AddString(CCommon::LoadText(IDS_FOLLOWING_SYSTEM));
-    int current_language_index{ -1 };       //å½“å‰è¯­è¨€åœ¨æ‰€æœ‰è¯­è¨€åˆ—è¡¨ä¸­çš„åºå·
+    int current_language_index{ -1 };       //µ±Ç°ÓïÑÔÔÚËùÓĞÓïÑÔÁĞ±íÖĞµÄĞòºÅ
     for (size_t i = 0; i < theApp.m_str_table.GetLanguageList().size(); i++)
     {
         const LanguageInfo& language_info = theApp.m_str_table.GetLanguageList()[i];
@@ -358,7 +358,7 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
         if (language_info == m_data.language)
             current_language_index = static_cast<int>(i);
     }
-    m_language_combo.SetCurSel(current_language_index + 1);     //ç”±äºComboBoxç¬¬ä¸€é¡¹æ˜¯â€œè·Ÿéšç³»ç»Ÿâ€ï¼Œå› æ­¤ComboBoxçš„åºå·éœ€è¦åŠ 1
+    m_language_combo.SetCurSel(current_language_index + 1);     //ÓÉÓÚComboBoxµÚÒ»ÏîÊÇ¡°¸úËæÏµÍ³¡±£¬Òò´ËComboBoxµÄĞòºÅĞèÒª¼Ó1
 
     ((CButton*)GetDlgItem(IDC_SHOW_ALL_CONNECTION_CHECK))->SetCheck(m_data.show_all_interface);
 
@@ -386,14 +386,14 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
 
     if (CTrafficMonitorDlg::Instance()->IsGetDiskUsageByPdh())
     {
-        const auto& disk_names = CTrafficMonitorDlg::Instance()->GetPdhDiskUsageHelper().GetDiskNames();
+        const auto& disk_names = CTrafficMonitorDlg::Instance()->GetDiskNames();
         for (const auto& hdd_name : disk_names)
             m_hard_disk_combo.AddString(hdd_name);
         int cur_index = m_hard_disk_combo.FindString(-1, m_data.hard_disk_name.c_str());
         m_hard_disk_combo.SetCurSel(cur_index);
     }
 #ifndef WITHOUT_TEMPERATURE
-    //åˆå§‹åŒ–ç¡¬ä»¶ç›‘æ§Check box
+    //³õÊ¼»¯Ó²¼ş¼à¿ØCheck box
     CheckDlgButton(IDC_CPU_CHECK, m_data.IsHardwareEnable(HI_CPU));
     CheckDlgButton(IDC_GPU_CHECK, m_data.IsHardwareEnable(HI_GPU));
     CheckDlgButton(IDC_HDD_CHECK, m_data.IsHardwareEnable(HI_HDD));
@@ -402,7 +402,7 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
     if (theApp.m_pMonitor != nullptr)
     {
         CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
-        //åˆå§‹åŒ–é€‰æ‹©ç¡¬ç›˜ä¸‹æ‹‰åˆ—è¡¨
+        //³õÊ¼»¯Ñ¡ÔñÓ²ÅÌÏÂÀ­ÁĞ±í
         if (!CTrafficMonitorDlg::Instance()->IsGetDiskUsageByPdh())
         {
             for (const auto& hdd_item : theApp.m_pMonitor->AllHDDTemperature())
@@ -410,7 +410,7 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
             int cur_index = m_hard_disk_combo.FindString(-1, m_data.hard_disk_name.c_str());
             m_hard_disk_combo.SetCurSel(cur_index);
         }
-        //åˆå§‹åŒ–é€‰æ‹©CPUä¸‹æ‹‰åˆ—è¡¨
+        //³õÊ¼»¯Ñ¡ÔñCPUÏÂÀ­ÁĞ±í
         m_select_cpu_combo.AddString(CCommon::LoadText(IDS_AVREAGE_TEMPERATURE));
         for (const auto& cpu_item : theApp.m_pMonitor->AllCpuTemperature())
             m_select_cpu_combo.AddString(cpu_item.first.c_str());
@@ -421,7 +421,7 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
     }
 #endif
 
-    //ä¸å«æ¸©åº¦ç›‘æ§çš„ç‰ˆæœ¬ï¼Œç¦ç”¨æ¸©åº¦ç›¸å…³çš„æ§ä»¶
+    //²»º¬ÎÂ¶È¼à¿ØµÄ°æ±¾£¬½ûÓÃÎÂ¶ÈÏà¹ØµÄ¿Ø¼ş
 #ifdef WITHOUT_TEMPERATURE
     EnableDlgCtrl(IDC_CPU_TEMP_TIP_CHECK, false);
     EnableDlgCtrl(IDC_CPU_TEMP_TIP_EDIT, false);
@@ -449,27 +449,27 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
     m_select_connection_btn.SetIcon(theApp.GetMenuIcon(IDI_CONNECTION));
 
     return TRUE;  // return TRUE unless you set the focus to a control
-                  // å¼‚å¸¸: OCX å±æ€§é¡µåº”è¿”å› FALSE
+                  // Òì³£: OCX ÊôĞÔÒ³Ó¦·µ»Ø FALSE
 }
 
 
 void CGeneralSettingsDlg::OnBnClickedCheckNowButton()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     theApp.CheckUpdateInThread(true);
 }
 
 
 void CGeneralSettingsDlg::OnBnClickedCheckUpdateCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.check_update_when_start = (IsDlgButtonChecked(IDC_CHECK_UPDATE_CHECK) != 0);
 }
 
 
 void CGeneralSettingsDlg::OnBnClickedAutoRunCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.auto_run = (IsDlgButtonChecked(IDC_AUTO_RUN_CHECK) != 0);
     m_auto_run_modified = true;
     SetControlEnable();
@@ -478,8 +478,8 @@ void CGeneralSettingsDlg::OnBnClickedAutoRunCheck()
 
 void CGeneralSettingsDlg::OnOK()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ ä¸“ç”¨ä»£ç å’Œ/æˆ–è°ƒç”¨åŸºç±»
-    //è·å–æ¶ˆæ¯æç¤ºçš„è®¾ç½®
+    // TODO: ÔÚ´ËÌí¼Ó×¨ÓÃ´úÂëºÍ/»òµ÷ÓÃ»ùÀà
+    //»ñÈ¡ÏûÏ¢ÌáÊ¾µÄÉèÖÃ
     m_data.traffic_tip_value = m_traffic_tip_edit.GetValue();
     if (m_data.traffic_tip_value < 1) m_data.traffic_tip_value = 1;
     if (m_data.traffic_tip_value > 32767) m_data.traffic_tip_value = 32767;
@@ -510,11 +510,11 @@ void CGeneralSettingsDlg::OnOK()
     m_data.mainboard_temp_tip.tip_value = m_mbd_temp_tip_edit.GetValue();
     checkTempTipValue(m_data.mainboard_temp_tip.tip_value);
 
-    //è·å–è¯­è¨€çš„è®¾ç½®
+    //»ñÈ¡ÓïÑÔµÄÉèÖÃ
     m_data.language = LanguageInfo();
     if (m_language_combo.GetCurSel() > 0)
     {
-        //é€‰æ‹©çš„ä¸æ˜¯â€œè·Ÿéšç³»ç»Ÿâ€
+        //Ñ¡ÔñµÄ²»ÊÇ¡°¸úËæÏµÍ³¡±
         int current_language_index = m_language_combo.GetCurSel() - 1;
         if (current_language_index >= 0 && current_language_index < static_cast<int>(theApp.m_str_table.GetLanguageList().size()))
         {
@@ -527,7 +527,7 @@ void CGeneralSettingsDlg::OnOK()
     }
     m_show_all_interface_modified = (m_data.show_all_interface != theApp.m_general_data.show_all_interface);
 
-    //è·å–æ•°æ®æ–‡ä»¶ä¿å­˜ä½ç½®çš„è®¾ç½®
+    //»ñÈ¡Êı¾İÎÄ¼ş±£´æÎ»ÖÃµÄÉèÖÃ
     m_data.portable_mode = (((CButton*)GetDlgItem(IDC_SAVE_TO_PROGRAM_DIR_RADIO))->GetCheck() != 0);
     if (m_data.portable_mode != theApp.m_general_data.portable_mode)
     {
@@ -542,7 +542,7 @@ void CGeneralSettingsDlg::OnOK()
 
 void CGeneralSettingsDlg::OnBnClickedTodayTrafficTipCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.traffic_tip_enable = (IsDlgButtonChecked(IDC_TODAY_TRAFFIC_TIP_CHECK) != 0);
     SetControlEnable();
 }
@@ -550,7 +550,7 @@ void CGeneralSettingsDlg::OnBnClickedTodayTrafficTipCheck()
 
 void CGeneralSettingsDlg::OnBnClickedMemoryUsageTipCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.memory_usage_tip.enable = (IsDlgButtonChecked(IDC_MEMORY_USAGE_TIP_CHECK) != 0);
     SetControlEnable();
 }
@@ -558,14 +558,14 @@ void CGeneralSettingsDlg::OnBnClickedMemoryUsageTipCheck()
 
 void CGeneralSettingsDlg::OnBnClickedOpenConfigPathButton()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     ShellExecute(NULL, _T("explore"), theApp.m_config_dir.c_str(), NULL, NULL, SW_SHOWNORMAL);
 }
 
 
 void CGeneralSettingsDlg::OnBnClickedShowAllConnectionCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.show_all_interface = (IsDlgButtonChecked(IDC_SHOW_ALL_CONNECTION_CHECK) != 0);
     SetControlEnable();
 }
@@ -573,7 +573,7 @@ void CGeneralSettingsDlg::OnBnClickedShowAllConnectionCheck()
 
 BOOL CGeneralSettingsDlg::PreTranslateMessage(MSG* pMsg)
 {
-    // TODO: åœ¨æ­¤æ·»åŠ ä¸“ç”¨ä»£ç å’Œ/æˆ–è°ƒç”¨åŸºç±»
+    // TODO: ÔÚ´ËÌí¼Ó×¨ÓÃ´úÂëºÍ/»òµ÷ÓÃ»ùÀà
     if (pMsg->message == WM_MOUSEMOVE)
         m_toolTip.RelayEvent(pMsg);
 
@@ -597,12 +597,12 @@ afx_msg LRESULT CGeneralSettingsDlg::OnSpinEditPosChanged(WPARAM wParam, LPARAM 
     if (pSpin == nullptr)
         return 0;
     CWnd* pEdit = pSpin->GetBuddy();
-    if (pEdit == &m_monitor_span_edit)       //å½“ç”¨æˆ·ç‚¹å‡»äº†â€œç›‘æ§æ—¶é—´é—´éš”â€çš„å¾®è°ƒæŒ‰é’®æ—¶
+    if (pEdit == &m_monitor_span_edit)       //µ±ÓÃ»§µã»÷ÁË¡°¼à¿ØÊ±¼ä¼ä¸ô¡±µÄÎ¢µ÷°´Å¥Ê±
     {
         LPNMUPDOWN pNMUpDown = reinterpret_cast<LPNMUPDOWN>(lParam);
         if (pNMUpDown->iDelta == -1)
         {
-            // ç”¨æˆ·æŒ‰ä¸‹äº†spinæ§ä»¶çš„å‘ä¸‹ç®­å¤´
+            // ÓÃ»§°´ÏÂÁËspin¿Ø¼şµÄÏòÏÂ¼ıÍ·
             int value = m_monitor_span_edit.GetValue();
             value -= MONITOR_SPAN_STEP;
             value /= MONITOR_SPAN_STEP;
@@ -611,7 +611,7 @@ afx_msg LRESULT CGeneralSettingsDlg::OnSpinEditPosChanged(WPARAM wParam, LPARAM 
         }
         else if (pNMUpDown->iDelta == 1)
         {
-            // ç”¨æˆ·æŒ‰ä¸‹äº†spinæ§ä»¶çš„å‘ä¸Šç®­å¤´
+            // ÓÃ»§°´ÏÂÁËspin¿Ø¼şµÄÏòÉÏ¼ıÍ·
             int value = m_monitor_span_edit.GetValue();
             value += MONITOR_SPAN_STEP;
             value /= MONITOR_SPAN_STEP;
@@ -627,9 +627,9 @@ afx_msg LRESULT CGeneralSettingsDlg::OnSpinEditPosChanged(WPARAM wParam, LPARAM 
 
 void CGeneralSettingsDlg::OnEnKillfocusMonitorSpanEdit()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
 
-    //è¿™é‡Œé™åˆ¶ç›‘æ§æ—¶é—´é—´éš”åªèƒ½è¾“å…¥100çš„å€æ•°
+    //ÕâÀïÏŞÖÆ¼à¿ØÊ±¼ä¼ä¸ôÖ»ÄÜÊäÈë100µÄ±¶Êı
     CString str;
     GetDlgItemText(IDC_MONITOR_SPAN_EDIT, str);
     str.Replace(_T(","), _T(""));
@@ -649,7 +649,7 @@ void CGeneralSettingsDlg::OnEnKillfocusMonitorSpanEdit()
 
 void CGeneralSettingsDlg::OnBnClickedCpuTempTipCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.cpu_temp_tip.enable = (IsDlgButtonChecked(IDC_CPU_TEMP_TIP_CHECK) != 0);
     SetControlEnable();
 }
@@ -657,7 +657,7 @@ void CGeneralSettingsDlg::OnBnClickedCpuTempTipCheck()
 
 void CGeneralSettingsDlg::OnBnClickedGpuTempTipCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.gpu_temp_tip.enable = (IsDlgButtonChecked(IDC_GPU_TEMP_TIP_CHECK) != 0);
     SetControlEnable();
 }
@@ -665,7 +665,7 @@ void CGeneralSettingsDlg::OnBnClickedGpuTempTipCheck()
 
 void CGeneralSettingsDlg::OnBnClickedHddTempTipCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.hdd_temp_tip.enable = (IsDlgButtonChecked(IDC_HDD_TEMP_TIP_CHECK) != 0);
     SetControlEnable();
 }
@@ -673,7 +673,7 @@ void CGeneralSettingsDlg::OnBnClickedHddTempTipCheck()
 
 void CGeneralSettingsDlg::OnBnClickedMbdTempTipCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.mainboard_temp_tip.enable = (IsDlgButtonChecked(IDC_MBD_TEMP_TIP_CHECK) != 0);
     SetControlEnable();
 }
@@ -681,15 +681,15 @@ void CGeneralSettingsDlg::OnBnClickedMbdTempTipCheck()
 
 void CGeneralSettingsDlg::OnBnClickedGithubRadio()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.update_source = 0;
-    theApp.m_general_data.update_source = 0;        //ç‚¹å‡»â€œæ›´æ–°æºâ€çš„å•é€‰æŒ‰é’®æ—¶ï¼ŒåŒæ—¶æ›´æ”¹theAppä¸­çš„è®¾ç½®ï¼Œä»¥ç¡®ä¿ç‚¹å‡»â€œç«‹å³æ£€æŸ¥â€æŒ‰é’®æ—¶ä½¿ç”¨é€‰æ‹©çš„æ›´æ–°æºæ›´æ–°
+    theApp.m_general_data.update_source = 0;        //µã»÷¡°¸üĞÂÔ´¡±µÄµ¥Ñ¡°´Å¥Ê±£¬Í¬Ê±¸ü¸ÄtheAppÖĞµÄÉèÖÃ£¬ÒÔÈ·±£µã»÷¡°Á¢¼´¼ì²é¡±°´Å¥Ê±Ê¹ÓÃÑ¡ÔñµÄ¸üĞÂÔ´¸üĞÂ
 }
 
 
 void CGeneralSettingsDlg::OnBnClickedGiteeRadio()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.update_source = 1;
     theApp.m_general_data.update_source = 1;
 }
@@ -697,8 +697,8 @@ void CGeneralSettingsDlg::OnBnClickedGiteeRadio()
 
 void CGeneralSettingsDlg::OnCancel()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ ä¸“ç”¨ä»£ç å’Œ/æˆ–è°ƒç”¨åŸºç±»
-    theApp.m_general_data.update_source = m_update_source_ori;      //ç‚¹å‡»â€œå–æ¶ˆâ€æ—¶æ¢å¤å¼€å§‹çš„â€œæ›´æ–°æºâ€é€‰é¡¹
+    // TODO: ÔÚ´ËÌí¼Ó×¨ÓÃ´úÂëºÍ/»òµ÷ÓÃ»ùÀà
+    theApp.m_general_data.update_source = m_update_source_ori;      //µã»÷¡°È¡Ïû¡±Ê±»Ö¸´¿ªÊ¼µÄ¡°¸üĞÂÔ´¡±Ñ¡Ïî
 
     CTabDlg::OnCancel();
 }
@@ -706,14 +706,14 @@ void CGeneralSettingsDlg::OnCancel()
 
 void CGeneralSettingsDlg::OnBnClickedRestoreDefaultTimeSpanButton()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_monitor_span_edit.SetValue(1000);
 }
 
 
 void CGeneralSettingsDlg::OnCbnSelchangeSelectHardDiskCombo()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     CString hard_disk_name;
     m_hard_disk_combo.GetWindowText(hard_disk_name);
     m_data.hard_disk_name = hard_disk_name.GetString();
@@ -722,7 +722,7 @@ void CGeneralSettingsDlg::OnCbnSelchangeSelectHardDiskCombo()
 
 void CGeneralSettingsDlg::OnBnClickedCpuCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     bool checked = IsDlgButtonChecked(IDC_CPU_CHECK) != 0;
     if (checked && !ShowHardwareMonitorWarning())
     {
@@ -735,7 +735,7 @@ void CGeneralSettingsDlg::OnBnClickedCpuCheck()
 
 void CGeneralSettingsDlg::OnBnClickedGpuCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     bool checked = IsDlgButtonChecked(IDC_GPU_CHECK) != 0;
     if (checked && !ShowHardwareMonitorWarning())
     {
@@ -748,7 +748,7 @@ void CGeneralSettingsDlg::OnBnClickedGpuCheck()
 
 void CGeneralSettingsDlg::OnBnClickedHddCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     bool checked = IsDlgButtonChecked(IDC_HDD_CHECK) != 0;
     if (checked && !ShowHardwareMonitorWarning())
     {
@@ -761,7 +761,7 @@ void CGeneralSettingsDlg::OnBnClickedHddCheck()
 
 void CGeneralSettingsDlg::OnBnClickedMbdCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     bool checked = IsDlgButtonChecked(IDC_MBD_CHECK) != 0;
     if (checked && !ShowHardwareMonitorWarning())
     {
@@ -775,7 +775,7 @@ void CGeneralSettingsDlg::OnBnClickedMbdCheck()
 
 void CGeneralSettingsDlg::OnCbnSelchangeSelectCpuCombo()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     CString cpu_core_name;
     m_select_cpu_combo.GetWindowText(cpu_core_name);
     m_data.cpu_core_name = cpu_core_name.GetString();
@@ -784,14 +784,14 @@ void CGeneralSettingsDlg::OnCbnSelchangeSelectCpuCombo()
 
 void CGeneralSettingsDlg::OnBnClickedShowNotifyIconCheck()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     m_data.show_notify_icon = (IsDlgButtonChecked(IDC_SHOW_NOTIFY_ICON_CHECK) != 0);
 }
 
 
 void CGeneralSettingsDlg::OnBnClickedSelectConnectionsButton()
 {
-    // TODO: åœ¨æ­¤æ·»åŠ æ§ä»¶é€šçŸ¥å¤„ç†ç¨‹åºä»£ç 
+    // TODO: ÔÚ´ËÌí¼Ó¿Ø¼şÍ¨Öª´¦Àí³ÌĞò´úÂë
     CSelectConnectionsDlg dlg(m_data.connections_hide);
     if (dlg.DoModal() == IDOK)
     {
@@ -802,19 +802,19 @@ void CGeneralSettingsDlg::OnBnClickedSelectConnectionsButton()
 
 void CGeneralSettingsDlg::OnBnClickedResetAutoRunButton()
 {
-    //å…ˆåˆ é™¤å¼€æœºè‡ªåŠ¨è¿è¡Œ
+    //ÏÈÉ¾³ı¿ª»ú×Ô¶¯ÔËĞĞ
     theApp.SetAutoRunByRegistry(false);
     theApp.SetAutoRunByTaskScheduler(false);
-    if (!theApp.SetAutoRun(true, m_data.auto_run_by_task_scheduler))    //é‡æ–°è®¾ç½®å¼€æœºè‡ªåŠ¨è¿è¡Œ
+    if (!theApp.SetAutoRun(true, m_data.auto_run_by_task_scheduler))    //ÖØĞÂÉèÖÃ¿ª»ú×Ô¶¯ÔËĞĞ
     {
         MessageBox(CCommon::LoadText(IDS_SET_AUTO_RUN_FAILED_WARNING), NULL, MB_ICONWARNING | MB_OK);
         return;
     }
-    //è·å–å¼€æœºè‡ªåŠ¨è¿è¡Œçš„è·¯å¾„
+    //»ñÈ¡¿ª»ú×Ô¶¯ÔËĞĞµÄÂ·¾¶
     bool auto_run = theApp.GetAutoRun(&m_auto_run_path, m_data.auto_run_by_task_scheduler);
-    //é‡æ–°å‹¾é€‰â€œå¼€æœºè‡ªåŠ¨è¿è¡Œâ€å¤é€‰æ¡†
+    //ÖØĞÂ¹´Ñ¡¡°¿ª»ú×Ô¶¯ÔËĞĞ¡±¸´Ñ¡¿ò
     CheckDlgButton(IDC_AUTO_RUN_CHECK, auto_run);
-    //æ›´æ–°é¼ æ ‡æç¤º
+    //¸üĞÂÊó±êÌáÊ¾
     AddOrUpdateAutoRunTooltip(false);
 }
 

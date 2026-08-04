@@ -1,9 +1,9 @@
-// MonitorService.cpp : ç»Ÿä¸€é‡‡æ ·å¼•æ“å®ç°
+// MonitorService.cpp : Í³Ò»²ÉÑùÒıÇæÊµÏÖ
 #include "stdafx.h"
 #include "MonitorService.h"
 #include "Common.h"
 
-// è®¡ç®—æŒ‡å®šç§’æ•°çš„æ—¶é—´å†…é‡‡æ ·ä¼šè§¦å‘çš„æ¬¡æ•°
+// ¼ÆËãÖ¸¶¨ÃëÊıµÄÊ±¼äÄÚ²ÉÑù»á´¥·¢µÄ´ÎÊı
 static int GetSampleCount(int second, int monitor_time_span)
 {
     int count = second * 1000 / monitor_time_span;
@@ -36,20 +36,20 @@ void MonitorService::ApplyConfig(const Config& config)
 
 void MonitorService::InitConnections()
 {
-    //ä¸ºm_pIfTableå¼€è¾Ÿæ‰€éœ€å¤§å°çš„å†…å­˜
+    //Îªm_pIfTable¿ª±ÙËùĞè´óĞ¡µÄÄÚ´æ
     free(m_pIfTable);
     m_dwSize = sizeof(MIB_IFTABLE);
     m_pIfTable = (MIB_IFTABLE*)malloc(m_dwSize);
     int rtn;
     rtn = GetIfTable(m_pIfTable, &m_dwSize, FALSE);
-    if (rtn == ERROR_INSUFFICIENT_BUFFER)	//å¦‚æœå‡½æ•°è¿”å›å€¼ä¸ºERROR_INSUFFICIENT_BUFFERï¼Œè¯´æ˜m_pIfTableçš„å¤§å°ä¸å¤Ÿ
+    if (rtn == ERROR_INSUFFICIENT_BUFFER)	//Èç¹ûº¯Êı·µ»ØÖµÎªERROR_INSUFFICIENT_BUFFER£¬ËµÃ÷m_pIfTableµÄ´óĞ¡²»¹»
     {
         free(m_pIfTable);
-        m_pIfTable = (MIB_IFTABLE*)malloc(m_dwSize);	//ç”¨æ–°çš„å¤§å°é‡æ–°å¼€è¾Ÿä¸€å—å†…å­˜
+        m_pIfTable = (MIB_IFTABLE*)malloc(m_dwSize);	//ÓÃĞÂµÄ´óĞ¡ÖØĞÂ¿ª±ÙÒ»¿éÄÚ´æ
     }
     GetIfTable(m_pIfTable, &m_dwSize, FALSE);
 
-    //è·å–å½“å‰æ‰€æœ‰çš„è¿æ¥ï¼Œå¹¶ä¿å­˜åˆ°m_connectionså®¹å™¨ä¸­
+    //»ñÈ¡µ±Ç°ËùÓĞµÄÁ¬½Ó£¬²¢±£´æµ½m_connectionsÈİÆ÷ÖĞ
     if (!m_config.show_all_interface)
     {
         m_connections.clear();
@@ -67,19 +67,19 @@ void MonitorService::InitConnections()
         CAdapterCommon::GetAllIfTableInfo(m_connections, m_pIfTable);
     }
 
-    //å¦‚æœåœ¨è®¾ç½®äº†â€œæ˜¾ç¤ºæ‰€æœ‰ç½‘ç»œè¿æ¥â€æ—¶è®¾ç½®äº†â€œé€‰æ‹©å…¨éƒ¨â€ï¼Œåˆ™æ”¹ä¸ºâ€œè‡ªåŠ¨é€‰æ‹©â€
+    //Èç¹ûÔÚÉèÖÃÁË¡°ÏÔÊ¾ËùÓĞÍøÂçÁ¬½Ó¡±Ê±ÉèÖÃÁË¡°Ñ¡ÔñÈ«²¿¡±£¬Ôò¸ÄÎª¡°×Ô¶¯Ñ¡Ôñ¡±
     if (m_config.show_all_interface && m_config.select_all)
     {
         m_config.select_all = false;
         m_config.auto_select = true;
     }
 
-    //å†™å…¥è°ƒè¯•æ—¥å¿—
+    //Ğ´Èëµ÷ÊÔÈÕÖ¾
     if (m_config.debug_log)
     {
         CString log_str;
-        log_str += _T("æ­£åœ¨åˆå§‹åŒ–ç½‘ç»œè¿æ¥...\n");
-        log_str += _T("è¿æ¥åˆ—è¡¨ï¼š\n");
+        log_str += _T("ÕıÔÚ³õÊ¼»¯ÍøÂçÁ¬½Ó...\n");
+        log_str += _T("Á¬½ÓÁĞ±í£º\n");
         for (size_t i{}; i < m_connections.size(); i++)
         {
             log_str += m_connections[i].description.c_str();
@@ -98,17 +98,17 @@ void MonitorService::InitConnections()
         CCommon::WriteLog(log_str, (m_config.config_dir + L".\\connections.log").c_str());
     }
 
-    //é€‰æ‹©ç½‘ç»œè¿æ¥
-    if (m_config.auto_select)    //è‡ªåŠ¨é€‰æ‹©
+    //Ñ¡ÔñÍøÂçÁ¬½Ó
+    if (m_config.auto_select)    //×Ô¶¯Ñ¡Ôñ
     {
-        //å½“ä¸æ˜¯ç¬¬ä¸€æ¬¡åˆå§‹åŒ–æ—¶ï¼Œéœ€è¦å»¶æ—¶5ç§’å†é‡æ–°åˆå§‹åŒ–è¿æ¥ï¼ˆç”± UI å±‚å®šæ—¶å™¨å®ç°ï¼‰
+        //µ±²»ÊÇµÚÒ»´Î³õÊ¼»¯Ê±£¬ĞèÒªÑÓÊ±5ÃëÔÙÖØĞÂ³õÊ¼»¯Á¬½Ó£¨ÓÉ UI ²ã¶¨Ê±Æ÷ÊµÏÖ£©
         m_delayed_auto_select_pending = (m_restart_cnt != -1);
         if (m_restart_cnt == -1)
         {
             AutoSelect();
         }
     }
-    else        //æŸ¥æ‰¾ç½‘ç»œåä¸ºä¸Šæ¬¡é€‰æ‹©çš„è¿æ¥
+    else        //²éÕÒÍøÂçÃûÎªÉÏ´ÎÑ¡ÔñµÄÁ¬½Ó
     {
         m_connection_selected = 0;
         for (size_t i{}; i < m_connections.size(); i++)
@@ -121,7 +121,7 @@ void MonitorService::InitConnections()
         m_connection_selected = 0;
     m_config.connection_name = SelectedConnectionName();
 
-    m_restart_cnt++;    //è®°å½•åˆå§‹åŒ–æ¬¡æ•°
+    m_restart_cnt++;    //¼ÇÂ¼³õÊ¼»¯´ÎÊı
     m_connection_change_flag = true;
 }
 
@@ -137,11 +137,11 @@ void MonitorService::AutoSelect()
     unsigned __int64 max_in_out_bytes{};
     unsigned __int64 in_out_bytes;
     m_connection_selected = 0;
-    //è‡ªåŠ¨é€‰æ‹©è¿æ¥æ—¶ï¼ŒæŸ¥æ‰¾å·²å‘é€å’Œå·²æ¥æ”¶å­—èŠ‚æ•°ä¹‹å’Œæœ€å¤šçš„é‚£ä¸ªè¿æ¥ï¼Œå¹¶å°†å…¶è®¾ç½®ä¸ºå½“å‰æŸ¥çœ‹çš„è¿æ¥
+    //×Ô¶¯Ñ¡ÔñÁ¬½ÓÊ±£¬²éÕÒÒÑ·¢ËÍºÍÒÑ½ÓÊÕ×Ö½ÚÊıÖ®ºÍ×î¶àµÄÄÇ¸öÁ¬½Ó£¬²¢½«ÆäÉèÖÃÎªµ±Ç°²é¿´µÄÁ¬½Ó
     for (size_t i{}; i < m_connections.size(); i++)
     {
         auto table = GetConnectIfTable(i);
-        if (table.dwOperStatus == IF_OPER_STATUS_OPERATIONAL)     //åªé€‰æ‹©ç½‘ç»œçŠ¶æ€ä¸ºæ­£å¸¸çš„è¿æ¥
+        if (table.dwOperStatus == IF_OPER_STATUS_OPERATIONAL)     //Ö»Ñ¡ÔñÍøÂç×´Ì¬ÎªÕı³£µÄÁ¬½Ó
         {
             in_out_bytes = table.dwInOctets + table.dwOutOctets;
             if (in_out_bytes > max_in_out_bytes)
@@ -195,7 +195,7 @@ MIB_IFROW MonitorService::GetConnectIfTable(int connection_index) const
 
 void MonitorService::Sample()
 {
-    //è·å–ç½‘ç»œè¿æ¥é€Ÿåº¦
+    //»ñÈ¡ÍøÂçÁ¬½ÓËÙ¶È
     int rtn{};
     auto getLfTable = [&]() {
         __try
@@ -208,10 +208,10 @@ void MonitorService::Sample()
             m_dwSize = sizeof(MIB_IFTABLE);
             m_pIfTable = (MIB_IFTABLE*)malloc(m_dwSize);
             rtn = GetIfTable(m_pIfTable, &m_dwSize, FALSE);
-            if (rtn == ERROR_INSUFFICIENT_BUFFER)	//å¦‚æœå‡½æ•°è¿”å›å€¼ä¸ºERROR_INSUFFICIENT_BUFFERï¼Œè¯´æ˜m_pIfTableçš„å¤§å°ä¸å¤Ÿ
+            if (rtn == ERROR_INSUFFICIENT_BUFFER)	//Èç¹ûº¯Êı·µ»ØÖµÎªERROR_INSUFFICIENT_BUFFER£¬ËµÃ÷m_pIfTableµÄ´óĞ¡²»¹»
             {
                 free(m_pIfTable);
-                m_pIfTable = (MIB_IFTABLE*)malloc(m_dwSize);	//ç”¨æ–°çš„å¤§å°é‡æ–°å¼€è¾Ÿä¸€å—å†…å­˜
+                m_pIfTable = (MIB_IFTABLE*)malloc(m_dwSize);	//ÓÃĞÂµÄ´óĞ¡ÖØĞÂ¿ª±ÙÒ»¿éÄÚ´æ
             }
             GetIfTable(m_pIfTable, &m_dwSize, FALSE);
         }
@@ -219,13 +219,13 @@ void MonitorService::Sample()
 
     getLfTable();
 
-    if (!m_config.select_all)        //è·å–å½“å‰é€‰ä¸­è¿æ¥çš„ç½‘é€Ÿ
+    if (!m_config.select_all)        //»ñÈ¡µ±Ç°Ñ¡ÖĞÁ¬½ÓµÄÍøËÙ
     {
         auto table = GetConnectIfTable(m_connection_selected);
         m_in_bytes = table.dwInOctets;
         m_out_bytes = table.dwOutOctets;
     }
-    else        //è·å–å…¨éƒ¨è¿æ¥çš„ç½‘é€Ÿ
+    else        //»ñÈ¡È«²¿Á¬½ÓµÄÍøËÙ
     {
         m_in_bytes = 0;
         m_out_bytes = 0;
@@ -237,9 +237,9 @@ void MonitorService::Sample()
         }
     }
 
-    unsigned __int64 cur_in_speed{}, cur_out_speed{};       //æœ¬æ¬¡ç›‘æ§æ—¶é—´é—´éš”å†…çš„ä¸Šä¼ å’Œä¸‹è½½é€Ÿåº¦
+    unsigned __int64 cur_in_speed{}, cur_out_speed{};       //±¾´Î¼à¿ØÊ±¼ä¼ä¸ôÄÚµÄÉÏ´«ºÍÏÂÔØËÙ¶È
 
-    //å¦‚æœå‘é€å’Œæ¥æ”¶çš„å­—èŠ‚æ•°ä¸º0æˆ–ä¸Šæ¬¡å‘é€å’Œæ¥æ”¶çš„å­—èŠ‚æ•°ä¸º0æˆ–å½“å‰è¿æ¥å·²æ”¹å˜æ—¶ï¼Œç½‘é€Ÿæ— æ•ˆ
+    //Èç¹û·¢ËÍºÍ½ÓÊÕµÄ×Ö½ÚÊıÎª0»òÉÏ´Î·¢ËÍºÍ½ÓÊÕµÄ×Ö½ÚÊıÎª0»òµ±Ç°Á¬½ÓÒÑ¸Ä±äÊ±£¬ÍøËÙÎŞĞ§
     if ((m_in_bytes == 0 && m_out_bytes == 0) || (m_last_in_bytes == 0 && m_last_out_bytes == 0) || m_connection_change_flag
         || m_last_in_bytes > m_in_bytes || m_last_out_bytes > m_out_bytes)
     {
@@ -252,7 +252,7 @@ void MonitorService::Sample()
         cur_out_speed = m_out_bytes - m_last_out_bytes;
     }
 
-    //è®¡ç®—ä¸¤æ¬¡è·å–ç½‘é€Ÿçš„æ—¶é—´é—´éš”
+    //¼ÆËãÁ½´Î»ñÈ¡ÍøËÙµÄÊ±¼ä¼ä¸ô
     static ULONGLONG last_net_speed_time = 0;
     ULONGLONG net_speed_time = CCommon::GetCurrentTimeSinceEpochMilliseconds();
     int time_span = m_config.monitor_time_span;
@@ -260,16 +260,16 @@ void MonitorService::Sample()
         time_span = static_cast<int>(net_speed_time - last_net_speed_time);
     last_net_speed_time = net_speed_time;
 
-    //å°†å½“å‰ç›‘æ§æ—¶é—´é—´éš”çš„æµé‡è½¬æ¢æˆæ¯ç§’æ—¶é—´é—´éš”å†…çš„æµé‡
+    //½«µ±Ç°¼à¿ØÊ±¼ä¼ä¸ôµÄÁ÷Á¿×ª»»³ÉÃ¿ÃëÊ±¼ä¼ä¸ôÄÚµÄÁ÷Á¿
     m_snapshot.in_speed = static_cast<unsigned __int64>(cur_in_speed * 1000 / time_span);
     m_snapshot.out_speed = static_cast<unsigned __int64>(cur_out_speed * 1000 / time_span);
 
-    m_connection_change_flag = false;    //æ¸…é™¤è¿æ¥å‘ç”Ÿå˜åŒ–çš„æ ‡å¿—
+    m_connection_change_flag = false;    //Çå³ıÁ¬½Ó·¢Éú±ä»¯µÄ±êÖ¾
 
     m_last_in_bytes = m_in_bytes;
     m_last_out_bytes = m_out_bytes;
 
-    //å¤„äºè‡ªåŠ¨é€‰æ‹©çŠ¶æ€æ—¶ï¼Œå¦‚æœè¿ç»­30ç§’æ²¡æœ‰ç½‘é€Ÿï¼Œåˆ™å¯èƒ½è‡ªåŠ¨é€‰æ‹©çš„ç½‘ç»œä¸å¯¹ï¼Œæ­¤æ—¶æ‰§è¡Œä¸€æ¬¡è‡ªåŠ¨é€‰æ‹©
+    //´¦ÓÚ×Ô¶¯Ñ¡Ôñ×´Ì¬Ê±£¬Èç¹ûÁ¬Ğø30ÃëÃ»ÓĞÍøËÙ£¬Ôò¿ÉÄÜ×Ô¶¯Ñ¡ÔñµÄÍøÂç²»¶Ô£¬´ËÊ±Ö´ĞĞÒ»´Î×Ô¶¯Ñ¡Ôñ
     if (m_config.auto_select)
     {
         if (cur_in_speed == 0 && cur_out_speed == 0)
@@ -283,7 +283,7 @@ void MonitorService::Sample()
         }
     }
 
-    //å†å²æµé‡ç»Ÿè®¡ä¸ä¿å­˜
+    //ÀúÊ·Á÷Á¿Í³¼ÆÓë±£´æ
     UpdateHistoryTraffic(cur_in_speed, cur_out_speed);
 
     if (rtn == ERROR_INSUFFICIENT_BUFFER)
@@ -291,36 +291,36 @@ void MonitorService::Sample()
         InitConnections();
         if (m_config.debug_log)
         {
-            CString info = CCommon::LoadTextFormat(IDS_INSUFFICIENT_BUFFER, { m_restart_cnt });
+            CString info = CCommon::LoadText(IDS_INSUFFICIENT_BUFFER);
             CCommon::WriteLog(info, m_config.log_path.c_str());
         }
     }
 
-    //é‡æ–°è·å–å½“å‰è¿æ¥æ•°é‡ï¼Œå¦‚æœè¿æ¥æ•°å‘ç”Ÿå˜åŒ–ï¼Œåˆ™é‡æ–°åˆå§‹åŒ–è¿æ¥
+    //ÖØĞÂ»ñÈ¡µ±Ç°Á¬½ÓÊıÁ¿£¬Èç¹ûÁ¬½ÓÊı·¢Éú±ä»¯£¬ÔòÖØĞÂ³õÊ¼»¯Á¬½Ó
     if (m_monitor_time_cnt % GetSampleCount(3, m_config.monitor_time_span) == GetSampleCount(3, m_config.monitor_time_span) - 1)
     {
         static DWORD last_interface_num = -1;
         DWORD interface_num;
         GetNumberOfInterfaces(&interface_num);
-        if (last_interface_num != -1 && interface_num != last_interface_num)    //å¦‚æœè¿æ¥æ•°å‘ç”Ÿå˜åŒ–ï¼Œåˆ™é‡æ–°åˆå§‹åŒ–è¿æ¥
+        if (last_interface_num != -1 && interface_num != last_interface_num)    //Èç¹ûÁ¬½ÓÊı·¢Éú±ä»¯£¬ÔòÖØĞÂ³õÊ¼»¯Á¬½Ó
         {
             if (m_config.debug_log)
             {
-                CString info = CCommon::LoadTextFormat(IDS_CONNECTION_NUM_CHANGED, { last_interface_num, interface_num, m_restart_cnt + 1 });
+                CString info = CCommon::LoadText(IDS_CONNECTION_NUM_CHANGED);
                 CCommon::WriteLog(info, m_config.log_path.c_str());
             }
             InitConnections();
             last_interface_num = interface_num;
         }
 
-        //è¿æ¥åç§°ä¸åŒ¹é…æ—¶é‡æ–°åˆå§‹åŒ–è¿æ¥
+        //Á¬½ÓÃû³Æ²»Æ¥ÅäÊ±ÖØĞÂ³õÊ¼»¯Á¬½Ó
         std::string descr;
         descr = (const char*)GetConnectIfTable(m_connection_selected).bDescr;
         if (descr != m_config.connection_name)
         {
             if (m_config.debug_log)
             {
-                CString log_str = _T("è¿æ¥åç§°ä¸åŒ¹é…ï¼š\r\n");
+                CString log_str = _T("Á¬½ÓÃû³Æ²»Æ¥Åä£º\r\n");
                 log_str += _T("IfTable description: ");
                 log_str += descr.c_str();
                 log_str += _T("\r\nm_connection_name: ");
@@ -330,15 +330,15 @@ void MonitorService::Sample()
             InitConnections();
             if (m_config.debug_log)
             {
-                CString info = CCommon::LoadTextFormat(IDS_CONNECTION_NOT_MATCH, { m_restart_cnt });
+                CString info = CCommon::LoadText(IDS_CONNECTION_NOT_MATCH);
                 CCommon::WriteLog(info, m_config.log_path.c_str());
             }
         }
     }
 
-    //CPU/å†…å­˜é‡‡æ ·
+    //CPU/ÄÚ´æ²ÉÑù
     AcquireCpuMemory();
-    //ç¡¬ä»¶æ•°æ®é‡‡æ ·ï¼ˆæ¸©åº¦/GPU/HDDï¼‰
+    //Ó²¼şÊı¾İ²ÉÑù£¨ÎÂ¶È/GPU/HDD£©
     AcquireHardwareData();
 
     m_monitor_time_cnt++;
@@ -352,15 +352,15 @@ void MonitorService::AcquireCpuMemory()
     lite_version = true;
 #endif
 
-    //è·å–CPUä½¿ç”¨ç‡
+    //»ñÈ¡CPUÊ¹ÓÃÂÊ
     m_snapshot.cpu_usage = m_cpu_usage_helper.GetCpuUsage(m_config.cpu_usage_by_time);
 
-    //è·å–CPUé¢‘ç‡ï¼ˆPDH ä¼˜å…ˆï¼Œå¤±è´¥åˆ™ç­‰å¾… OHM å…œåº•ï¼‰
+    //»ñÈ¡CPUÆµÂÊ£¨PDH ÓÅÏÈ£¬Ê§°ÜÔòµÈ´ı OHM ¶µµ×£©
     m_cpu_freq_acquired = m_cpu_freq_helper.GetCpuFreq(m_snapshot.cpu_freq);
     if (!m_cpu_freq_acquired)
         m_snapshot.cpu_freq = -1;
 
-    //è·å–GPUåˆ©ç”¨ç‡ï¼ˆæœªå¯ç”¨ç¡¬ä»¶ç›‘æ§æ—¶ç”¨ PDHï¼Œå¯ç”¨åç”¨ OHMï¼‰
+    //»ñÈ¡GPUÀûÓÃÂÊ£¨Î´ÆôÓÃÓ²¼ş¼à¿ØÊ±ÓÃ PDH£¬ÆôÓÃºóÓÃ OHM£©
     m_gpu_usage_acquired = false;
     if (lite_version || !(m_config.hardware_monitor_item & HI_GPU))
     {
@@ -374,12 +374,12 @@ void MonitorService::AcquireCpuMemory()
         m_snapshot.gpu_usage = -1;
     }
 
-    //è·å–ç¡¬ç›˜åˆ©ç”¨ç‡ï¼ˆæœªå¯ç”¨ç¡¬ä»¶ç›‘æ§æ—¶ç”¨ PDHï¼Œå¯ç”¨åç”¨ OHMï¼‰
+    //»ñÈ¡Ó²ÅÌÀûÓÃÂÊ£¨Î´ÆôÓÃÓ²¼ş¼à¿ØÊ±ÓÃ PDH£¬ÆôÓÃºóÓÃ OHM£©
     m_get_disk_usage_by_pdh = false;
     if (lite_version || !(m_config.hardware_monitor_item & HI_HDD))
     {
         int disk_index = m_disk_usage_helper.FindDiskIndex(m_config.hard_disk_name);
-        //æ²¡æœ‰æ‰¾åˆ°è¦ç›‘æ§çš„ç¡¬ç›˜æ—¶é»˜è®¤ä½¿ç”¨æ€»ä½“åˆ©ç”¨ç‡
+        //Ã»ÓĞÕÒµ½Òª¼à¿ØµÄÓ²ÅÌÊ±Ä¬ÈÏÊ¹ÓÃ×ÜÌåÀûÓÃÂÊ
         if (disk_index < 0)
         {
             disk_index = m_disk_usage_helper.FindDiskIndex(L"_Total");
@@ -387,7 +387,7 @@ void MonitorService::AcquireCpuMemory()
             {
                 m_config.hard_disk_name = L"_Total";
             }
-            //ä»ç„¶æ²¡æœ‰æ‰¾åˆ°ä½¿ç”¨ç¬¬1å—ç¡¬ç›˜
+            //ÈÔÈ»Ã»ÓĞÕÒµ½Ê¹ÓÃµÚ1¿éÓ²ÅÌ
             else
             {
                 const auto& disk_names = m_disk_usage_helper.GetDiskNames();
@@ -408,7 +408,7 @@ void MonitorService::AcquireCpuMemory()
         m_snapshot.hdd_usage = -1;
     }
 
-    //è·å–å†…å­˜åˆ©ç”¨ç‡
+    //»ñÈ¡ÄÚ´æÀûÓÃÂÊ
     MEMORYSTATUSEX statex;
     statex.dwLength = sizeof(statex);
     GlobalMemoryStatusEx(&statex);
@@ -422,7 +422,7 @@ void MonitorService::AcquireHardwareData()
 #ifndef WITHOUT_TEMPERATURE
     if (m_hardware_provider == nullptr || !m_hardware_provider->IsAvailable())
     {
-        // ç¡¬ä»¶ç›‘æ§æœªå¯ç”¨æˆ–æœªåˆå§‹åŒ–ï¼Œä¿æŒå¿«ç…§ä¸­çš„ -1 é»˜è®¤å€¼
+        // Ó²¼ş¼à¿ØÎ´ÆôÓÃ»òÎ´³õÊ¼»¯£¬±£³Ö¿ìÕÕÖĞµÄ -1 Ä¬ÈÏÖµ
         m_snapshot.cpu_temperature = -1;
         m_snapshot.gpu_temperature = -1;
         m_snapshot.hdd_temperature = -1;
@@ -434,18 +434,18 @@ void MonitorService::AcquireHardwareData()
 
     m_snapshot.gpu_temperature = m_hardware_provider->GpuTemperature();
     m_snapshot.main_board_temperature = m_hardware_provider->MainboardTemperature();
-    //PDH æœªè·å–åˆ° GPU åˆ©ç”¨ç‡æ—¶ä½¿ç”¨ OHM æ•°æ®
+    //PDH Î´»ñÈ¡µ½ GPU ÀûÓÃÂÊÊ±Ê¹ÓÃ OHM Êı¾İ
     if (!m_gpu_usage_acquired)
         m_snapshot.gpu_usage = m_hardware_provider->GpuUsage();
-    //PDH æœªè·å–åˆ° CPU é¢‘ç‡æ—¶ä½¿ç”¨ OHM æ•°æ®
+    //PDH Î´»ñÈ¡µ½ CPU ÆµÂÊÊ±Ê¹ÓÃ OHM Êı¾İ
     if (!m_cpu_freq_acquired)
         m_snapshot.cpu_freq = m_hardware_provider->CpuFreq();
 
-    //è·å–CPUæ¸©åº¦
+    //»ñÈ¡CPUÎÂ¶È
     auto all_cpu_temp = m_hardware_provider->AllCpuTemperature();
     if (!all_cpu_temp.empty())
     {
-        if (m_config.cpu_core_name == CCommon::LoadText(IDS_AVREAGE_TEMPERATURE).GetString())  //å¦‚æœé€‰æ‹©äº†å¹³å‡æ¸©åº¦
+        if (m_config.cpu_core_name == CCommon::LoadText(IDS_AVREAGE_TEMPERATURE).GetString())  //Èç¹ûÑ¡ÔñÁËÆ½¾ùÎÂ¶È
         {
             m_snapshot.cpu_temperature = m_hardware_provider->CpuTemperature();
         }
@@ -465,7 +465,7 @@ void MonitorService::AcquireHardwareData()
         m_snapshot.cpu_temperature = -1;
     }
 
-    //è·å–ç¡¬ç›˜æ¸©åº¦
+    //»ñÈ¡Ó²ÅÌÎÂ¶È
     auto all_hdd_temp = m_hardware_provider->AllHddTemperature();
     if (!all_hdd_temp.empty())
     {
@@ -482,7 +482,7 @@ void MonitorService::AcquireHardwareData()
         m_snapshot.hdd_temperature = -1;
     }
 
-    //è·å–ç¡¬ç›˜åˆ©ç”¨ç‡ï¼ˆPDH æœªè·å–åˆ°æ—¶ä½¿ç”¨ OHM æ•°æ®ï¼‰
+    //»ñÈ¡Ó²ÅÌÀûÓÃÂÊ£¨PDH Î´»ñÈ¡µ½Ê±Ê¹ÓÃ OHM Êı¾İ£©
     if (!m_get_disk_usage_by_pdh)
     {
         auto all_hdd_usage = m_hardware_provider->AllHddUsage();
@@ -506,38 +506,38 @@ void MonitorService::AcquireHardwareData()
 
 void MonitorService::UpdateHistoryTraffic(uint64_t cur_in_speed, uint64_t cur_out_speed)
 {
-    //æ£€æµ‹å½“å‰æ—¥æœŸæ˜¯å¦æ”¹å˜ï¼Œå¦‚æœå·²æ”¹å˜ï¼Œå°±å‘å†å²æµé‡åˆ—è¡¨æ’å…¥ä¸€ä¸ªæ–°çš„æ—¥æœŸ
+    //¼ì²âµ±Ç°ÈÕÆÚÊÇ·ñ¸Ä±ä£¬Èç¹ûÒÑ¸Ä±ä£¬¾ÍÏòÀúÊ·Á÷Á¿ÁĞ±í²åÈëÒ»¸öĞÂµÄÈÕÆÚ
     SYSTEMTIME current_time;
     GetLocalTime(&current_time);
-    static int last_check_day = -1;  //ç”¨äºæ£€æµ‹æ—¥æœŸå˜åŒ–ï¼Œé‡ç½®ä¿å­˜çŠ¶æ€
+    static int last_check_day = -1;  //ÓÃÓÚ¼ì²âÈÕÆÚ±ä»¯£¬ÖØÖÃ±£´æ×´Ì¬
     if (m_history_traffic.GetTodayTraffic().day != current_time.wDay)
     {
         m_history_traffic.OnDateChanged();
         m_today_up_traffic = 0;
         m_today_down_traffic = 0;
-        last_check_day = -1;  //é‡ç½®æ—¥æœŸæ ‡è®°ï¼Œä¸‹æ¬¡æ£€æŸ¥æ—¶ä¼šé‡æ–°åˆå§‹åŒ–ä¿å­˜çŠ¶æ€
+        last_check_day = -1;  //ÖØÖÃÈÕÆÚ±ê¼Ç£¬ÏÂ´Î¼ì²éÊ±»áÖØĞÂ³õÊ¼»¯±£´æ×´Ì¬
     }
 
-    //ç»Ÿè®¡ä»Šå¤©å·²ä½¿ç”¨çš„æµé‡
+    //Í³¼Æ½ñÌìÒÑÊ¹ÓÃµÄÁ÷Á¿
     m_today_up_traffic += cur_out_speed;
     m_today_down_traffic += cur_in_speed;
     m_history_traffic.GetTodayTraffic().up_kBytes = m_today_up_traffic / 1024u;
     m_history_traffic.GetTodayTraffic().down_kBytes = m_today_down_traffic / 1024u;
-    //æ¯éš”30ç§’ä¿å­˜ä¸€æ¬¡æµé‡å†å²è®°å½•
+    //Ã¿¸ô30Ãë±£´æÒ»´ÎÁ÷Á¿ÀúÊ·¼ÇÂ¼
     if (m_monitor_time_cnt % GetSampleCount(30, m_config.monitor_time_span) == GetSampleCount(30, m_config.monitor_time_span) - 1)
     {
         static unsigned __int64 last_today_kbytes = 0;
         static bool last_today_kbytes_initialized = false;
         unsigned __int64 current_kbytes = m_history_traffic.GetTodayTraffic().kBytes();
 
-        //å¦‚æœæ—¥æœŸæ”¹å˜äº†ï¼Œé‡ç½®åˆå§‹åŒ–çŠ¶æ€
+        //Èç¹ûÈÕÆÚ¸Ä±äÁË£¬ÖØÖÃ³õÊ¼»¯×´Ì¬
         if (last_check_day != current_time.wDay)
         {
             last_today_kbytes_initialized = false;
             last_check_day = current_time.wDay;
         }
 
-        //é¦–æ¬¡æ£€æŸ¥æ—¶åˆå§‹åŒ–ï¼Œä¸ä¿å­˜
+        //Ê×´Î¼ì²éÊ±³õÊ¼»¯£¬²»±£´æ
         if (!last_today_kbytes_initialized)
         {
             last_today_kbytes = current_kbytes;
@@ -545,7 +545,7 @@ void MonitorService::UpdateHistoryTraffic(uint64_t cur_in_speed, uint64_t cur_ou
         }
         else
         {
-            //åªæœ‰å½“30ç§’å†…æµé‡å˜åŒ–è¶…è¿‡10MBæ—¶æ‰ä¿å­˜å†å²æµé‡è®°å½•ï¼Œé˜²æ­¢ç£ç›˜å†™å…¥è¿‡äºé¢‘ç¹
+            //Ö»ÓĞµ±30ÃëÄÚÁ÷Á¿±ä»¯³¬¹ı10MBÊ±²Å±£´æÀúÊ·Á÷Á¿¼ÇÂ¼£¬·ÀÖ¹´ÅÅÌĞ´Èë¹ıÓÚÆµ·±
             unsigned __int64 change_kbytes = current_kbytes - last_today_kbytes;
             if (change_kbytes >= 10240u) // 10MB = 10240KB
             {
@@ -556,7 +556,7 @@ void MonitorService::UpdateHistoryTraffic(uint64_t cur_in_speed, uint64_t cur_ou
         }
     }
 
-    //æ›´æ–°å¿«ç…§ä¸­çš„ä»Šæ—¥æµé‡
+    //¸üĞÂ¿ìÕÕÖĞµÄ½ñÈÕÁ÷Á¿
     m_snapshot.today_up_traffic = m_today_up_traffic;
     m_snapshot.today_down_traffic = m_today_down_traffic;
 }

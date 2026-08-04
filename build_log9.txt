@@ -1,0 +1,11 @@
+
+  OpenHardwareMonitorApi.vcxproj -> F:\DeepSeek_Workspace\TaskbarMon\Bin\x64\Release\OpenHardwareMonitorApi.dll
+  
+TaskbarMon.rc(434): error RC2135: file not found: OK [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  
+  
+TaskbarMon.rc(435): error RC2135: file not found: Cancel [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  
+  
+TaskbarMon.rc(436): error RC2135: file not found: [F:\DeepSeek_Workspace\TaskbarMon\TaskbarMon\TaskbarMon.vcxproj]
+  
