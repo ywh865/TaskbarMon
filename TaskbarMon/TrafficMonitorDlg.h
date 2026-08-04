@@ -17,11 +17,7 @@
 #include "IniHelper.h"
 #include "AdapterCommon.h"
 #include "AboutDlg.h"
-#include "PdhHardwareQuery/CPUUsage.h"
-#include "PdhHardwareQuery/CpuFreq.h"
-#include "PdhHardwareQuery/GpuUsage.h"
-#include "PdhHardwareQuery/DiskUsage.h"
-#include "HistoryTrafficFile.h"
+#include "core/MonitorService.h"
 
 // CTrafficMonitorDlg 对话框（隐藏宿主窗口，仅承载任务栏窗口、托盘与监控调度）
 class CTrafficMonitorDlg : public CDialog
@@ -39,8 +35,23 @@ public:
     enum { IDD = IDD_TRAFFICMONITOR_DIALOG };
 #endif
 
-    CPdhDiskUsage& GetPdhDiskUsageHelper() { return m_disk_usage_helper; }
-    bool IsGetDiskUsageByPdh() const { return m_get_disk_usage_by_pdh; }
+    // 硬件数据提供者（封装 OpenHardwareMonitor 访问，供 MonitorService 采样）
+    class CHardwareDataProvider : public IHardwareDataProvider
+    {
+    public:
+        bool IsAvailable() const override;
+        void Acquire() override;
+        float CpuTemperature() const override;
+        float CpuFreq() const override;
+        float GpuTemperature() const override;
+        float HddTemperature() const override;
+        float MainboardTemperature() const override;
+        int GpuUsage() const override;
+        int HddUsage() const override;
+        std::map<std::wstring, float> AllCpuTemperature() const override;
+        std::map<std::wstring, float> AllHddTemperature() const override;
+        std::map<std::wstring, int> AllHddUsage() const override;
+    };
 
 protected:
     virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
@@ -50,22 +61,6 @@ protected:
 protected:
     NOTIFYICONDATA m_ntIcon;    //通知区域图标
     CTaskBarDlg* m_tBarDlg{};     //任务栏窗口的指针
-
-    vector<NetWorkConection> m_connections; //保存获取到的要显示到“选择网卡”菜单项中的所有网络连接
-    MIB_IFTABLE* m_pIfTable;
-    DWORD m_dwSize{};	//m_pIfTable的大小
-    int m_connection_selected{ 0 }; //要显示流量的连接的序号
-    unsigned __int64 m_in_bytes{};        //当前已接收的字节数
-    unsigned __int64 m_out_bytes{};   //当前已发送的字节数
-    unsigned __int64 m_last_in_bytes{}; //上次已接收的字节数
-    unsigned __int64 m_last_out_bytes{};    //上次已发送的字节数
-
-    CCPUUsage m_cpu_usage_helper;
-    CPdhCpuFreq m_cpu_freq_helper;
-    CPdhGPUUsage m_gpu_usage_helper;
-    CPdhDiskUsage m_disk_usage_helper;
-
-    bool m_get_disk_usage_by_pdh{};
 
     bool m_first_start{ true };     //初始时为true，在定时器第一次启动后置为flase
 
@@ -95,28 +90,27 @@ protected:
     vector<CRect> m_last_screen_rects;       //上一次所有屏幕的范围（不包含任务栏）
     CSize m_screen_size;        //屏幕的大小（包含任务栏）
 
-    int m_restart_cnt{ -1 };    //重新初始化次数
     unsigned int m_timer_cnt{};     //定时器触发次数（自程序启动以来的秒数）
     unsigned int m_taskbar_timer_cnt{0}; //适用于TaskBarDlg的定时器触发次数（自程序启动以来的秒数）
-    unsigned int m_monitor_time_cnt{};
-    int m_zero_speed_cnt{}; //如果检测不到网速，该变量就会自加
     int m_insert_to_taskbar_cnt{};  //用来统计尝试嵌入任务栏的次数
     int m_cannot_insert_to_task_bar_warning{ true };   //指示是否会在无法嵌入任务栏时弹出提示框
 
     static unsigned int m_WM_TASKBARCREATED;    //任务栏重启消息
 
     SYSTEMTIME m_start_time;    //程序启动时的时间
-    CHistoryTrafficFile m_history_traffic{ theApp.m_history_traffic_path }; //储存历史流量
 
-    bool m_connection_change_flag{ false };     //如果执行过IniConnection()函数，该flag会置为true
     bool m_is_foreground_fullscreen{ false };   //指示前台窗口是否正在全局显示
     bool m_menu_popuped{ false };               //指示当前是否有菜单处于弹出状态
 
     HDC m_desktop_dc;
 
-    string m_connection_name_preferd{ theApp.m_cfg_data.m_connection_name };          //保存用户手动选择的网络连接名称
+    // 统一采样引擎
+    MonitorService m_monitor_service;
+    CHardwareDataProvider m_hardware_provider;
 
-    void DoMonitorAcquisition();    //获取一次监控信息
+    // 从全局设置提取采样配置
+    MonitorService::Config GetMonitorConfig() const;
+
     static UINT MonitorThreadCallback(LPVOID dwUser);   //获取监控信息的线程函数
     bool m_monitor_data_required{ false };          //线程中需要获取监控数据标志，当需要获取监控数据时置为true，获取到一次监控数据时置为false
     bool m_is_thread_exit{ false }; //线程退出标志
@@ -126,13 +120,6 @@ public:
 
 protected:
     void GetScreenSize();           //获取屏幕的大小
-
-    void AutoSelect();
-    //自动选择连接
-    void IniConnection();   //初始化连接
-
-    MIB_IFROW GetConnectIfTable(int connection_index);    //获取当前选择的网络连接的MIB_IFROW对象。connection_index为m_connections中的索引
-    NetWorkConection GetConnection(int connection_index); //获取当前选择的网络连接的NetWorkConection对象。connection_index为m_connections中的索引
 
     void IniConnectionMenu(CMenu* pMenu);   //初始化“选择网络连接”菜单
     void IniTaskBarConnectionMenu();        //初始化任务栏窗口的“选择网络连接”菜单

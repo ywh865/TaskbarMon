@@ -331,7 +331,8 @@
     <ClInclude Include="AdapterCommon.h">
       <Filter>源文件和头文件\公共的类\AdapterCommon</Filter>
     </ClInclude>
-    <ClInclude Include="WinVersionHelper.h">
+    <ClInclude Include="core\MonitorService.h">
+    <ClInclude Include="core\MonitorTypes.h">
       <Filter>源文件和头文件\公共的类\WinVersionHelper</Filter>
     </ClInclude>
     <ClInclude Include="AboutDlg.h">
@@ -641,7 +642,7 @@
     <ClCompile Include="Test.cpp">
       <Filter>测试</Filter>
     </ClCompile>
-    <ClCompile Include="WIC.cpp">
+    <ClCompile Include="core\MonitorService.cpp">
       <Filter>源文件和头文件\公共的类\WIC</Filter>
     </ClCompile>
     <ClCompile Include="DisplayTextSettingDlg.cpp">

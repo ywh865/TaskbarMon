@@ -857,6 +857,8 @@
     <ClInclude Include="WindowsWebExperienceDetector.h" />
     <ClInclude Include="WineTaskbarDlg.h" />
     <ClInclude Include="WinVersionHelper.h" />
+    <ClInclude Include="core\MonitorService.h" />
+    <ClInclude Include="core\MonitorTypes.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AboutDlg.cpp" />
@@ -961,6 +963,7 @@
     <ClCompile Include="TrafficMonitorDlg.cpp" />
     <ClCompile Include="UpdateHelper.cpp" />
     <ClCompile Include="WIC.cpp" />
+    <ClCompile Include="core\MonitorService.cpp" />
     <ClCompile Include="Win11TaskbarDlg.cpp" />
     <ClCompile Include="Win11TaskbarSettingDlg.cpp" />
     <ClCompile Include="WindowsSettingHelper.cpp" />
