@@ -6,6 +6,31 @@
 #include "TaskbarDefaultStyle.h"
 #include "TaskBarDlgDrawCommon.h"
 
+namespace
+{
+    constexpr size_t kMaximumPluginDisplayItemConfigLength = 4096;
+    constexpr size_t kMaximumDoubleClickExecutableLength = 32767;
+    constexpr int kMaximumNotifyInterval = 24 * 60 * 60;
+    constexpr size_t kMaximumDeviceNameLength = 256;
+
+    bool IsOutOfRange(int value, int minimum, int maximum)
+    {
+        return value < minimum || value > maximum;
+    }
+
+    void ResetIfOutOfRange(int& value, int minimum, int maximum, int fallback)
+    {
+        if (IsOutOfRange(value, minimum, maximum))
+            value = fallback;
+    }
+
+    void LimitStringLength(std::wstring& value, size_t maximum_length)
+    {
+        if (value.size() > maximum_length)
+            value.resize(maximum_length);
+    }
+}
+
 ConfigStore::ConfigStore(const std::wstring& path)
     : m_path(path)
 {
@@ -14,7 +39,7 @@ ConfigStore::ConfigStore(const std::wstring& path)
 void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar, MainConfigData& config,
                        const EnvironmentDefaults& defaults)
 {
-    CSettingsHelper ini;
+    CSettingsHelper ini{ m_path };
 
     //常规设置
     general.check_update_when_start = ini.GetBool(_T("general"), _T("check_update_when_start"), true);
@@ -23,7 +48,11 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     general.cpu_usage_acquire_method = static_cast<GeneralSettingData::CpuUsageAcquireMethod>(ini.GetInt(L"general", L"cpu_usage_acquire_method", GeneralSettingData::CA_PDH));
     general.monitor_time_span = ini.GetInt(L"general", L"monitor_time_span", 1000);
     general.hard_disk_name = ini.GetString(L"general", L"hard_disk_name", L"");
-    general.cpu_core_name = ini.GetString(L"general", L"cpu_core_name", L"Core Average");
+    // Store the localized display value because the settings dialog persists
+    // the selected combo-box text. Keep legacy English values compatible in
+    // MonitorService when an older config is opened in another locale.
+    general.cpu_core_name = ini.GetString(
+        L"general", L"cpu_core_name", CCommon::LoadText(IDS_AVREAGE_TEMPERATURE).GetString());
     general.hardware_monitor_item = ini.GetInt(L"general", L"hardware_monitor_item", 0);
     std::vector<std::wstring> connections_hide;
     ini.GetStringList(L"general", L"connections_hide", connections_hide, std::vector<std::wstring>{});
@@ -33,7 +62,9 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     config.m_show_task_bar_wnd = ini.GetBool(_T("config"), _T("show_task_bar_wnd"), false);
     config.m_auto_select = ini.GetBool(_T("connection"), _T("auto_select"), true);
     config.m_select_all = ini.GetBool(_T("connection"), _T("select_all"), false);
-    config.m_connection_name = CCommon::UnicodeToStr(ini.GetString(L"connection", L"connection_name", L"").c_str());
+    std::wstring connection_name = ini.GetString(L"connection", L"connection_name", L"");
+    LimitStringLength(connection_name, kMaximumDeviceNameLength);
+    config.m_connection_name = CCommon::UnicodeToStr(connection_name.c_str());
     general.show_notify_icon = ini.GetBool(_T("config"), _T("show_notify_icon"), true);
     config.m_notify_icon_selected = ini.GetInt(_T("config"), _T("notify_icon_selected"), (defaults.is_windows7_or_8 ? 2 : defaults.default_notify_icon));
     config.m_notify_icon_auto_adapt = ini.GetBool(_T("config"), _T("notify_icon_auto_adapt"), true);
@@ -122,7 +153,11 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
 
     taskbar.item_order.Init();
     taskbar.item_order.FromString(ini.GetString(L"task_bar", L"item_order", L""));
-    taskbar.plugin_display_item.FromString(ini.GetString(L"task_bar", L"plugin_display_item", L""));
+    const std::wstring plugin_display_item = ini.GetString(L"task_bar", L"plugin_display_item", L"");
+    if (plugin_display_item.size() <= kMaximumPluginDisplayItemConfigLength)
+        taskbar.plugin_display_item.FromString(plugin_display_item);
+    else
+        taskbar.plugin_display_item.FromString(L"");
     taskbar.auto_save_taskbar_color_settings_to_preset = ini.GetBool(L"task_bar", L"auto_save_taskbar_color_settings_to_preset", true);
 
     taskbar.show_netspeed_figure = ini.GetBool(L"task_bar", L"show_netspeed_figure", true);
@@ -140,12 +175,22 @@ void ConfigStore::Load(GeneralSettingData& general, TaskBarSettingData& taskbar,
     config.m_use_log_scale = ini.GetBool(_T("histroy_traffic"), _T("use_log_scale"), true);
     config.m_sunday_first = ini.GetBool(_T("histroy_traffic"), _T("sunday_first"), true);
     config.m_view_type = static_cast<HistoryTrafficViewType>(ini.GetInt(_T("histroy_traffic"), _T("view_type"), static_cast<int>(HistoryTrafficViewType::HV_DAY)));
+
+    if (config.m_notify_icon_selected < 0 || config.m_notify_icon_selected >= MAX_NOTIFY_ICON)
+        config.m_notify_icon_selected = defaults.is_windows7_or_8 ? 2 : defaults.default_notify_icon;
+
+    const int history_view_type = static_cast<int>(config.m_view_type);
+    if (IsOutOfRange(history_view_type, static_cast<int>(HistoryTrafficViewType::HV_DAY),
+                     static_cast<int>(HistoryTrafficViewType::HV_YEAR)))
+    {
+        config.m_view_type = HistoryTrafficViewType::HV_DAY;
+    }
 }
 
 bool ConfigStore::Save(const GeneralSettingData& general, const TaskBarSettingData& taskbar,
                        const MainConfigData& config, const OtherSettings& other, const wchar_t* version)
 {
-    CSettingsHelper ini;
+    CSettingsHelper ini{ m_path };
 
     //常规设置
     ini.WriteBool(_T("general"), _T("check_update_when_start"), general.check_update_when_start);
@@ -259,11 +304,13 @@ bool ConfigStore::Save(const GeneralSettingData& general, const TaskBarSettingDa
 
 void ConfigStore::LoadOther(OtherSettings& other, const EnvironmentDefaults& defaults)
 {
-    CSettingsHelper ini;
+    CSettingsHelper ini{ m_path };
     other.no_multistart_warning = ini.GetBool(_T("other"), _T("no_multistart_warning"), false);
     other.exit_when_start_by_restart_manager = ini.GetBool(_T("other"), _T("exit_when_start_by_restart_manager"), true);
     other.debug_log = ini.GetBool(_T("other"), _T("debug_log"), false);
     other.notify_interval = ini.GetInt(_T("other"), _T("notify_interval"), 60);
+    ResetIfOutOfRange(other.notify_interval, 0, kMaximumNotifyInterval, 60);
+
     //由于Win7系统中设置任务栏窗口透明色会导致任务栏窗口不可见，因此默认在Win7中禁用透明色的设定
     other.taksbar_transparent_color_enable = ini.GetBool(L"other", L"taksbar_transparent_color_enable", !defaults.is_windows7);
     other.last_light_mode = ini.GetBool(L"other", L"last_light_mode", defaults.default_light_theme);
@@ -272,7 +319,7 @@ void ConfigStore::LoadOther(OtherSettings& other, const EnvironmentDefaults& def
 
 bool ConfigStore::SaveOther(const OtherSettings& other)
 {
-    CSettingsHelper ini;
+    CSettingsHelper ini{ m_path };
     ini.WriteBool(_T("other"), _T("no_multistart_warning"), other.no_multistart_warning);
     ini.WriteBool(_T("other"), _T("exit_when_start_by_restart_manager"), other.exit_when_start_by_restart_manager);
     ini.WriteBool(_T("other"), _T("debug_log"), other.debug_log);
@@ -295,9 +342,62 @@ void ConfigStore::Validate(GeneralSettingData& general, TaskBarSettingData& task
     if (general.monitor_time_span < MONITOR_TIME_SPAN_MIN || general.monitor_time_span > MONITOR_TIME_SPAN_MAX)
         general.monitor_time_span = 1000;
 
+    ResetIfOutOfRange(general.update_source, 0, 1, 0);
+    if (general.cpu_usage_acquire_method != GeneralSettingData::CA_CPU_TIME &&
+        general.cpu_usage_acquire_method != GeneralSettingData::CA_PDH)
+    {
+        general.cpu_usage_acquire_method = GeneralSettingData::CA_PDH;
+    }
+    general.hardware_monitor_item &= static_cast<unsigned int>(HI_CPU | HI_GPU | HI_HDD | HI_MBD);
+    LimitStringLength(general.hard_disk_name, kMaximumDeviceNameLength);
+    LimitStringLength(general.cpu_core_name, kMaximumDeviceNameLength);
+
+    ResetIfOutOfRange(general.traffic_tip_value, 1, 32767, 200);
+    ResetIfOutOfRange(general.traffic_tip_unit, 0, 1, 0);
+    ResetIfOutOfRange(general.memory_usage_tip.tip_value, 1, 100, 80);
+    ResetIfOutOfRange(general.cpu_temp_tip.tip_value, 1, 120, 80);
+    ResetIfOutOfRange(general.gpu_temp_tip.tip_value, 1, 120, 80);
+    ResetIfOutOfRange(general.hdd_temp_tip.tip_value, 1, 120, 80);
+    ResetIfOutOfRange(general.mainboard_temp_tip.tip_value, 1, 120, 80);
+
+    if (taskbar.font.size < MIN_FONT_SIZE || taskbar.font.size > MAX_FONT_SIZE)
+        taskbar.font.size = 9;
+    if (taskbar.font.name.GetLength() >= LF_FACESIZE)
+        taskbar.font.name = taskbar.font.name.Left(LF_FACESIZE - 1);
+    LimitStringLength(taskbar.double_click_exe, kMaximumDoubleClickExecutableLength);
+
+    if (taskbar.speed_unit < SpeedUnit::AUTO || taskbar.speed_unit > SpeedUnit::MBPS)
+        taskbar.speed_unit = SpeedUnit::AUTO;
+    if (taskbar.memory_display < MemoryDisplay::USAGE_PERCENTAGE ||
+        taskbar.memory_display > MemoryDisplay::MEMORY_AVAILABLE)
+    {
+        taskbar.memory_display = MemoryDisplay::USAGE_PERCENTAGE;
+    }
+    if (taskbar.double_click_action < DoubleClickAction::CONNECTION_INFO ||
+        taskbar.double_click_action > DoubleClickAction::NONE)
+    {
+        taskbar.double_click_action = DoubleClickAction::CONNECTION_INFO;
+    }
+    ResetIfOutOfRange(taskbar.digits_number, 3, 7, 4);
+
     //任务栏窗口布局参数校验
     taskbar.ValidItemSpace();
+    taskbar.ValidVerticalMargin();
     taskbar.ValidWindowOffsetTop();
+    if (taskbar.secondary_display_index < 0)
+        taskbar.secondary_display_index = 0;
+    ResetIfOutOfRange(taskbar.taskbar_left_space_win11, 0, 300, 160);
+    ResetIfOutOfRange(taskbar.taskbar_right_space_win11, 0, 300, 280);
+    ResetIfOutOfRange(taskbar.dark_default_style, 0, TASKBAR_DEFAULT_STYLE_NUM - 1, 0);
+    ResetIfOutOfRange(taskbar.light_default_style, 0, TASKBAR_DEFAULT_STYLE_NUM - 1,
+                      TASKBAR_DEFAULT_LIGHT_STYLE_INDEX);
+
+
+    // Keep INI-controlled graph settings within the ranges accepted by the UI.
+    if (taskbar.netspeed_figure_max_value < 1 || taskbar.netspeed_figure_max_value > 1024)
+        taskbar.netspeed_figure_max_value = 10;
+    if (taskbar.netspeed_figure_max_value_unit < 0 || taskbar.netspeed_figure_max_value_unit > 1)
+        taskbar.netspeed_figure_max_value_unit = 1;
     taskbar.ValidWindowOffsetLeft();
 
     //不含温度监控的版本，不显示温度监控相关项目

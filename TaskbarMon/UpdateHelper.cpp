@@ -1,7 +1,5 @@
 ﻿#include "stdafx.h"
 #include "UpdateHelper.h"
-#include "SimpleXML.h"
-#include "Common.h"
 
 
 CUpdateHelper::CUpdateHelper()
@@ -18,119 +16,31 @@ void CUpdateHelper::SetUpdateSource(UpdateSource update_source)
     m_update_source = update_source;
 }
 
-bool CUpdateHelper::CheckForUpdate()
+bool CUpdateHelper::IsUpdateCheckSupported() const noexcept
 {
-    wstring version_info;
-    //使用GitHub更新源
-    if (m_update_source == UpdateSource::GitHubSource)
-    {
-        if (CCommon::GetURL(L"https://raw.githubusercontent.com/zhongyang219/TrafficMonitor/master/version_utf8.info", version_info, true))     //获取版本信息
-        {
-            m_row_data = true;
-        }
-        else if (CCommon::GetURL(L"https://github.com/zhongyang219/TrafficMonitor/blob/master/version_utf8.info", version_info, true))      //获取版本信息
-        {
-            m_row_data = false;
-        }
-        else
-        {
-            return false;
-        }
-
-        if (!m_row_data)
-        {
-            size_t index = version_info.find(L"﻿&lt;version&gt;");
-            if (index != std::wstring::npos)
-                version_info = version_info.substr(index);
-
-            CString str_version_info = version_info.c_str();
-            str_version_info.Replace(L"&lt;", L"<");
-            str_version_info.Replace(L"&gt;", L">");
-
-            version_info = str_version_info;
-        }
-    }
-    //使用Gitee更新源
-    else
-    {
-        if (!CCommon::GetURL(L"https://gitee.com/zhongyang219/TrafficMonitor/raw/master/version_utf8.info", version_info, true))     //获取版本信息
-            return false;
-    }
-
-    ParseUpdateInfo(version_info);
-
-    return true;
+    return false;
 }
 
-void CUpdateHelper::ParseUpdateInfo(wstring version_info)
+bool CUpdateHelper::CheckForUpdate()
 {
-    CSimpleXML version_xml;
-    version_xml.LoadXMLContentDirect(version_info);
+    // The old implementation consumed unsigned metadata from the upstream
+    // TrafficMonitor repository. That metadata is not authoritative for this
+    // fork, so update checks fail closed until TaskbarMon publishes a signed
+    // manifest and hashes for its own release artifacts.
+    ClearUpdateInfo();
+    m_row_data = true;
+    return false;
+}
 
-    m_version = version_xml.GetNode(L"version");
-
-    // Validate version string: must only contain digits, dots, and alphanumeric chars.
-    // An empty or malformed version string indicates a tampered/invalid manifest.
-    if (m_version.empty())
-        return;
-    for (wchar_t ch : m_version)
-    {
-        if (!iswalnum(ch) && ch != L'.' && ch != L'-')
-        {
-            m_version.clear();
-            return;
-        }
-    }
-
-    wstring str_source_tag = (m_update_source == UpdateSource::GitHubSource ? L"GitHub" : L"Gitee");
-    wstring str_link_tag, str_link_tag_x64, str_link_tag_arm64ec;
-#ifdef WITHOUT_TEMPERATURE
-    str_link_tag = L"link_without_temperature";
-    str_link_tag_x64 = L"link_without_temperature_x64";
-    str_link_tag_arm64ec = L"link_without_temperature_arm64ec";
-#else
-    str_link_tag = L"link";
-    str_link_tag_x64 = L"link_x64";
-    str_link_tag_arm64ec = L"link_arm64ec";
-#endif
-    m_link64 = version_xml.GetNode(str_link_tag_x64.c_str(), str_source_tag.c_str());
-    m_link = version_xml.GetNode(str_link_tag.c_str(), str_source_tag.c_str());
-    m_link_arm64ec = version_xml.GetNode(str_link_tag_arm64ec.c_str(), str_source_tag.c_str());
-
-    // Validate all download URLs: must use HTTPS and originate from a trusted domain.
-    // This prevents a network-level attacker from injecting plain-HTTP or off-domain
-    // download links via a tampered update manifest (MITM / supply-chain protection).
-    auto IsValidDownloadUrl = [](const std::wstring& url) -> bool {
-        if (url.empty())
-            return true;
-        // Enforce HTTPS scheme
-        if (url.compare(0, 8, L"https://") != 0)
-            return false;
-        // Enforce trusted hosting domains (GitHub or Gitee)
-        const std::wstring host = url.substr(8);
-        return (host.compare(0, 11, L"github.com/") == 0 ||
-                host.compare(0, 10, L"gitee.com/") == 0);
-    };
-
-    if (!IsValidDownloadUrl(m_link) || !IsValidDownloadUrl(m_link64) || !IsValidDownloadUrl(m_link_arm64ec))
-    {
-        // Clear all update data to prevent MITM-injected URLs from being acted upon
-        m_version.clear();
-        m_link.clear();
-        m_link64.clear();
-        m_link_arm64ec.clear();
-        return;
-    }
-
-    CString contents_zh_cn = version_xml.GetNode(L"contents_zh_cn", L"update_contents").c_str();
-    CString contents_en = version_xml.GetNode(L"contents_en", L"update_contents").c_str();
-    CString contents_zh_tw = version_xml.GetNode(L"contents_zh_tw", L"update_contents").c_str();
-    contents_zh_cn.Replace(L"\\n", L"\r\n");
-    contents_en.Replace(L"\\n", L"\r\n");
-    contents_zh_tw.Replace(L"\\n", L"\r\n");
-    m_contents_zh_cn = contents_zh_cn;
-    m_contents_en = contents_en;
-    m_contents_zh_tw = contents_zh_tw;
+void CUpdateHelper::ClearUpdateInfo() noexcept
+{
+    m_version.clear();
+    m_link.clear();
+    m_link64.clear();
+    m_link_arm64ec.clear();
+    m_contents_en.clear();
+    m_contents_zh_cn.clear();
+    m_contents_zh_tw.clear();
 }
 
 const std::wstring& CUpdateHelper::GetVersion() const

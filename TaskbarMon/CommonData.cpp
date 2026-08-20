@@ -5,6 +5,19 @@
 #include "TaskbarMon.h"
 #include "WindowsSettingHelper.h"
 
+#include <cwctype>
+
+namespace
+{
+    constexpr size_t kMaximumStringSetItems = 128;
+    constexpr size_t kMaximumStringSetItemLength = 128;
+
+    bool IsConfigWhitespace(wchar_t value)
+    {
+        return std::iswspace(static_cast<wint_t>(value)) != 0;
+    }
+}
+
 ///////////////////////////////////////////////////////////////////////////////////
 int Date::week() const
 {
@@ -107,11 +120,45 @@ void StringSet::SetStrContained(const std::wstring& str, bool contained)
 
 void StringSet::FromString(const std::wstring& str)
 {
-    std::vector<std::wstring> item_vect;
-    CCommon::StringSplit(str, L',', item_vect);
     string_set.clear();
-    for (const auto& i : item_vect)
-        string_set.insert(i);
+    size_t item_begin{};
+    size_t item_count{};
+    while (item_begin <= str.size())
+    {
+        // StringSet is fed by user-editable configuration.  Stop before a
+        // comma-heavy value can allocate an unbounded vector or set.
+        if (item_count >= kMaximumStringSetItems)
+        {
+            string_set.clear();
+            return;
+        }
+        ++item_count;
+
+        size_t item_end = str.find(L',', item_begin);
+        if (item_end == std::wstring::npos)
+            item_end = str.size();
+
+        size_t begin = item_begin;
+        size_t end = item_end;
+        while (begin < end && IsConfigWhitespace(str[begin]))
+            ++begin;
+        while (end > begin && IsConfigWhitespace(str[end - 1]))
+            --end;
+
+        if (begin != end)
+        {
+            if (end - begin > kMaximumStringSetItemLength)
+            {
+                string_set.clear();
+                return;
+            }
+            string_set.emplace(str, begin, end - begin);
+        }
+
+        if (item_end == str.size())
+            return;
+        item_begin = item_end + 1;
+    }
 }
 
 std::wstring StringSet::ToString() const
@@ -212,9 +259,9 @@ void TaskBarSettingData::ValidWindowOffsetTop()
 void TaskBarSettingData::ValidWindowOffsetLeft()
 {
     if (window_offset_left < -800)
-        window_offset_top = -800;
-    if (window_offset_top > 800)
-        window_offset_top = 800;
+        window_offset_left = -800;
+    if (window_offset_left > 800)
+        window_offset_left = 800;
 }
 
 unsigned __int64 TaskBarSettingData::GetNetspeedFigureMaxValueInBytes() const
@@ -261,19 +308,21 @@ wstring LanguageInfo::toConfigString() const
 
 void LanguageInfo::fromConfigString(const wstring& config_str)
 {
-    std::vector<wstring> parts;
-    CCommon::StringSplit(config_str, L'|', parts, false);
-    if (parts.size() >= 1)
+    // Only the first three fields are consumed.  Do not use StringSplit here:
+    // a user-editable value containing a large number of separators would
+    // otherwise materialize an equally large vector of empty strings.
+    constexpr size_t kMaxLanguageConfigFieldLength = 128;
+    wstring* fields[] = { &bcp_47, &display_name, &translator };
+    size_t field_begin{};
+    for (size_t i{}; i < _countof(fields) && field_begin != wstring::npos; ++i)
     {
-        bcp_47 = parts[0];
+        const size_t field_end = config_str.find(L'|', field_begin);
+        const size_t field_length = (field_end == wstring::npos ? config_str.size() : field_end) - field_begin;
+        wstring field = config_str.substr(field_begin, (std::min)(field_length, kMaxLanguageConfigFieldLength));
+        CCommon::StringNormalize(field);
+        *fields[i] = std::move(field);
+        field_begin = field_end == wstring::npos ? wstring::npos : field_end + 1;
     }
-    if (parts.size() >= 2)
-    {
-        display_name = parts[1];
-    }
-    if (parts.size() >= 3)
-    {
-        translator = parts[2];
-    }
-    language_id = LocaleNameToLCID(bcp_47.c_str(), 0);
+    const LCID locale_id = LocaleNameToLCID(bcp_47.c_str(), 0);
+    language_id = LANGIDFROMLCID(locale_id);
 }

@@ -10,39 +10,96 @@ CPictureStatic::CPictureStatic()
 CPictureStatic::~CPictureStatic()
 {
 	m_memDC.DeleteDC();
-	m_bitmap.Detach();
+	m_bitmap.DeleteObject();
 }
 
 void CPictureStatic::SetPicture(UINT pic_id)
 {
 	m_memDC.DeleteDC();
-	if (!m_bitmap.LoadBitmap(pic_id))		//载入位图
+	m_bitmap.DeleteObject();
+	ZeroMemory(&m_bm, sizeof(m_bm));
+
+	if (!m_bitmap.LoadBitmap(pic_id))
+	{
+		Invalidate();
 		return;
-	//获取图像实际大小
-	GetObject(m_bitmap, sizeof(BITMAP), &m_bm);
-	CDC* pDC = GetDC();
-	m_memDC.CreateCompatibleDC(pDC);
-	m_memDC.SelectObject(&m_bitmap);
-	//获取控件大小
+	}
+
+	if (::GetObject(m_bitmap.GetSafeHandle(), static_cast<int>(sizeof(m_bm)), &m_bm) != static_cast<int>(sizeof(m_bm)))
+	{
+		m_bitmap.DeleteObject();
+		Invalidate();
+		return;
+	}
+
+	CDC* window_dc = GetDC();
+	if (window_dc == nullptr)
+	{
+		m_bitmap.DeleteObject();
+		Invalidate();
+		return;
+	}
+
+	const BOOL created = m_memDC.CreateCompatibleDC(window_dc);
+	ReleaseDC(window_dc);
+	if (!created || m_memDC.SelectObject(&m_bitmap) == nullptr)
+	{
+		m_memDC.DeleteDC();
+		m_bitmap.DeleteObject();
+		Invalidate();
+		return;
+	}
+
 	GetClientRect(m_rect);
-	//手动重绘
 	Invalidate();
 }
 
 void CPictureStatic::SetPicture(HBITMAP hBitmap)
 {
 	m_memDC.DeleteDC();
-	m_bitmap.Detach();
-	if (!m_bitmap.Attach(hBitmap))
+	m_bitmap.DeleteObject();
+	ZeroMemory(&m_bm, sizeof(m_bm));
+
+	if (hBitmap == nullptr)
+	{
+		Invalidate();
 		return;
-	//获取图像实际大小
-	GetObject(m_bitmap, sizeof(BITMAP), &m_bm);
-	CDC* pDC = GetDC();
-	m_memDC.CreateCompatibleDC(pDC);
-	m_memDC.SelectObject(&m_bitmap);
-	//获取控件大小
+	}
+
+	// Ownership of hBitmap transfers to this control.
+	if (!m_bitmap.Attach(hBitmap))
+	{
+		::DeleteObject(hBitmap);
+		Invalidate();
+		return;
+	}
+
+	if (::GetObject(m_bitmap.GetSafeHandle(), static_cast<int>(sizeof(m_bm)), &m_bm) != static_cast<int>(sizeof(m_bm)))
+	{
+		m_bitmap.DeleteObject();
+		Invalidate();
+		return;
+	}
+
+	CDC* window_dc = GetDC();
+	if (window_dc == nullptr)
+	{
+		m_bitmap.DeleteObject();
+		Invalidate();
+		return;
+	}
+
+	const BOOL created = m_memDC.CreateCompatibleDC(window_dc);
+	ReleaseDC(window_dc);
+	if (!created || m_memDC.SelectObject(&m_bitmap) == nullptr)
+	{
+		m_memDC.DeleteDC();
+		m_bitmap.DeleteObject();
+		Invalidate();
+		return;
+	}
+
 	GetClientRect(m_rect);
-	//手动重绘
 	Invalidate();
 }
 

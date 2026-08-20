@@ -195,6 +195,25 @@
       </AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <!-- Match the native application's compiler security and warning baseline. -->
+  <ItemDefinitionGroup Label="SecurityHardening">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'" Label="ReleaseWarningPolicy">
+    <ClCompile>
+      <TreatWarningAsError>true</TreatWarningAsError>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <Reference Include="LibreHardwareMonitorLib">
       <HintPath>LibreHardwareMonitorLib.dll</HintPath>

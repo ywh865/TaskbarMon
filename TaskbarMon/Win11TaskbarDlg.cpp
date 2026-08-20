@@ -1,100 +1,165 @@
-﻿#include "stdafx.h"
+#include "stdafx.h"
 #include "Win11TaskbarDlg.h"
 #include "WindowsSettingHelper.h"
 
-void CWin11TaskbarDlg::AdjustTaskbarWndPos(bool force_adjust)
+namespace
 {
-    ::GetWindowRect(m_hNotify, m_rcNotify);
-    ::GetWindowRect(m_hStart, m_rcStart);
-    m_rcStart.MoveToXY(m_rcStart.left - m_rcTaskbar.left, m_rcStart.top - m_rcTaskbar.top);
+bool IsContainedIn(const CRect& outer, const CRect& inner)
+{
+    return inner.left >= outer.left && inner.top >= outer.top
+        && inner.right <= outer.right && inner.bottom <= outer.bottom;
+}
 
-    //设置窗口大小
-    m_rect.right = m_rect.left + m_window_width;
-    m_rect.bottom = m_rect.top + m_window_height;
-    if (force_adjust || m_rcNotify.Width() != m_last_notify_width || m_rcStart.left != m_last_start_pos)   //如果最小化窗口的宽度改变了，重新设置任务栏窗口的位置
+bool GetClientRectInScreenPixels(HWND hwnd, CRect& screen_rect)
+{
+    RECT client_rect{};
+    if (hwnd == nullptr || !::IsWindow(hwnd) || !::GetClientRect(hwnd, &client_rect))
+        return false;
+
+    CPoint top_left{client_rect.left, client_rect.top};
+    if (!::ClientToScreen(hwnd, &top_left))
+        return false;
+
+    screen_rect.SetRect(top_left.x,
+                        top_left.y,
+                        top_left.x + (client_rect.right - client_rect.left),
+                        top_left.y + (client_rect.bottom - client_rect.top));
+    return screen_rect.Width() > 0 && screen_rect.Height() > 0;
+}
+}
+
+bool CWin11TaskbarDlg::InitTaskbarWnd()
+{
+    m_hNotify = nullptr;
+    m_hStart = nullptr;
+
+    // Secondary-taskbar and non-horizontal hierarchies have historically
+    // varied across Windows releases.  Use the safe floating path until a
+    // concrete layout has been verified rather than guessing a host window.
+    if (m_is_secondary_display || !IsWindowClass(m_hTaskbar, L"Shell_TrayWnd"))
+        return false;
+
+    m_hNotify = ::FindWindowEx(m_hTaskbar, nullptr, L"TrayNotifyWnd", nullptr);
+    m_hStart = ::FindWindowEx(m_hTaskbar, nullptr, L"Start", nullptr);
+    return IsTaskbarLayoutValid();
+}
+
+bool CWin11TaskbarDlg::IsTaskbarLayoutValid() const
+{
+    if (m_is_secondary_display || !IsWindowClass(m_hTaskbar, L"Shell_TrayWnd")
+        || m_hNotify == nullptr || m_hStart == nullptr || !::IsWindow(m_hNotify) || !::IsWindow(m_hStart)
+        || ::GetParent(m_hNotify) != m_hTaskbar || ::GetParent(m_hStart) != m_hTaskbar
+        || !IsWindowClass(m_hNotify, L"TrayNotifyWnd") || !IsWindowClass(m_hStart, L"Start"))
     {
-        m_last_notify_width = m_rcNotify.Width();
-        m_last_start_pos = m_rcStart.left;
-        //任务窗口显示在右侧时，或者Windows11下任务栏左对齐时
-        //（Windows11下，如果任务栏设置为左对齐，即使在“任务栏窗口设置”中设置了任务窗口显示在左边，窗口仍然显示在右边）
-        if (!theApp.m_taskbar_data.tbar_wnd_on_left || !CWindowsSettingHelper::IsTaskbarCenterAlign())
-        {
-            ////靠近任务栏图标的情况
-            //if (theApp.m_taskbar_data.tbar_wnd_snap && IsTaskbarCloseToIconEnable(theApp.m_taskbar_data.tbar_wnd_on_left))
-            //{
-            //    m_rect.MoveToX(m_rcMin.right + 2);
-            //}
-            ////靠近通知区的情况
-            //else
-            //{
-            //通知区窗口的水平位置
-            int notify_x_pos = m_rcNotify.left;
-            //没有获取到通知区位置的情况
-            if (notify_x_pos == 0)
-            {
-                //Win11副屏没有通知区窗口，这里使用固定的值（88像素的系统时间区域）
-                if (m_is_secondary_display)
-                    notify_x_pos = m_rcTaskbar.Width() - DPI(88);
-                //如果不是副屏，但是仍然没有获取到通知区域的位置，使用配置文件中taskbar_right_space_win11指定的值
-                else
-                    notify_x_pos = m_rcTaskbar.Width() - DPI(theApp.m_taskbar_data.taskbar_right_space_win11);
-            }
-            //如果显示了小组件，并且任务栏靠左显示，则留出小组件的位置
-            if (theApp.m_taskbar_data.avoid_overlap_with_widgets && CWindowsSettingHelper::IsTaskbarWidgetsBtnShown() && !CWindowsSettingHelper::IsTaskbarCenterAlign())
-                m_rect.MoveToX(notify_x_pos - m_rect.Width() + 2 - DPI(theApp.m_taskbar_data.taskbar_left_space_win11));
-            else
-                m_rect.MoveToX(notify_x_pos - m_rect.Width() + 2);
-            //}
-        }
-        //任务栏窗口显示在左侧时
-        else
-        {
-            //靠近“开始”按钮
-            if (theApp.m_taskbar_data.tbar_wnd_snap)
-            {
-                m_rect.MoveToX(m_rcStart.left - m_rect.Width() - 2);
-            }
-            //靠近最左侧
-            else
-            {
-                if (CWindowsSettingHelper::IsTaskbarWidgetsBtnShown())
-                    m_rect.MoveToX(2 + DPI(theApp.m_taskbar_data.taskbar_left_space_win11));
-                else
-                    m_rect.MoveToX(2);
-            }
-        }
-        //水平偏移
-        m_rect.MoveToX(m_rect.left + DPI(theApp.m_taskbar_data.window_offset_left));
-        ////确保水平方向不超出屏幕边界
-        //if (m_rect.left < 0)
-        //    m_rect.MoveToX(0);
-        //if (m_rcTaskbar.Width() > m_rect.Width() && m_rect.right > m_rcTaskbar.Width())
-        //    m_rect.MoveToX(m_rcTaskbar.Width() - m_rect.Width());
-
-        //设置任务栏窗口的垂直位置
-        //注：这里加上(m_rcTaskbar.Height() - rcStart.Height())用于修正Windows11 build 22621版本后触屏设备任务栏窗口位置不正确的问题。
-        //在这种情况下m_rcTaskbar的高度要大于m_rcBar的高度，正常情况下，它们的高度相同
-        //但是当任务栏上没有任何图标时，m_rcBar的高度会变为0，因此使用rcStart代替
-        m_rect.MoveToY((m_rcStart.Height() - m_rect.Height()) / 2 + (m_rcTaskbar.Height() - m_rcStart.Height()) + DPI(theApp.m_taskbar_data.window_offset_top));
-        ////确保垂直方向不超出屏幕边界
-        //if (m_rect.top < 0)
-        //    m_rect.MoveToY(0);
-        //if (m_rcTaskbar.Height() > m_rect.Height() && m_rect.bottom > m_rcTaskbar.Height())
-        //    m_rect.MoveToY(m_rcTaskbar.Height() - m_rect.Height());
-
-        MoveWindow(m_rect);
+        return false;
     }
+
+    CRect taskbar_rect;
+    CRect taskbar_client_rect;
+    CRect notify_rect;
+    CRect start_rect;
+    if (!::GetWindowRect(m_hTaskbar, &taskbar_rect) || !GetClientRectInScreenPixels(m_hTaskbar, taskbar_client_rect)
+        || !::GetWindowRect(m_hNotify, &notify_rect) || !::GetWindowRect(m_hStart, &start_rect))
+    {
+        return false;
+    }
+
+    return taskbar_rect.Width() >= 64 && taskbar_rect.Height() >= 16
+        && taskbar_rect.Width() >= taskbar_rect.Height()
+        && IsContainedIn(taskbar_client_rect, notify_rect)
+        && IsContainedIn(taskbar_client_rect, start_rect);
 }
 
-void CWin11TaskbarDlg::InitTaskbarWnd()
+bool CWin11TaskbarDlg::AdjustTaskbarWndPos(bool force_adjust)
 {
-    m_hNotify = ::FindWindowEx(m_hTaskbar, 0, L"TrayNotifyWnd", NULL);
-    m_hStart = ::FindWindowEx(m_hTaskbar, nullptr, L"Start", NULL);
-    ::GetWindowRect(m_hNotify, m_rcNotify);
+    (void)force_adjust;
+    if (!IsTaskbarLayoutValid() || !IsWindowSizeWithinSafeLimits())
+    {
+        SetTaskbarError(ERROR_NOT_SUPPORTED);
+        return false;
+    }
+
+    CRect notify_screen_rect;
+    CRect start_screen_rect;
+    RECT raw_client_rect{};
+    if (!::GetWindowRect(m_hNotify, &notify_screen_rect) || !::GetWindowRect(m_hStart, &start_screen_rect)
+        || !::GetClientRect(m_hTaskbar, &raw_client_rect))
+    {
+        SetTaskbarError(::GetLastError());
+        return false;
+    }
+    const CRect taskbar_client{raw_client_rect};
+
+    CPoint notify_position{notify_screen_rect.left, notify_screen_rect.top};
+    CPoint start_position{start_screen_rect.left, start_screen_rect.top};
+    if (!::ScreenToClient(m_hTaskbar, &notify_position) || !::ScreenToClient(m_hTaskbar, &start_position))
+    {
+        SetTaskbarError(::GetLastError());
+        return false;
+    }
+
+    const CRect notify_rect{notify_position.x,
+                            notify_position.y,
+                            notify_position.x + notify_screen_rect.Width(),
+                            notify_position.y + notify_screen_rect.Height()};
+    const CRect start_rect{start_position.x,
+                           start_position.y,
+                           start_position.x + start_screen_rect.Width(),
+                           start_position.y + start_screen_rect.Height()};
+    if (!IsContainedIn(taskbar_client, notify_rect) || !IsContainedIn(taskbar_client, start_rect))
+    {
+        SetTaskbarError(ERROR_INVALID_DATA);
+        return false;
+    }
+
+    int hosted_x{};
+    if (!theApp.m_taskbar_data.tbar_wnd_on_left || !CWindowsSettingHelper::IsTaskbarCenterAlign())
+    {
+        hosted_x = notify_rect.left - m_window_width;
+        if (theApp.m_taskbar_data.avoid_overlap_with_widgets
+            && CWindowsSettingHelper::IsTaskbarWidgetsBtnShown()
+            && !CWindowsSettingHelper::IsTaskbarCenterAlign())
+        {
+            hosted_x -= DPI(theApp.m_taskbar_data.taskbar_left_space_win11);
+        }
+    }
+    else if (theApp.m_taskbar_data.tbar_wnd_snap)
+    {
+        hosted_x = start_rect.left - m_window_width;
+    }
+    else
+    {
+        hosted_x = DPI(2);
+        if (CWindowsSettingHelper::IsTaskbarWidgetsBtnShown())
+            hosted_x += DPI(theApp.m_taskbar_data.taskbar_left_space_win11);
+    }
+
+    hosted_x += DPI(theApp.m_taskbar_data.window_offset_left);
+    const int hosted_y = (taskbar_client.Height() - m_window_height) / 2
+        + DPI(theApp.m_taskbar_data.window_offset_top);
+    const CRect hosted_window{hosted_x, hosted_y, hosted_x + m_window_width, hosted_y + m_window_height};
+    if (!IsContainedIn(taskbar_client, hosted_window))
+    {
+        SetTaskbarError(ERROR_NOT_ENOUGH_MEMORY);
+        return false;
+    }
+
+    // Windows 11 overlay mode intentionally changes only our child window.
+    // It never moves or resizes Start, TrayNotifyWnd, or a task-list window.
+    m_rect = hosted_window;
+    if (!MoveWindow(m_rect))
+    {
+        SetTaskbarError(::GetLastError());
+        return false;
+    }
+    return true;
 }
 
-void CWin11TaskbarDlg::ResetTaskbarPos()
+bool CWin11TaskbarDlg::ResetTaskbarPos()
 {
+    // Overlay mode does not mutate Explorer windows.  CloseAndRestore restores
+    // our own captured parent/style/position after this returns.
+    return true;
 }
 
 HWND CWin11TaskbarDlg::GetParentHwnd()
@@ -104,5 +169,9 @@ HWND CWin11TaskbarDlg::GetParentHwnd()
 
 void CWin11TaskbarDlg::CheckTaskbarOnTopOrBottom()
 {
-    m_taskbar_on_top_or_bottom = true;
+    CRect taskbar_rect;
+    if (::GetWindowRect(m_hTaskbar, &taskbar_rect) && taskbar_rect.Width() > 0 && taskbar_rect.Height() > 0)
+        m_taskbar_on_top_or_bottom = taskbar_rect.Width() >= taskbar_rect.Height();
+    else
+        m_taskbar_on_top_or_bottom = true;
 }

@@ -3,7 +3,6 @@
 #include <unordered_map>
 #include <chrono>
 #include <mutex>
-#include <thread>
 #include <type_traits>
 #include <initializer_list>
 #include "IDrawCommon.h"
@@ -679,9 +678,6 @@ namespace TaskBarDlgUser32DrawTextHook
 #define TRAFFICMONITOR_CD2D1BITMAPCACHE_LOCK_CACHE_MAP_AND_EXPIRE_INTERVAL(sp_data) \
     std::lock_guard<std::mutex> cache_and_expire_interval_lock_guard(sp_data->m_mutex)
 
-#define TRAFFICMONITOR_CD2D1BITMAPCACHE_LOCK_GC_INTERVAL(sp_data) \
-    std::lock_guard<std::mutex> gc_lock_guard(sp_data->m_gc_mutex)
-
 // ResourceBitmapCreator 主模板（只需声明）
 template <typename ResType>
 struct ResourceBitmapCreator;
@@ -769,42 +765,19 @@ private:
             return (now - cache.m_init_timestamp) > m_cache_expire_interval;
         }
 
-        std::mutex m_gc_mutex{};
         std::chrono::seconds m_gc_interval{std::chrono::seconds(60)};
+        std::chrono::steady_clock::time_point m_last_gc_timestamp{};
     };
 
     Microsoft::WRL::ComPtr<ID2D1RenderTarget> m_p_render_target;
     std::shared_ptr<HeapData> m_sp_data{std::make_shared<HeapData>()};
-    std::thread m_gc_thread{
-        [wp_data = std::weak_ptr<HeapData>(m_sp_data)]()
-        {
-            do
-            {
-                auto sp_data = wp_data.lock();
-                if (!sp_data)
-                {
-                    break;
-                }
-
-                CD2D1ResCacheBase::GCImpl(sp_data);
-
-                decltype(sp_data->m_gc_interval) gc_interval;
-                {
-                    TRAFFICMONITOR_CD2D1BITMAPCACHE_LOCK_GC_INTERVAL(sp_data);
-                    gc_interval = sp_data->m_gc_interval;
-                }
-                std::this_thread::sleep_for(gc_interval);
-            } while (true);
-        }};
 
 public:
     CD2D1ResCacheBase(Microsoft::WRL::ComPtr<ID2D1RenderTarget> p_render_target)
         : m_p_render_target{ p_render_target }
     {}
 
-    ~CD2D1ResCacheBase() {
-        m_gc_thread.detach();
-    }
+    ~CD2D1ResCacheBase() = default;
 
     // 尚不支持复制或移动
     CD2D1ResCacheBase(const CD2D1ResCacheBase&) = delete;
@@ -842,6 +815,9 @@ public:
 
     Microsoft::WRL::ComPtr<ID2D1Bitmap> GetResource(ResType res) {
         TRAFFICMONITOR_CD2D1BITMAPCACHE_LOCK_CACHE_MAP_AND_EXPIRE_INTERVAL(m_sp_data);
+        // The D2D factory is single-threaded, so cache eviction must stay on
+        // the caller's drawing thread: erasing an entry releases its bitmap.
+        GCIfNeededLocked(*m_sp_data);
         auto it = m_sp_data->m_cache_map.find(res);
         if (it != m_sp_data->m_cache_map.end())
         {
@@ -854,7 +830,10 @@ public:
         else
         {
             AddResource(res);
-            return m_sp_data->m_cache_map[res].m_cache;
+            auto inserted = m_sp_data->m_cache_map.find(res);
+            return inserted == m_sp_data->m_cache_map.end()
+                ? Microsoft::WRL::ComPtr<ID2D1Bitmap>{}
+                : inserted->second.m_cache;
         }
     }
 
@@ -895,9 +874,12 @@ public:
         }
     }
 
-    void GC() { GCImpl(m_sp_data); }
+    void GC() {
+        TRAFFICMONITOR_CD2D1BITMAPCACHE_LOCK_CACHE_MAP_AND_EXPIRE_INTERVAL(m_sp_data);
+        GCImplLocked(*m_sp_data, std::chrono::steady_clock::now());
+    }
     void SetGCInterval(const std::chrono::seconds interval) {
-        TRAFFICMONITOR_CD2D1BITMAPCACHE_LOCK_GC_INTERVAL(m_sp_data);
+        TRAFFICMONITOR_CD2D1BITMAPCACHE_LOCK_CACHE_MAP_AND_EXPIRE_INTERVAL(m_sp_data);
         m_sp_data->m_gc_interval = interval;
     }
     void SetExpireInterval(const std::chrono::seconds interval) {
@@ -917,13 +899,11 @@ private:
         auto existing_it = m_sp_data->m_cache_map.find(res);
         return existing_it != m_sp_data->m_cache_map.end();
     }
-    static void GCImpl(std::shared_ptr<HeapData> sp_data) {
-        auto now = std::chrono::steady_clock::now();
-        TRAFFICMONITOR_CD2D1BITMAPCACHE_LOCK_CACHE_MAP_AND_EXPIRE_INTERVAL(sp_data);
-        auto& ref_cache_map = sp_data->m_cache_map;
+    static void GCImplLocked(HeapData& data, std::chrono::steady_clock::time_point now) {
+        auto& ref_cache_map = data.m_cache_map;
         for (auto it = ref_cache_map.begin(); it != ref_cache_map.end();)
         {
-            if (sp_data->IsCacheExpire(it->second, now))
+            if (data.IsCacheExpire(it->second, now))
             {
                 it = ref_cache_map.erase(it);
             }
@@ -931,6 +911,15 @@ private:
             {
                 ++it;
             }
+        }
+        data.m_last_gc_timestamp = now;
+    }
+    static void GCIfNeededLocked(HeapData& data) {
+        const auto now = std::chrono::steady_clock::now();
+        if (data.m_last_gc_timestamp == std::chrono::steady_clock::time_point{}
+            || now - data.m_last_gc_timestamp >= data.m_gc_interval)
+        {
+            GCImplLocked(data, now);
         }
     }
 };
@@ -971,8 +960,6 @@ public:
 class CTaskBarDlgDrawCommon final : public IDrawCommon
 {
 private:
-    constexpr static int DEFAULT_GDI_OP_TEXTURE_ALPHA = 2;
-
     CTaskBarDlgDrawCommonWindowSupport* m_p_window_support{nullptr};
     CD2D1DeviceContextWindowSupport* m_p_d2d1_device_context_support{nullptr};
     Microsoft::WRL::ComPtr<ID2D1DeviceContext> m_p_device_context{};
@@ -1027,9 +1014,15 @@ public:
     template <class GdiOp>
     void ExecuteGdiOperation(CRect rect, GdiOp gdi_op)
     {
+        if (m_p_window_support == nullptr)
+            return;
         auto& ref_gdi_interop_object = m_gdi_interop_object.Get();
+        if (ref_gdi_interop_object.m_gdi_interop_cdc.GetSafeHdc() == NULL)
+            return;
         auto old_hfont = ref_gdi_interop_object.m_gdi_interop_cdc.SelectObject(
             m_p_window_support->GetFont());
+        if (old_hfont == nullptr || old_hfont == HGDI_ERROR)
+            return;
         ref_gdi_interop_object.m_gdi_interop_cdc.SetTextColor(m_text_color);
         TaskBarDlgUser32DrawTextHook::Details::DrawTextReplacedFunctionState state{ref_gdi_interop_object.m_gdi_interop_cdc};
 

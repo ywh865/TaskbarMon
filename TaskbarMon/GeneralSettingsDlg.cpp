@@ -272,8 +272,10 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
         CheckDlgButton(IDC_GITEE_RADIO, TRUE);
 
     //检查开始菜单的“启动”目录下有没有程序的快捷方式，如果有则设置开机自启动，然后删除快捷方式
-    wstring start_up_path = CCommon::GetStartUpPath();
-    bool shortcut_exist = CCommon::FileExist((start_up_path + L"\\TrafficMonitor.lnk").c_str());
+    // TaskbarMon must not adopt, recreate or delete an upstream
+    // TrafficMonitor startup shortcut merely because its settings page opens.
+    // Its own autorun state is limited to the TaskbarMon registry value or
+    // Task Scheduler task checked below.
     m_data.auto_run = false;
 #ifdef WITHOUT_TEMPERATURE
     m_data.auto_run_by_task_scheduler = false;
@@ -281,15 +283,8 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
     m_data.auto_run_by_task_scheduler = true;
 #endif
 
-    if (shortcut_exist)
-    {
-        theApp.SetAutoRun(true, false);
-        m_data.auto_run = true;
-        DeleteFile((start_up_path + L"\\TrafficMonitor.lnk").c_str());
-        CheckDlgButton(IDC_AUTO_RUN_METHOD_REGESTRY_RADIO, TRUE);
-    }
     //检查开机自动运行的设置是通过注册表还是任务计划程序实现的，并设置相应的选项
-    else
+    // Check TaskbarMon autorun only; legacy applications remain untouched.
     {
         bool auto_run_by_registry = theApp.GetAutoRun(&m_auto_run_path, false);
         if (auto_run_by_registry)
@@ -399,11 +394,14 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
     CheckDlgButton(IDC_HDD_CHECK, m_data.IsHardwareEnable(HI_HDD));
     CheckDlgButton(IDC_MBD_CHECK, m_data.IsHardwareEnable(HI_MBD));
 
-    if (theApp.m_pMonitor != nullptr)
+    // MonitorService samples acquire its mutex before the hardware lock. Read this state first to preserve that order.
+    const bool disk_usage_by_pdh = CTrafficMonitorDlg::Instance()->IsGetDiskUsageByPdh();
     {
         CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
+        if (theApp.m_pMonitor != nullptr)
+        {
         //初始化选择硬盘下拉列表
-        if (!CTrafficMonitorDlg::Instance()->IsGetDiskUsageByPdh())
+        if (!disk_usage_by_pdh)
         {
             for (const auto& hdd_item : theApp.m_pMonitor->AllHDDTemperature())
                 m_hard_disk_combo.AddString(hdd_item.first.c_str());
@@ -418,6 +416,7 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
         if (cur_index < 0)
             cur_index = 0;
         m_select_cpu_combo.SetCurSel(cur_index);
+        }
     }
 #endif
 

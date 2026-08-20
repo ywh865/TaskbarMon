@@ -1,13 +1,14 @@
 ﻿#include "stdafx.h"
 #include "WinVersionHelper.h"
 #include "WindowsSettingHelper.h"
+#include "DllFunctions.h"
 
 
 CWinVersionHelper::CWinVersionHelper()
 {
 	DWORD dwMajorVer{}, dwMinorVer{}, dwBuildNumber{};
 	HMODULE hModNtdll{};
-	if (hModNtdll = ::LoadLibraryW(L"ntdll.dll"))
+	if (hModNtdll = DllFunctions::LoadSystemLibrary(L"ntdll.dll"))
 	{
 		typedef void (WINAPI *pfRTLGETNTVERSIONNUMBERS)(DWORD*, DWORD*, DWORD*);
 		pfRTLGETNTVERSIONNUMBERS pfRtlGetNtVersionNumbers;

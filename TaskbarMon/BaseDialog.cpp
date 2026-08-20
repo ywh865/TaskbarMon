@@ -366,9 +366,11 @@ BOOL CBaseDialog::OnInitDialog()
     // 在还原窗口大小之前（当前窗口状态与资源一致），派生类执行控件文本初始化及调整控件排布
     // 与实际窗口大小相关的初始化（比如表格列宽）应在派生类的OnInitDialog进行
     m_pDC = GetDC();
-    m_pDC->SelectObject(&m_dlg_font);
+    if (m_pDC != nullptr)
+        m_pDC->SelectObject(&m_dlg_font);
     bool rtn = InitializeControls();
-    ReleaseDC(m_pDC);
+    if (m_pDC != nullptr)
+        ReleaseDC(m_pDC);
     m_pDC = nullptr;
     // 如果更改了控件排布那么应当返回true以向布局管理器应用控件调整（重新加载动态布局设置）
     if (rtn)

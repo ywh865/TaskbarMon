@@ -61,10 +61,11 @@ int CCPUUsage::GetCpuUsage(bool use_cpu_time)
 int CCPUUsage::GetCpuUsageByGetSystemTimes()
 {
     int cpu_usage{};
-    FILETIME idleTime;
-    FILETIME kernelTime;
-    FILETIME userTime;
-    GetSystemTimes(&idleTime, &kernelTime, &userTime);
+    FILETIME idleTime{};
+    FILETIME kernelTime{};
+    FILETIME userTime{};
+    if (!GetSystemTimes(&idleTime, &kernelTime, &userTime))
+        return 0;
 
     __int64 idle = CCommon::CompareFileTime2(m_preidleTime, idleTime);
     __int64 kernel = CCommon::CompareFileTime2(m_prekernelTime, kernelTime);

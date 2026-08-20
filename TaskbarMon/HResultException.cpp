@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "HResultException.h"
 #include "TaskbarMon.h"
+#include "DllFunctions.h"
 
 namespace FunctionChecker
 {
@@ -10,7 +11,10 @@ namespace FunctionChecker
         bool StrategicCheck(LPCTSTR p_library_name, Strategy strategy)
         {
             bool result = false;
-            auto hmodule = ::LoadLibrary(p_library_name);
+            // Every current caller probes a Windows system DLL.  Loading by
+            // basename through the normal search order would let an
+            // application-directory DLL spoof a feature probe.
+            auto hmodule = DllFunctions::LoadSystemLibrary(p_library_name);
             if (hmodule)
             {
                 result = strategy(hmodule);
@@ -59,7 +63,7 @@ auto CHResultException::GetError()
 
 bool CHResultException::HasError() const noexcept
 {
-    return SUCCEEDED(m_hr);
+    return FAILED(m_hr);
 }
 
 auto CHResultException::GetHResult() const noexcept

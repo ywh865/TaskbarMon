@@ -76,7 +76,7 @@ void CHistoryTrafficCalendarDlg::CalculateMonthTotalTraffic()
 void CHistoryTrafficCalendarDlg::SetComboSel()
 {
     int cnt{};
-    int year_selected;
+    int year_selected{ 0 };
     for (int i{ m_year_max }; i >= m_year_min; i--)
     {
         if (i == m_year)
@@ -155,15 +155,22 @@ BOOL CHistoryTrafficCalendarDlg::OnInitDialog()
     CTabDlg::OnInitDialog();
 
     // TODO:  在此添加额外的初始化
-    m_year = m_history_traffics[0].year;
-    m_month = m_history_traffics[0].month;
+    SYSTEMTIME now{};
+    GetLocalTime(&now);
+    m_year = now.wYear;
+    m_month = now.wMonth;
+    if (!m_history_traffics.empty())
+    {
+        m_year = m_history_traffics.front().year;
+        m_month = m_history_traffics.front().month;
+    }
     CCalendarHelper::GetCalendar(m_year, m_month, m_calendar, theApp.m_cfg_data.m_sunday_first);
     SetDayTraffic();
     CalculateMonthTotalTraffic();
 
     //初始化Combo Box
-    m_year_max = m_history_traffics[0].year;
-    m_year_min = m_history_traffics.back().year;
+    m_year_max = m_history_traffics.empty() ? m_year : m_history_traffics.front().year;
+    m_year_min = m_history_traffics.empty() ? m_year : m_history_traffics.back().year;
     for (int i{ m_year_max }; i >= m_year_min; i--)
     {
         m_year_combo.AddString(CCommon::IntToString(i));
@@ -271,7 +278,10 @@ void CHistoryTrafficCalendarDlg::OnPaint()
                 frame_color = RGB(218, 91, 91);
             else
                 frame_color = RGB(1, 133, 238);
-            if (m_year == m_history_traffics[0].year && m_month == m_history_traffics[0].month && m_calendar[i][j].day == m_history_traffics[0].day)
+            if (!m_history_traffics.empty() &&
+                m_year == m_history_traffics.front().year &&
+                m_month == m_history_traffics.front().month &&
+                m_calendar[i][j].day == m_history_traffics.front().day)
                 draw.DrawRectOutLine(rect, frame_color, theApp.DPI(2));
 
             //绘制指示流量大小的矩形
@@ -357,10 +367,12 @@ void CHistoryTrafficCalendarDlg::OnPaint()
 
 void CHistoryTrafficCalendarDlg::OnCbnSelchangeYearCombo()
 {
-    // TODO: 在此添加控件通知处理程序代码
     int index = m_year_combo.GetCurSel();
+    if (index < 0)
+        return;
     CString str;
-    m_year_combo.GetLBText(index, str);
+    if (m_year_combo.GetLBText(index, str) == CB_ERR)
+        return;
     m_year = _ttoi(str);
     MonthSelectChanged();
 }
@@ -368,8 +380,10 @@ void CHistoryTrafficCalendarDlg::OnCbnSelchangeYearCombo()
 
 void CHistoryTrafficCalendarDlg::OnCbnSelchangeMonthCombo()
 {
-    // TODO: 在此添加控件通知处理程序代码
-    m_month = m_month_combo.GetCurSel() + 1;
+    const int index = m_month_combo.GetCurSel();
+    if (index < 0 || index >= 12)
+        return;
+    m_month = index + 1;
     MonthSelectChanged();
 }
 
@@ -551,8 +565,18 @@ void CHistoryTrafficCalendarDlg::OnFirstDayOfWeekMonday()
 void CHistoryTrafficCalendarDlg::OnCalendarJumpToToday()
 {
     // TODO: 在此添加命令处理程序代码
-    m_year = m_history_traffics[0].year;
-    m_month = m_history_traffics[0].month;
+    if (!m_history_traffics.empty())
+    {
+        m_year = m_history_traffics.front().year;
+        m_month = m_history_traffics.front().month;
+    }
+    else
+    {
+        SYSTEMTIME now{};
+        GetLocalTime(&now);
+        m_year = now.wYear;
+        m_month = now.wMonth;
+    }
     SetComboSel();
     MonthSelectChanged();
 

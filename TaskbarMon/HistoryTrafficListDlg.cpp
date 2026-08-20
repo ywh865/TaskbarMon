@@ -7,6 +7,8 @@
 #include "afxdialogex.h"
 #include "CalendarHelper.h"
 
+#include <limits>
+
 
 // CHistoryTrafficListDlgDlg 对话框
 
@@ -66,7 +68,9 @@ void CHistoryTrafficListDlg::AddListRow(const ListRowData& data, unsigned __int6
     }
     m_history_list.SetItemText(index, 3, CCommon::KBytesToString(total_kbytes));
 
-    double range = static_cast<double>(total_kbytes) * 1000 / max_traffic;
+    double range = max_traffic == 0
+        ? 0.0
+        : static_cast<double>(total_kbytes) * 1000 / max_traffic;
     COLORREF color;
     if (total_kbytes < 1024 * 1024)		//流量小于1GB时绘制蓝色
         color = TRAFFIC_COLOR_BLUE;
@@ -332,9 +336,12 @@ void CHistoryTrafficListDlg::OnSize(UINT nType, int cx, int cy)
         std::vector<int> widths;
         if(CalculateColumeWidth(widths))
         {
+            if (widths.size() > static_cast<size_t>((std::numeric_limits<int>::max)()))
+                return;
+
             for (size_t i{}; i < widths.size(); i++)
             {
-                m_history_list.SetColumnWidth(i, widths[i]);
+                m_history_list.SetColumnWidth(static_cast<int>(i), widths[i]);
             }
         }
     }

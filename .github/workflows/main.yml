@@ -1,4 +1,5 @@
 name: Build CI
+
 on:
   push:
     branches: [master, main]
@@ -7,40 +8,168 @@ on:
     branches: [master, main]
   workflow_dispatch:
 
+# The workflow only needs the checked-out source. Do not grant a token write
+# permissions to build jobs or artifact upload steps.
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    name: ${{ matrix.id }}
+    runs-on: windows-2022
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - platform: x64
-            config: Release
+          - id: release-x64
+            configuration: Release
+            platform: x64
             bin_path: Bin/x64/Release
-          - platform: x86
-            config: Release
+          - id: release-x86
+            configuration: Release
+            platform: x86
             bin_path: Bin/Release
-          - platform: x64
-            config: Release (lite)
+          - id: release-arm64ec
+            configuration: Release
+            platform: ARM64EC
+            bin_path: Bin/ARM64EC/Release
+          - id: release-lite-x64
+            configuration: Release (lite)
+            platform: x64
             bin_path: Bin/x64/Release (lite)
-    runs-on: windows-latest
+          - id: release-lite-x86
+            configuration: Release (lite)
+            platform: x86
+            bin_path: Bin/Release (lite)
+          - id: release-lite-arm64ec
+            configuration: Release (lite)
+            platform: ARM64EC
+            bin_path: Bin/ARM64EC/Release (lite)
+
     steps:
-      - uses: actions/checkout@v4
+      # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v2
+      - name: Validate project structure
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & "$env:GITHUB_WORKSPACE/scripts/ValidateProject.ps1"
 
-      - name: Build TaskbarMon (${{ matrix.platform }} / ${{ matrix.config }})
-        run: msbuild TaskbarMon.sln -p:configuration="${{ matrix.config }}" -p:platform=${{ matrix.platform }} -p:platformToolset=v143 -m
+      - name: Verify update policy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $forbidden = Select-String -Path @('TaskbarMon/UpdateHelper.cpp', 'TaskbarMon/UpdateHelper.h') -Pattern 'GetURL\s*\(|https?://|version_utf8\.info|zhongyang219/TrafficMonitor|gitee\.com/zhongyang219' -AllMatches
+          if ($forbidden) {
+            $forbidden | Format-Table -AutoSize
+            throw 'TaskbarMon must not make update-network requests until it has an authenticated project-owned update channel.'
+          }
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Build TaskbarMon (${{ matrix.configuration }} / ${{ matrix.platform }})
+        shell: pwsh
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+          PLATFORM: ${{ matrix.platform }}
+          BUILD_ID: ${{ matrix.id }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (-not (Test-Path -LiteralPath $vswhere)) {
+            throw "vswhere.exe was not found at $vswhere"
+          }
+
+          $vsInstallation = @(& $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath | Select-Object -First 1)
+          if ($vsInstallation.Count -ne 1 -or [string]::IsNullOrWhiteSpace($vsInstallation[0])) {
+            throw 'Unable to locate a Visual Studio installation through vswhere.'
+          }
+
+          $vsDevCmd = Join-Path $vsInstallation[0] 'Common7\Tools\VsDevCmd.bat'
+          $msbuild = Join-Path $vsInstallation[0] 'MSBuild\Current\Bin\MSBuild.exe'
+          foreach ($tool in @($vsDevCmd, $msbuild)) {
+            if (-not (Test-Path -LiteralPath $tool -PathType Leaf)) {
+              throw "Required Visual Studio build tool was not found: $tool"
+            }
+          }
+
+          $logDirectory = Join-Path $env:GITHUB_WORKSPACE 'artifacts/build-logs'
+          New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null
+          $textLog = Join-Path $logDirectory "$env:BUILD_ID.log"
+          $binaryLog = Join-Path $logDirectory "$env:BUILD_ID.binlog"
+          $arguments = @(
+            'TaskbarMon.sln',
+            '/m',
+            '/nologo',
+            "/p:Configuration=$env:CONFIGURATION",
+            "/p:Platform=$env:PLATFORM",
+            '/p:PlatformToolset=v143',
+            '/p:TreatWarningAsError=true',
+            "/bl:$binaryLog"
+          )
+
+          # MSBuild can discover much more from the VS developer environment
+          # than from a bare runner PATH (notably the Windows SDK).  Keep x64
+          # as the compiler host; the solution's Platform property selects
+          # x86, x64, or ARM64EC output independently.
+          $cmdArguments = $arguments | ForEach-Object {
+            '"' + $_.Replace('"', '""') + '"'
+          }
+          $command = 'call "{0}" -no_logo -arch=x64 -host_arch=x64 && "{1}" {2}' -f $vsDevCmd, $msbuild, ($cmdArguments -join ' ')
+          & $env:ComSpec /d /s /c $command 2>&1 | Tee-Object -FilePath $textLog
+          $exitCode = $LASTEXITCODE
+          if ($exitCode -ne 0) {
+            exit $exitCode
+          }
+
+      - name: Verify runtime payload
+        shell: pwsh
+        env:
+          BIN_PATH: ${{ matrix.bin_path }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $required = @(
+            (Join-Path $env:BIN_PATH 'TaskbarMon.exe')
+          )
+
+          foreach ($path in $required) {
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Required runtime artifact is missing: $path"
+            }
+            if ((Get-Item -LiteralPath $path).Length -le 0) {
+              throw "Required runtime artifact is empty: $path"
+            }
+          }
+
+          $forbiddenHardwareDll = Join-Path $env:BIN_PATH 'LibreHardwareMonitorLib.dll'
+          if (Test-Path -LiteralPath $forbiddenHardwareDll -PathType Leaf) {
+            throw "The disabled hardware-monitor DLL must not be present in runtime output: $forbiddenHardwareDll"
+          }
+
+          Get-ChildItem -LiteralPath $env:BIN_PATH -File | Sort-Object Name | Format-Table Name, Length -AutoSize
+          Get-FileHash -LiteralPath $required -Algorithm SHA256 | Format-Table Algorithm, Hash, Path -AutoSize
+
+      # v4.6.2; upload logs even when compilation fails so warnings and linker
+      # diagnostics remain reviewable rather than being silently ignored.
+      - name: Upload build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TaskbarMon_${{ matrix.platform }}_${{ matrix.config }}
-          path: |
-            ${{ matrix.bin_path }}/TaskbarMon.exe
-            ${{ matrix.bin_path }}/*.dll
+          name: build-evidence-${{ matrix.id }}
+          path: artifacts/build-logs/${{ matrix.id }}.*
+          if-no-files-found: warn
+          retention-days: 14
 
-      - name: Upload pdb files
-        uses: actions/upload-artifact@v4
+      # v4.6.2
+      - name: Upload runtime payload
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: TaskbarMon_${{ matrix.platform }}_${{ matrix.config }}_pdb
-          path: ${{ matrix.bin_path }}/*.pdb
+          name: TaskbarMon-${{ matrix.id }}
+          path: ${{ matrix.bin_path }}/TaskbarMon.exe
+          if-no-files-found: error
+          retention-days: 14

@@ -130,7 +130,11 @@ auto CD3D10Support1::GetDeviceList(bool force_refresh)
         Destroy(&p_dxgi_factory1_wrapper);
         EmplaceAt(&p_dxgi_factory1_wrapper);
         p_dxgi_factory1_wrapper.Construct([](ComPtr<IDXGIFactory1>* p_content)
-                                          { CreateDXGIFactory1(IID_PPV_ARGS(&*p_content)); });
+                                          {
+                                              ThrowIfFailed<CD3D10Exception1>(
+                                                  CreateDXGIFactory1(IID_PPV_ARGS(&*p_content)),
+                                                  TRAFFICMONITOR_ERROR_STR("Create DXGI factory1 failed."));
+                                          });
     }
 
     using DeviceVector = std::vector<ComPtr<IDXGIAdapter1>>;
@@ -142,6 +146,12 @@ auto CD3D10Support1::GetDeviceList(bool force_refresh)
         result.Construct([](DeviceVector* p_content)
                          {
             auto p_dxgi_factory1 = p_dxgi_factory1_wrapper.GetUnsafe().Get();
+            if (p_dxgi_factory1 == nullptr)
+            {
+                throw CD3D10Exception1{
+                    E_FAIL,
+                    TRAFFICMONITOR_ERROR_STR("DXGI factory1 is not available.")};
+            }
             UINT i = 0;
             do
             {

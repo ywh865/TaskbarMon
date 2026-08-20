@@ -1,17 +1,22 @@
-#pragma once
+ï»¿#pragma once
 #include "Common.h"
+#include <iphlpapi.h>
 
-//±£´æÒ»¸öÍøÂçÁ¬½ÓĞÅÏ¢
+//ä¿å­˜ä¸€ä¸ªç½‘ç»œè¿æ¥ä¿¡æ¯
 struct NetWorkConection
 {
-	int index{};			//¸ÃÁ¬½ÓÔÚMIB_IFTABLEÖĞµÄË÷Òı
-	string description;		//ÍøÂçÃèÊö£¨»ñÈ¡×ÔGetAdapterInfo£©
-	string description_2;	//ÍøÂçÃèÊö£¨»ñÈ¡×ÔGetIfTable£©
-	unsigned int in_bytes;	//³õÊ¼Ê±ÒÑ½ÓÊÕ×Ö½ÚÊı
-	unsigned int out_bytes;	//³õÊ¼Ê±ÒÑ·¢ËÍ×Ö½ÚÊı
-	wstring ip_address{ L"-.-.-.-" };	//IPµØÖ·
-	wstring subnet_mask{ L"-.-.-.-" };	//×ÓÍøÑÚÂë
-	wstring default_gateway{ L"-.-.-.-" };	//Ä¬ÈÏÍø¹Ø
+	// index is the current row in MIB_IFTABLE. It is a presentation
+	// convenience only; interface_index is the stable identity used for
+	// sampling and must be preferred after a table refresh.
+	int index{ -1 };
+	DWORD interface_index{};	// MIB_IFROW::dwIndex
+	string description;		//ç½‘ç»œæè¿°ï¼ˆè·å–è‡ªGetAdapterInfoï¼‰
+	string description_2;	//ç½‘ç»œæè¿°ï¼ˆè·å–è‡ªGetIfTableï¼‰
+	unsigned int in_bytes;	//åˆå§‹æ—¶å·²æ¥æ”¶å­—èŠ‚æ•°
+	unsigned int out_bytes;	//åˆå§‹æ—¶å·²å‘é€å­—èŠ‚æ•°
+	wstring ip_address{ L"-.-.-.-" };	//IPåœ°å€
+	wstring subnet_mask{ L"-.-.-.-" };	//å­ç½‘æ©ç 
+	wstring default_gateway{ L"-.-.-.-" };	//é»˜è®¤ç½‘å…³
 };
 
 class CAdapterCommon
@@ -20,22 +25,35 @@ public:
 	CAdapterCommon();
 	~CAdapterCommon();
 
-	//»ñÈ¡ÍøÂçÁ¬½ÓÁĞ±í£¬Ìî³äÍøÂçÃèÊö¡¢IPµØÖ·¡¢×ÓÍøÑÚÂë¡¢Ä¬ÈÏÍø¹ØĞÅÏ¢
+	//è·å–ç½‘ç»œè¿æ¥åˆ—è¡¨ï¼Œå¡«å……ç½‘ç»œæè¿°ã€IPåœ°å€ã€å­ç½‘æ©ç ã€é»˜è®¤ç½‘å…³ä¿¡æ¯
 	static void GetAdapterInfo(vector<NetWorkConection>& adapters);
 
-	//Ë¢ĞÂÍøÂçÁ¬½ÓÁĞ±íÖĞµÄIPµØÖ·¡¢×ÓÍøÑÚÂë¡¢Ä¬ÈÏÍø¹ØĞÅÏ¢
+	//åˆ·æ–°ç½‘ç»œè¿æ¥åˆ—è¡¨ä¸­çš„IPåœ°å€ã€å­ç½‘æ©ç ã€é»˜è®¤ç½‘å…³ä¿¡æ¯
 	static void RefreshIpAddress(vector<NetWorkConection>& adapters);
 
-	//»ñÈ¡ÍøÂçÁĞ±íÖĞÃ¿¸öÍøÂçÁ¬½ÓµÄMIB_IFTABLEÖĞµÄË÷Òı¡¢³õÊ¼Ê±ÒÑ½ÓÊÕ/·¢ËÍ×Ö½ÚÊıµÄĞÅÏ¢
+	//è·å–ç½‘ç»œåˆ—è¡¨ä¸­æ¯ä¸ªç½‘ç»œè¿æ¥çš„MIB_IFTABLEä¸­çš„ç´¢å¼•ã€åˆå§‹æ—¶å·²æ¥æ”¶/å‘é€å­—èŠ‚æ•°çš„ä¿¡æ¯
 	static void GetIfTableInfo(vector<NetWorkConection>& adapters, MIB_IFTABLE* pIfTable);
 
-	//Ö±½Ó½«MIB_IFTABLEÖĞµÄËùÓĞÁ¬½ÓÌí¼Óµ½adaptersÈİÆ÷ÖĞ
+	//ç›´æ¥å°†MIB_IFTABLEä¸­çš„æ‰€æœ‰è¿æ¥æ·»åŠ åˆ°adapterså®¹å™¨ä¸­
 	static void GetAllIfTableInfo(vector<NetWorkConection>& adapters, MIB_IFTABLE* pIfTable);
+
+	// Return a row for a Windows interface index, or -1 when the interface is
+	// absent. MIB_IFTABLE row positions are not stable across refreshes.
+	static int FindIfTableRowByInterfaceIndex(DWORD interface_index, const MIB_IFTABLE* pIfTable);
+
+	// Ask Windows which interface owns the unique lowest-effective-metric
+	// IPv4/IPv6 default route. Zero means no unambiguous default route was
+	// resolved; callers must make a conservative fallback.
+	static DWORD GetDefaultRouteInterfaceIndex();
+
+	// bDescr is length-delimited by dwDescrLen and is not guaranteed to be NUL
+	// terminated. Use this helper for all MIB description conversions.
+	static string GetIfTableDescription(const MIB_IFROW& row);
 private:
-	//¸ù¾İÒ»¸öÍøÂçÁ¬½ÓÃèÊöÅĞ¶ÏÊÇ·ñÔÚIfTableÁĞ±íÀï£¬·µ»ØË÷Òı£¬ÕÒ²»µ½Ôò·µ»Ø-1
+	//æ ¹æ®ä¸€ä¸ªç½‘ç»œè¿æ¥æè¿°åˆ¤æ–­æ˜¯å¦åœ¨IfTableåˆ—è¡¨é‡Œï¼Œè¿”å›ç´¢å¼•ï¼Œæ‰¾ä¸åˆ°åˆ™è¿”å›-1
 	static int FindConnectionInIfTable(string connection, MIB_IFTABLE* pIfTable);
 
-	//¸ù¾İÒ»¸öÍøÂçÁ¬½ÓÃèÊöÅĞ¶ÏÊÇ·ñÔÚIfTable½ÓÁĞ±íÀï£¬·µ»ØË÷Òı£¬ÕÒ²»µ½Ôò·µ»Ø-1¡£Ö»ĞèÒª²¿·ÖÆ¥Åä
+	//æ ¹æ®ä¸€ä¸ªç½‘ç»œè¿æ¥æè¿°åˆ¤æ–­æ˜¯å¦åœ¨IfTableæ¥åˆ—è¡¨é‡Œï¼Œè¿”å›ç´¢å¼•ï¼Œæ‰¾ä¸åˆ°åˆ™è¿”å›-1ã€‚åªéœ€è¦éƒ¨åˆ†åŒ¹é…
 	static int FindConnectionInIfTableFuzzy(string connection, MIB_IFTABLE* pIfTable);
 };
 

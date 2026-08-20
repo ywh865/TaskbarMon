@@ -48,6 +48,10 @@ protected:
 	wstring m_file_path;
 	wstring m_ini_str;
 	bool m_save_as_utf8{ true };		//是否以及UTF8编码保存
+    // A pre-existing file that could not be read must never be replaced with
+    // a partially reconstructed configuration on a later Save().
+    bool m_load_failed{ false };
+    bool m_file_existed_at_load{ false };
 
     static void UnEscapeString(wstring& str);
     void _WriteString(const wchar_t* AppName, const wchar_t* KeyName, const wstring& str);

@@ -13,6 +13,10 @@ public:
 
     void SetUpdateSource(UpdateSource update_source);
 
+    // TaskbarMon does not currently publish a project-owned, signed update
+    // manifest. Keep this legacy API so existing configuration remains
+    // readable, but never query the upstream TrafficMonitor feed.
+    bool IsUpdateCheckSupported() const noexcept;
     bool CheckForUpdate();
 
     const std::wstring& GetVersion() const;
@@ -25,7 +29,7 @@ public:
     bool IsRowData();
 
 private:
-    void ParseUpdateInfo(wstring version_info);
+    void ClearUpdateInfo() noexcept;
 
 private:
     std::wstring m_version;
@@ -36,5 +40,7 @@ private:
     std::wstring m_contents_zh_cn;
     std::wstring m_contents_zh_tw;
     bool m_row_data{ true };
+    // Retained for configuration compatibility only. It is intentionally not
+    // used until TaskbarMon has an authenticated update channel of its own.
     UpdateSource m_update_source{ UpdateSource::GitHubSource };
 };

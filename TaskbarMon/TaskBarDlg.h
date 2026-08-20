@@ -34,6 +34,13 @@ public:
     bool AdjustWindowPos(bool force_adjust = false);	//设置窗口在任务栏中的位置（如果force_adjust为true，则会强制调整一次任务栏窗口的位置）
     void ApplyWindowTransparentColor();
 
+    // Restores both the hosted window and every Explorer window this instance
+    // changed.  Callers must keep the instance alive and retry when false is
+    // returned; a false result means Explorer is not known to be restored.
+    bool CloseAndRestore();
+    bool IsRestorationPending() const { return m_restoration_pending; }
+    bool IsTaskbarAttached() const { return m_attached_to_taskbar; }
+
     //bool IsTaskbarChanged();
 
     void WidthChanged();    //调用此函数通知任务栏窗口宽度改变以强制调整一次任务栏窗口位置
@@ -81,15 +88,47 @@ public:
 #endif
 
 protected:
-    virtual void InitTaskbarWnd() = 0;
-    virtual void AdjustTaskbarWndPos(bool force_adjust) = 0;
-    virtual void ResetTaskbarPos() = 0;
+    // InitTaskbarWnd must only identify and snapshot a known Explorer layout.
+    // It must not mutate Explorer.  Returning false selects floating mode.
+    virtual bool InitTaskbarWnd() = 0;
+    virtual bool IsTaskbarLayoutValid() const = 0;
+    virtual bool AdjustTaskbarWndPos(bool force_adjust) = 0;
+    virtual bool ResetTaskbarPos() = 0;
     virtual void CheckTaskbarOnTopOrBottom() = 0;		//检查任务栏是否在屏幕的顶部或底部，并将结果保存在m_taskbar_on_top_or_bottom中
     virtual HWND GetParentHwnd() = 0;
 
+    // Top-level states use screen_rect. Child states also capture their
+    // parent-client rect so a taskbar move cannot change the restored offset.
+    // m_rect is parent client pixels while hosted and screen pixels while in
+    // floating mode.
+    struct WindowState
+    {
+        HWND hwnd{};
+        HWND parent{};
+        LONG_PTR style{};
+        LONG_PTR ex_style{};
+        CRect screen_rect{};
+        CRect parent_client_rect{};
+        std::wstring window_class;
+        DWORD process_id{};
+        bool has_parent_client_rect{};
+        bool captured{};
+    };
+
+    bool CaptureWindowState(WindowState& state, HWND hwnd) const;
+    bool RestoreWindowState(const WindowState& state) const;
+    bool VerifyWindowState(const WindowState& state) const;
+    bool VerifyWindowIdentity(const WindowState& state) const;
+    bool VerifyWindowClientRect(HWND hwnd, HWND parent, const CRect& parent_client_rect) const;
+    bool MoveWindow(CRect rect, bool rect_is_parent_client = true);
+    bool IsWindowSizeWithinSafeLimits() const;
+    bool IsTaskbarWindow(HWND hwnd) const;
+    bool IsWindowClass(HWND hwnd, const wchar_t* expected_class) const;
+    void SetTaskbarError(DWORD error_code);
+
     virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持
 
-    HWND m_hTaskbar;	//任务栏窗口句柄
+    HWND m_hTaskbar{};	//任务栏窗口句柄
     CRect m_rcTaskbar;  //任务栏的矩形区域
     CRect m_rect;		//当前窗口的矩形区域
     int m_window_width{};   //保存计算得到的窗口宽度
@@ -148,6 +187,11 @@ protected:
     uint64_t m_value_cache_revision{ UINT64_MAX };
 
     bool m_connot_insert_to_task_bar{ false };	//如果窗口无法嵌入任务栏，则为true
+    bool m_attached_to_taskbar{ false };
+    bool m_restoration_pending{ false };
+    bool m_restoration_completed{ false };
+    bool m_layout_is_verified{ false };
+    WindowState m_original_window_state{};
     bool m_taskbar_on_top_or_bottom{ true };		//如果任务栏在屏幕顶部或底部，则为ture
     int m_error_code{};
     bool m_menu_popuped{ false };               //指示当前是否有菜单处于弹出状态
@@ -157,8 +201,6 @@ protected:
     UINT m_taskbar_dpi{};//TaskBarDlg自身专用dpi
 
     CFont m_font;			//字体
-
-    CDC* m_pDC{};		//窗口的DC，用来计算窗口的宽度
 
     //查找任务栏的句柄
     //is_scendary_display：找到的是否为副显示器的任务栏
@@ -180,7 +222,10 @@ protected:
     //  vertical: 如果为true，则标签和数值上下显示
     void DrawDisplayItem(IDrawCommon& drawer, DisplayItem type, CRect rect, int label_width, bool vertical = false);
 
-    void MoveWindow(CRect rect);
+    bool AttachToTaskbar();
+    bool RollbackAttachment();
+    bool PositionFloatingWindow();
+    bool IsWindowParentAndStyle(HWND hwnd, HWND parent, LONG_PTR required_style, LONG_PTR forbidden_style) const;
 
 public:
     static void DisableRenderFeatureIfNecessary(CSupportedRenderEnums& ref_supported_render_enums);
@@ -210,6 +255,9 @@ public:
 public:
     virtual BOOL OnInitDialog();
     virtual void OnCancel();
+    // Keep an external MFC DestroyWindow call from bypassing Explorer-state
+    // restoration. Raw Win32 destruction is still handled by the owner path.
+    BOOL DestroyWindow() override;
     afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
     //afx_msg void OnSetBackgroundColor();
     //afx_msg void OnSetTextColor();

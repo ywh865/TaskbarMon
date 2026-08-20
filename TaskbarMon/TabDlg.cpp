@@ -230,7 +230,8 @@ bool CTabDlg::IsScrollBarVisible()
 {
     SCROLLINFO scrollinfo;
     GetScrollInfo(SB_VERT, &scrollinfo, SIF_ALL);
-    bool visible = scrollinfo.nPage < scrollinfo.nMax;
+    const bool visible = scrollinfo.nMax > 0 &&
+        scrollinfo.nPage < static_cast<UINT>(scrollinfo.nMax);
     return visible;
 }
 

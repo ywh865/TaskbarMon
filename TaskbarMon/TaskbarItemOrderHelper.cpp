@@ -3,6 +3,48 @@
 #include "Common.h"
 #include "TaskbarMon.h"
 
+#include <cwctype>
+
+namespace
+{
+    bool TryParseItemIndex(const std::wstring& value, size_t begin, size_t end,
+                           size_t item_count, int& item_index)
+    {
+        if (item_count == 0)
+            return false;
+
+        while (begin < end && std::iswspace(static_cast<wint_t>(value[begin])))
+            ++begin;
+        if (begin < end && value[begin] == L'+')
+            ++begin;
+
+        const size_t maximum_index = item_count - 1;
+        size_t parsed_value{};
+        bool has_digit{};
+        while (begin < end && std::iswdigit(static_cast<wint_t>(value[begin])))
+        {
+            const size_t digit = static_cast<size_t>(value[begin] - L'0');
+            if (digit > maximum_index ||
+                parsed_value > (maximum_index - digit) / 10)
+            {
+                return false;
+            }
+
+            parsed_value = parsed_value * 10 + digit;
+            has_digit = true;
+            ++begin;
+        }
+
+        while (begin < end && std::iswspace(static_cast<wint_t>(value[begin])))
+            ++begin;
+        if (!has_digit || begin != end)
+            return false;
+
+        item_index = static_cast<int>(parsed_value);
+        return true;
+    }
+}
+
 //////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -13,6 +55,8 @@ CTaskbarItemOrderHelper::CTaskbarItemOrderHelper(bool displayed_only)
 
 void CTaskbarItemOrderHelper::Init()
 {
+    m_all_item_in_default_order.clear();
+    m_all_item_in_default_order.reserve(AllDisplayItems.size());
     for (const auto& item : AllDisplayItems)
     {
         m_all_item_in_default_order.push_back(item);
@@ -40,11 +84,36 @@ std::vector<CommonDisplayItem> CTaskbarItemOrderHelper::GetAllDisplayItemsWithOr
 void CTaskbarItemOrderHelper::FromString(const std::wstring& str)
 {
     m_item_order.clear();
-    std::vector<std::wstring> str_list;
-    CCommon::StringSplit(str, L',', str_list);
-    for (const auto& s : str_list)
+    const size_t item_count = AllDisplayItems.size();
+    if (item_count == 0)
+        return;
+
+    // item_order is user-editable INI input.  Parse it without materialising
+    // every comma-separated token and retain at most one occurrence of each
+    // valid item.  This keeps a value such as "0,0,0,..." linear in input
+    // size instead of feeding a huge vector into erase-based de-duplication.
+    m_item_order.reserve(item_count);
+    std::vector<bool> seen(item_count);
+    size_t item_begin{};
+    while (item_begin <= str.size())
     {
-        m_item_order.push_back(_wtoi(s.c_str()));
+        size_t item_end = str.find(L',', item_begin);
+        if (item_end == std::wstring::npos)
+            item_end = str.size();
+
+        int item_index{};
+        if (TryParseItemIndex(str, item_begin, item_end, item_count, item_index) &&
+            !seen[static_cast<size_t>(item_index)])
+        {
+            seen[static_cast<size_t>(item_index)] = true;
+            m_item_order.push_back(item_index);
+            if (m_item_order.size() == item_count)
+                break;
+        }
+
+        if (item_end == str.size())
+            break;
+        item_begin = item_end + 1;
     }
     NormalizeItemOrder();
 }
@@ -100,39 +169,38 @@ bool CTaskbarItemOrderHelper::IsItemDisplayed(CommonDisplayItem item)
 
 void CTaskbarItemOrderHelper::NormalizeItemOrder()
 {
-    //检查是否有超出范围的序号
-    int item_num = static_cast<int>(AllDisplayItems.size());
-    for (auto iter = m_item_order.begin(); iter != m_item_order.end();)
+    const size_t item_num = AllDisplayItems.size();
+    std::vector<bool> seen(item_num);
+    vector<int> normalized_order;
+    normalized_order.reserve(item_num);
+
+    for (int item_index : m_item_order)
     {
-        if (*iter < 0 || *iter >= item_num)
-            iter = m_item_order.erase(iter);
-        else
-            ++iter;
-    }
-    //删除不显示的序号
-    if (m_displayed_only)
-    {
-        for (auto iter = m_item_order.begin(); iter != m_item_order.end();)
+        if (item_index < 0 || static_cast<size_t>(item_index) >= item_num ||
+            seen[static_cast<size_t>(item_index)])
         {
-            if (*iter >= 0 && *iter < static_cast<int>(m_all_item_in_default_order.size()))
-            {
-                CommonDisplayItem item = m_all_item_in_default_order[*iter];
-                if (!IsItemDisplayed(item))
-                {
-                    iter = m_item_order.erase(iter);
-                    continue;
-                }
-            }
-            ++iter;
+            continue;
         }
+
+        const size_t index = static_cast<size_t>(item_index);
+        if (m_displayed_only && index < m_all_item_in_default_order.size() &&
+            !IsItemDisplayed(m_all_item_in_default_order[index]))
+        {
+            continue;
+        }
+
+        seen[index] = true;
+        normalized_order.push_back(item_index);
     }
-    //删除重复的序号
-    CCommon::RemoveVectorDuplicateItem(m_item_order);
-    //检查是否有缺少的序号
-    for (int i = 0; i < item_num; i++)
+
+    // Keep every built-in item in the persisted order.  Items currently
+    // hidden by hardware settings are appended after the visible entries, as
+    // before, so their preference is retained when they become available.
+    for (size_t index{}; index < item_num; ++index)
     {
-        auto iter = std::find(m_item_order.begin(), m_item_order.end(), i);
-        if (iter == m_item_order.end())
-            m_item_order.push_back(i);
+        if (!seen[index])
+            normalized_order.push_back(static_cast<int>(index));
     }
+
+    m_item_order.swap(normalized_order);
 }

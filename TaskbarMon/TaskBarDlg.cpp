@@ -13,11 +13,40 @@
 #include "WindowsWebExperienceDetector.h"
 #include "TaskbarHelper.h"
 
+#include <exception>
+
 #ifdef DEBUG
 // DX调试信息捕获
 #include "dxgi1_3.h"
 #include "DXProgrammableCapture.h"
 #endif
+
+namespace
+{
+constexpr int kMinimumHostedWidthAt96Dpi = 64;
+constexpr int kMinimumHostedHeightAt96Dpi = 16;
+constexpr int kMaximumHostedWidthAt96Dpi = 8192;
+constexpr int kMaximumHostedHeightAt96Dpi = 2048;
+
+bool IsUsableRect(const CRect& rect)
+{
+    return rect.Width() > 0 && rect.Height() > 0;
+}
+
+bool SetWindowLongPtrChecked(HWND hwnd, int index, LONG_PTR value)
+{
+    ::SetLastError(ERROR_SUCCESS);
+    const LONG_PTR previous = ::SetWindowLongPtr(hwnd, index, value);
+    return previous != 0 || ::GetLastError() == ERROR_SUCCESS;
+}
+
+bool SetParentChecked(HWND hwnd, HWND parent)
+{
+    ::SetLastError(ERROR_SUCCESS);
+    const HWND previous = ::SetParent(hwnd, parent);
+    return previous != nullptr || ::GetLastError() == ERROR_SUCCESS;
+}
+}
 
 // CTaskBarDlg 对话框
 
@@ -236,6 +265,18 @@ void CTaskBarDlg::DrawDisplayItem(IDrawCommon& drawer, DisplayItem type, CRect r
         || type == TDI_GPU_TEMP || type == TDI_HDD_TEMP || type == TDI_MAIN_BOARD_TEMP || type == TDI_HDD_USAGE
         || type == TDI_UP || type == TDI_DOWN || type == TDI_TOTAL_SPEED/* ||type==TDI_CPU_FREQ*/)
     {
+        const auto to_status_bar_percent = [](float value) noexcept
+        {
+            // Hardware readings are external input. The renderer only accepts
+            // a percentage, so reject non-finite values and clamp before the
+            // narrowing conversion.
+            if (!std::isfinite(value) || value <= 0.0f)
+                return 0;
+            if (value >= 100.0f)
+                return 100;
+            return static_cast<int>(value);
+        };
+
         int figure_value{};
         switch (type)
         {
@@ -249,16 +290,16 @@ void CTaskBarDlg::DrawDisplayItem(IDrawCommon& drawer, DisplayItem type, CRect r
             figure_value = theApp.m_gpu_usage;
             break;
         case TDI_CPU_TEMP:
-            figure_value = theApp.m_cpu_temperature;
+            figure_value = to_status_bar_percent(theApp.m_cpu_temperature);
             break;
         case TDI_GPU_TEMP:
-            figure_value = theApp.m_gpu_temperature;
+            figure_value = to_status_bar_percent(theApp.m_gpu_temperature);
             break;
         case TDI_HDD_TEMP:
-            figure_value = theApp.m_hdd_temperature;
+            figure_value = to_status_bar_percent(theApp.m_hdd_temperature);
             break;
         case TDI_MAIN_BOARD_TEMP:
-            figure_value = theApp.m_main_board_temperature;
+            figure_value = to_status_bar_percent(theApp.m_main_board_temperature);
             break;
         case TDI_HDD_USAGE:
             figure_value = theApp.m_hdd_usage;
@@ -321,12 +362,347 @@ void CTaskBarDlg::DrawDisplayItem(IDrawCommon& drawer, DisplayItem type, CRect r
 }
 
 
-void CTaskBarDlg::MoveWindow(CRect rect)
+bool CTaskBarDlg::CaptureWindowState(WindowState& state, HWND hwnd) const
 {
-    if (IsWindow(GetSafeHwnd()))
+    state = {};
+    if (hwnd == nullptr || !::IsWindow(hwnd))
+        return false;
+
+    CRect screen_rect;
+    if (!::GetWindowRect(hwnd, &screen_rect) || !IsUsableRect(screen_rect))
+        return false;
+
+    const HWND parent = ::GetParent(hwnd);
+    const LONG_PTR style = ::GetWindowLongPtr(hwnd, GWL_STYLE);
+    const LONG_PTR ex_style = ::GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+    wchar_t class_name[256]{};
+    if (::GetClassNameW(hwnd, class_name, static_cast<int>(sizeof(class_name) / sizeof(class_name[0]))) == 0)
+        return false;
+
+    DWORD process_id{};
+    if (::GetWindowThreadProcessId(hwnd, &process_id) == 0 || process_id == 0)
+        return false;
+
+    CRect parent_client_rect;
+    const bool is_child = (style & WS_CHILD) != 0;
+    if (is_child)
     {
-        ::MoveWindow(GetSafeHwnd(), rect.left, rect.top, rect.Width(), rect.Height(), TRUE);
+        if (parent == nullptr || !::IsWindow(parent))
+            return false;
+
+        CPoint top_left{screen_rect.left, screen_rect.top};
+        CPoint bottom_right{screen_rect.right, screen_rect.bottom};
+        if (!::ScreenToClient(parent, &top_left) || !::ScreenToClient(parent, &bottom_right))
+            return false;
+
+        parent_client_rect.SetRect(top_left.x, top_left.y, bottom_right.x, bottom_right.y);
+        if (!IsUsableRect(parent_client_rect))
+            return false;
     }
+
+    state.hwnd = hwnd;
+    state.parent = parent;
+    state.style = style;
+    state.ex_style = ex_style;
+    state.screen_rect = screen_rect;
+    state.parent_client_rect = parent_client_rect;
+    state.window_class = class_name;
+    state.process_id = process_id;
+    state.has_parent_client_rect = is_child;
+    state.captured = true;
+    return true;
+}
+
+bool CTaskBarDlg::VerifyWindowIdentity(const WindowState& state) const
+{
+    if (!state.captured || state.hwnd == nullptr || !::IsWindow(state.hwnd)
+        || state.window_class.empty() || state.process_id == 0)
+    {
+        return false;
+    }
+
+    DWORD process_id{};
+    return ::GetWindowThreadProcessId(state.hwnd, &process_id) != 0
+        && process_id == state.process_id
+        && IsWindowClass(state.hwnd, state.window_class.c_str());
+}
+
+bool CTaskBarDlg::VerifyWindowState(const WindowState& state) const
+{
+    if (!VerifyWindowIdentity(state))
+        return false;
+
+    if (::GetParent(state.hwnd) != state.parent)
+        return false;
+    if (::GetWindowLongPtr(state.hwnd, GWL_STYLE) != state.style)
+        return false;
+    if (::GetWindowLongPtr(state.hwnd, GWL_EXSTYLE) != state.ex_style)
+        return false;
+
+    if ((state.style & WS_CHILD) != 0)
+    {
+        return state.has_parent_client_rect
+            && VerifyWindowClientRect(state.hwnd, state.parent, state.parent_client_rect);
+    }
+
+    CRect current_screen_rect;
+    return ::GetWindowRect(state.hwnd, &current_screen_rect) != FALSE
+        && current_screen_rect.EqualRect(&state.screen_rect) != FALSE;
+}
+
+bool CTaskBarDlg::RestoreWindowState(const WindowState& state) const
+{
+    if (!VerifyWindowIdentity(state))
+        return false;
+    if (state.parent != nullptr && !::IsWindow(state.parent))
+        return false;
+
+    const bool is_child = (state.style & WS_CHILD) != 0;
+    if (is_child)
+    {
+        // Set WS_CHILD before assigning a parent, as required by SetParent.
+        if (state.parent == nullptr || !SetWindowLongPtrChecked(state.hwnd, GWL_STYLE, state.style)
+            || !SetWindowLongPtrChecked(state.hwnd, GWL_EXSTYLE, state.ex_style)
+            || (::GetParent(state.hwnd) != state.parent && !SetParentChecked(state.hwnd, state.parent)))
+        {
+            return false;
+        }
+    }
+    else
+    {
+        // A popup's parent is its owner.  Detach the current child relation
+        // first, restore WS_POPUP, then restore that owner relation.
+        if (::GetParent(state.hwnd) != nullptr && !SetParentChecked(state.hwnd, nullptr))
+            return false;
+        if (!SetWindowLongPtrChecked(state.hwnd, GWL_STYLE, state.style)
+            || !SetWindowLongPtrChecked(state.hwnd, GWL_EXSTYLE, state.ex_style))
+        {
+            return false;
+        }
+        if (state.parent != nullptr && !SetParentChecked(state.hwnd, state.parent))
+            return false;
+    }
+
+    if (is_child && !state.has_parent_client_rect)
+        return false;
+
+    const CRect& target_rect = is_child ? state.parent_client_rect : state.screen_rect;
+
+    if (!::SetWindowPos(state.hwnd,
+                        nullptr,
+                        target_rect.left,
+                        target_rect.top,
+                        target_rect.Width(),
+                        target_rect.Height(),
+                        SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED))
+    {
+        return false;
+    }
+
+    return VerifyWindowState(state);
+}
+
+bool CTaskBarDlg::VerifyWindowClientRect(HWND hwnd, HWND parent, const CRect& parent_client_rect) const
+{
+    if (hwnd == nullptr || parent == nullptr || !::IsWindow(hwnd) || !::IsWindow(parent)
+        || ::GetParent(hwnd) != parent || !IsUsableRect(parent_client_rect))
+    {
+        return false;
+    }
+
+    CPoint expected_position{parent_client_rect.left, parent_client_rect.top};
+    if (!::ClientToScreen(parent, &expected_position))
+        return false;
+
+    CRect actual_screen_rect;
+    if (!::GetWindowRect(hwnd, &actual_screen_rect))
+        return false;
+
+    return actual_screen_rect.left == expected_position.x
+        && actual_screen_rect.top == expected_position.y
+        && actual_screen_rect.Width() == parent_client_rect.Width()
+        && actual_screen_rect.Height() == parent_client_rect.Height();
+}
+
+bool CTaskBarDlg::MoveWindow(CRect rect, bool rect_is_parent_client)
+{
+    const HWND hwnd = GetSafeHwnd();
+    if (hwnd == nullptr || !::IsWindow(hwnd) || !IsUsableRect(rect))
+        return false;
+    if (!::MoveWindow(hwnd, rect.left, rect.top, rect.Width(), rect.Height(), TRUE))
+        return false;
+
+    if (rect_is_parent_client)
+    {
+        return VerifyWindowClientRect(hwnd, ::GetParent(hwnd), rect);
+    }
+
+    CRect actual_screen_rect;
+    return ::GetWindowRect(hwnd, &actual_screen_rect) != FALSE
+        && actual_screen_rect.EqualRect(&rect) != FALSE;
+}
+
+bool CTaskBarDlg::IsWindowSizeWithinSafeLimits() const
+{
+    const UINT dpi = m_taskbar_dpi == 0 ? 96 : m_taskbar_dpi;
+    const auto scale = [dpi](int value) { return static_cast<int>(dpi) * value / 96; };
+    return m_window_width >= scale(kMinimumHostedWidthAt96Dpi)
+        && m_window_height >= scale(kMinimumHostedHeightAt96Dpi)
+        && m_window_width <= scale(kMaximumHostedWidthAt96Dpi)
+        && m_window_height <= scale(kMaximumHostedHeightAt96Dpi);
+}
+
+bool CTaskBarDlg::IsWindowClass(HWND hwnd, const wchar_t* expected_class) const
+{
+    if (hwnd == nullptr || expected_class == nullptr || !::IsWindow(hwnd))
+        return false;
+
+    wchar_t class_name[256]{};
+    return ::GetClassNameW(hwnd, class_name, static_cast<int>(sizeof(class_name) / sizeof(class_name[0]))) > 0
+        && ::lstrcmpW(class_name, expected_class) == 0;
+}
+
+bool CTaskBarDlg::IsTaskbarWindow(HWND hwnd) const
+{
+    return IsWindowClass(hwnd, L"Shell_TrayWnd") || IsWindowClass(hwnd, L"Shell_SecondaryTrayWnd");
+}
+
+bool CTaskBarDlg::IsWindowParentAndStyle(HWND hwnd,
+                                         HWND parent,
+                                         LONG_PTR required_style,
+                                         LONG_PTR forbidden_style) const
+{
+    if (hwnd == nullptr || parent == nullptr || !::IsWindow(hwnd) || !::IsWindow(parent))
+        return false;
+
+    const LONG_PTR style = ::GetWindowLongPtr(hwnd, GWL_STYLE);
+    return ::GetParent(hwnd) == parent
+        && (style & required_style) == required_style
+        && (style & forbidden_style) == 0;
+}
+
+void CTaskBarDlg::SetTaskbarError(DWORD error_code)
+{
+    m_error_code = static_cast<int>(error_code == ERROR_SUCCESS ? ERROR_GEN_FAILURE : error_code);
+}
+
+bool CTaskBarDlg::AttachToTaskbar()
+{
+    const HWND hwnd = GetSafeHwnd();
+    const HWND parent = GetParentHwnd();
+    if (!m_original_window_state.captured || hwnd == nullptr || !::IsWindow(hwnd)
+        || parent == nullptr || !::IsWindow(parent) || !m_layout_is_verified || !IsTaskbarLayoutValid())
+    {
+        SetTaskbarError(ERROR_NOT_SUPPORTED);
+        return false;
+    }
+
+    const LONG_PTR current_style = ::GetWindowLongPtr(hwnd, GWL_STYLE);
+    const LONG_PTR hosted_style = (current_style | WS_CHILD) & ~static_cast<LONG_PTR>(WS_POPUP);
+    if (!SetWindowLongPtrChecked(hwnd, GWL_STYLE, hosted_style)
+        || !SetParentChecked(hwnd, parent)
+        || !IsWindowParentAndStyle(hwnd, parent, WS_CHILD, WS_POPUP))
+    {
+        SetTaskbarError(::GetLastError());
+        if (!RestoreWindowState(m_original_window_state))
+            m_restoration_pending = true;
+        return false;
+    }
+
+    m_attached_to_taskbar = true;
+    m_connot_insert_to_task_bar = false;
+    return true;
+}
+
+bool CTaskBarDlg::RollbackAttachment()
+{
+    const bool taskbar_restored = !m_attached_to_taskbar || ResetTaskbarPos();
+    const bool window_restored = RestoreWindowState(m_original_window_state);
+    if (!taskbar_restored || !window_restored)
+    {
+        SetTaskbarError(::GetLastError());
+        m_restoration_pending = true;
+        return false;
+    }
+
+    m_attached_to_taskbar = false;
+    m_layout_is_verified = false;
+    m_connot_insert_to_task_bar = true;
+    return true;
+}
+
+bool CTaskBarDlg::PositionFloatingWindow()
+{
+    CRect anchor = m_rcTaskbar;
+    if (!IsUsableRect(anchor))
+    {
+        RECT work_area{};
+        if (!::SystemParametersInfo(SPI_GETWORKAREA, 0, &work_area, 0))
+            return false;
+        anchor = work_area;
+    }
+
+    const int margin = (m_taskbar_dpi == 0 ? 2 : DPI(2));
+    CRect floating_rect{};
+    if (anchor.Width() >= anchor.Height())
+    {
+        floating_rect.left = anchor.right - m_window_width - margin;
+        floating_rect.top = anchor.top + max(0, (anchor.Height() - m_window_height) / 2);
+    }
+    else
+    {
+        floating_rect.left = anchor.left + max(0, (anchor.Width() - m_window_width) / 2);
+        floating_rect.top = anchor.bottom - m_window_height - margin;
+    }
+    if (floating_rect.left < anchor.left)
+        floating_rect.left = anchor.left;
+    if (floating_rect.top < anchor.top)
+        floating_rect.top = anchor.top;
+    floating_rect.right = floating_rect.left + m_window_width;
+    floating_rect.bottom = floating_rect.top + m_window_height;
+
+    m_rect = floating_rect;
+    return MoveWindow(m_rect, false);
+}
+
+bool CTaskBarDlg::CloseAndRestore()
+{
+    if (m_restoration_completed)
+        return true;
+
+    // An unattached instance whose attach rollback completed has no remaining
+    // Explorer mutation to restore. This includes the floating fallback when
+    // capturing the initial top-level state failed; it must not become
+    // impossible to close merely because there is no state to restore.
+    if (!m_attached_to_taskbar && !m_restoration_pending)
+    {
+        m_restoration_pending = false;
+        m_restoration_completed = true;
+        return true;
+    }
+
+    // If Explorer has destroyed or replaced the taskbar root, the child window
+    // we changed cannot still be present. Do not replay stale HWND state into
+    // an unrelated new shell hierarchy; only restore this dialog to its owner.
+    const bool explorer_host_missing = m_attached_to_taskbar && !IsTaskbarWindow(m_hTaskbar);
+    const bool hosted_window_exists = GetSafeHwnd() != nullptr && ::IsWindow(GetSafeHwnd());
+    const bool taskbar_restored = explorer_host_missing || !m_attached_to_taskbar || ResetTaskbarPos();
+    // Explorer can destroy our child HWND while rebuilding the captured host.
+    // In that case ResetTaskbarPos has either restored the old task list or
+    // proved that it disappeared with Explorer, so there is no owned HWND left
+    // to detach and retrying would only block shutdown.
+    const bool window_restored = !hosted_window_exists || RestoreWindowState(m_original_window_state);
+    if (!taskbar_restored || !window_restored)
+    {
+        SetTaskbarError(::GetLastError());
+        m_restoration_pending = true;
+        return false;
+    }
+
+    m_attached_to_taskbar = false;
+    m_restoration_pending = false;
+    m_restoration_completed = true;
+    return true;
 }
 
 void CTaskBarDlg::DisableRenderFeatureIfNecessary(CSupportedRenderEnums& ref_supported_render_enums)
@@ -365,39 +741,41 @@ bool CTaskBarDlg::AdjustWindowPos(bool force_adjust)
 {
     if (this->GetSafeHwnd() == NULL || !IsWindow(this->GetSafeHwnd()))
         return false;
+    if (m_restoration_pending)
+        return false;
 
     if (m_is_width_changed)
         force_adjust = true;
 
-    if (force_adjust)
-        ResetTaskbarPos();
+    if (!m_attached_to_taskbar)
+    {
+        const bool positioned = PositionFloatingWindow();
+        if (!positioned)
+            SetTaskbarError(::GetLastError());
+        m_is_width_changed = false;
+        return positioned;
+    }
 
-    ::GetWindowRect(m_hTaskbar, m_rcTaskbar);   //获得任务栏的矩形区域
+    if (!IsTaskbarWindow(m_hTaskbar) || !::GetWindowRect(m_hTaskbar, m_rcTaskbar)
+        || !IsUsableRect(m_rcTaskbar) || !IsTaskbarLayoutValid())
+    {
+        SetTaskbarError(ERROR_NOT_SUPPORTED);
+        return RollbackAttachment() && PositionFloatingWindow();
+    }
 
-    static bool last_taskbar_on_top_or_bottom;
+    const bool taskbar_was_horizontal = m_taskbar_on_top_or_bottom;
     CheckTaskbarOnTopOrBottom();
-    if (force_adjust || m_taskbar_on_top_or_bottom != last_taskbar_on_top_or_bottom)
+    if (force_adjust || m_taskbar_on_top_or_bottom != taskbar_was_horizontal)
     {
         CalculateWindowSize();
-        last_taskbar_on_top_or_bottom = m_taskbar_on_top_or_bottom;
         force_adjust = true;
     }
 
-    AdjustTaskbarWndPos(force_adjust);
-
-    //如果窗口没有被成功嵌入到任务栏，窗口移动到了基于屏幕左上角的绝对位置，则修正窗口的位置
-    if (m_connot_insert_to_task_bar)
+    if (!IsWindowSizeWithinSafeLimits() || !AdjustTaskbarWndPos(force_adjust))
     {
-        CRect rc_parent;
-        ::GetWindowRect(GetParentHwnd(), rc_parent);
-        CRect rect{ m_rect };
-        rect.MoveToXY(rect.left + rc_parent.left, rect.top + rc_parent.top);
-        this->MoveWindow(rect);
-
-        if (::GetForegroundWindow() == m_hTaskbar)   //在窗口无法嵌入任务栏时，如果焦点设置在了任务栏上，则让窗口置顶
-        {
-            SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);         //设置置顶
-        }
+        if (m_error_code == ERROR_SUCCESS)
+            SetTaskbarError(ERROR_NOT_SUPPORTED);
+        return RollbackAttachment() && PositionFloatingWindow();
     }
 
     m_is_width_changed = false;     //调整完窗口位置重置标志
@@ -531,6 +909,12 @@ HWND CTaskBarDlg::FindTaskbarHandle(bool& is_scendary_display)
     if (hTaskbar == nullptr)
         hTaskbar = ::FindWindow(_T("Shell_TrayWnd"), NULL);
 
+    if (!IsTaskbarWindow(hTaskbar))
+    {
+        hTaskbar = nullptr;
+        is_scendary_display = false;
+    }
+
     return hTaskbar;
 }
 
@@ -656,19 +1040,27 @@ void CTaskBarDlg::CalculateWindowSize()
     //显示项目的宽度
     std::map<CommonDisplayItem, ItemWidth> item_widths;
 
-    m_pDC->SelectObject(&m_font);
+    // A measurement DC is short-lived.  Keeping a window DC across the
+    // dialog lifetime leaks a GDI resource and can leave m_font selected when
+    // settings replace it.
+    CClientDC measurement_dc(this);
+    CFont* previous_font = measurement_dc.SelectObject(&m_font);
+    // Compute the ordered items once. Calling GetAllDisplayItemsWithOrder()
+    // separately for begin() and end() creates distinct temporary containers,
+    // leaving the iterator dangling before its first dereference.
+    const auto item_order = theApp.m_taskbar_data.item_order.GetAllDisplayItemsWithOrder();
+
     //计算标签和数值的宽度
     //const auto& item_map = theApp.m_taskbar_data.disp_str.GetAllItems();
-    for (auto iter = theApp.m_taskbar_data.item_order.GetAllDisplayItemsWithOrder().begin(); iter != theApp.m_taskbar_data.item_order.GetAllDisplayItemsWithOrder().end(); ++iter)
+    for (const auto& item : item_order)
     {
         //标签宽度
-        item_widths[*iter].label_width = m_pDC->GetTextExtent(theApp.m_taskbar_data.disp_str.GetConst(*iter).c_str()).cx;
+        item_widths[item].label_width = measurement_dc.GetTextExtent(theApp.m_taskbar_data.disp_str.GetConst(item).c_str()).cx;
         //数值宽度
-        CString sample_str = iter->GetItemValueSampleText(false);
-        item_widths[*iter].value_width = m_pDC->GetTextExtent(sample_str).cx;
+        CString sample_str = item.GetItemValueSampleText(false);
+        item_widths[item].value_width = measurement_dc.GetTextExtent(sample_str).cx;
     }
 
-    auto item_order{ theApp.m_taskbar_data.item_order.GetAllDisplayItemsWithOrder() };
     for (const auto& item : item_order)
     {
         if (theApp.m_taskbar_data.display_item.Contains(item.ItemType()))
@@ -828,6 +1220,9 @@ void CTaskBarDlg::CalculateWindowSize()
     m_rect.right = m_rect.left + m_window_width;
     m_rect.bottom = m_rect.top + m_window_height;
 
+    if (previous_font != nullptr)
+        measurement_dc.SelectObject(previous_font);
+
 }
 
 void CTaskBarDlg::SetToolTipsTopMost()
@@ -874,6 +1269,13 @@ BOOL CTaskBarDlg::OnInitDialog()
 
     // TODO:  在此添加额外的初始化
     SetWindowText(TASKBAR_WINDOW_NAME);
+    if (!CaptureWindowState(m_original_window_state, GetSafeHwnd()))
+    {
+        // Without a complete snapshot this instance must never attempt to
+        // embed itself, because a later detach could not be proven complete.
+        SetTaskbarError(::GetLastError());
+        m_connot_insert_to_task_bar = true;
+    }
     // 检测系统是否安装了 MicrosoftWindows.Client.WebExperience (aka Windows Web Experience Pack)
     theApp.m_taskbar_data.is_windows_web_experience_detected =
         WindowsWebExperienceDetector::IsDetected();
@@ -882,16 +1284,25 @@ BOOL CTaskBarDlg::OnInitDialog()
     //设置隐藏任务栏图标
     ModifyStyleEx(0, WS_EX_TOOLWINDOW);
 
-    m_pDC = GetDC();
-
     m_hTaskbar = FindTaskbarHandle(m_is_secondary_display); //查找任务栏的句柄
-    ::GetWindowRect(m_hTaskbar, m_rcTaskbar);   //获得任务栏的矩形区域
+    if (m_hTaskbar == nullptr || !::GetWindowRect(m_hTaskbar, m_rcTaskbar) || m_rcTaskbar.IsRectEmpty())
+    {
+        m_rcTaskbar.SetRectEmpty();
+        SetTaskbarError(ERROR_NOT_SUPPORTED);
+    }
 
     //设置窗口透明色
     ApplyWindowTransparentColor();
 
-    InitTaskbarWnd();
-    m_connot_insert_to_task_bar = !(::SetParent(this->m_hWnd, GetParentHwnd())); //把程序窗口设置成任务栏的子窗口
+    if (!m_connot_insert_to_task_bar && IsTaskbarWindow(m_hTaskbar))
+        m_layout_is_verified = InitTaskbarWnd();
+    if (!m_layout_is_verified || !AttachToTaskbar())
+    {
+        m_connot_insert_to_task_bar = true;
+        m_attached_to_taskbar = false;
+        if (m_error_code == ERROR_SUCCESS)
+            SetTaskbarError(ERROR_NOT_SUPPORTED);
+    }
 
     //根据已经确定的任务栏最小化窗口区域得到屏幕并获得所在屏幕的DPI（Windows 8.1及其以上）
     if (theApp.m_win_version.IsWindows8Point1OrLater())
@@ -909,15 +1320,13 @@ BOOL CTaskBarDlg::OnInitDialog()
 
     //设置字体
     SetTextFont();
-    m_pDC->SelectObject(&m_font);
-
     CheckTaskbarOnTopOrBottom();
     CalculateWindowSize();
     m_rect.SetRectEmpty();
     m_rect.bottom = m_window_height;
     m_rect.right = m_rect.left + m_window_width;
-    m_error_code = GetLastError();
-    AdjustWindowPos(true);
+    if (!AdjustWindowPos(true) && m_error_code == ERROR_SUCCESS)
+        SetTaskbarError(::GetLastError());
 
     SetBackgroundColor(theApp.m_taskbar_data.back_color);
 
@@ -935,6 +1344,16 @@ BOOL CTaskBarDlg::OnInitDialog()
                   // 异常: OCX 属性页应返回 FALSE
 }
 
+BOOL CTaskBarDlg::DestroyWindow()
+{
+    // CloseAndRestore is idempotent. Calling it here protects MFC callers
+    // that attempt to destroy the hosted dialog without going through its
+    // owner, while the explicit base call avoids recursion.
+    if (!CloseAndRestore())
+        return FALSE;
+    return CDialogEx::DestroyWindow();
+}
+
 void CTaskBarDlg::OnCancel()
 {
     // TODO: 在此添加专用代码和/或调用基类
@@ -950,8 +1369,13 @@ void CTaskBarDlg::OnCancel()
         }
     }
 
+    // Do not destroy the dialog while Explorer state is still unverified.
+    // The owner uses CloseAndRestore/IsRestorationPending to retry or cancel
+    // process shutdown instead of silently leaving a resized task list.
+    if (!CloseAndRestore())
+        return;
+
     DestroyWindow();
-    ResetTaskbarPos();
 
     //CDialogEx::OnCancel();
 }
@@ -1050,7 +1474,8 @@ void CTaskBarDlg::OnLButtonDblClk(UINT nFlags, CPoint point)
         SendMessage(WM_COMMAND, ID_OPTIONS2);       //双击后弹出“选项设置”对话框
         break;
     case DoubleClickAction::TASK_MANAGER:
-        ShellExecuteW(NULL, _T("open"), (theApp.m_system_dir + L"\\Taskmgr.exe").c_str(), NULL, NULL, SW_NORMAL);       //打开任务管理器
+        if (!theApp.m_system_dir.empty())
+            ShellExecuteW(NULL, _T("open"), (theApp.m_system_dir + L"\\Taskmgr.exe").c_str(), NULL, NULL, SW_NORMAL);       //打开任务管理器
         break;
     case DoubleClickAction::SEPCIFIC_APP:
         ShellExecuteW(NULL, _T("open"), (theApp.m_taskbar_data.double_click_exe).c_str(), NULL, NULL, SW_NORMAL);   //打开指定程序，默认任务管理器
@@ -1098,40 +1523,81 @@ void CTaskBarDlg::OnPaint()
                        // TODO: 在此处添加消息处理程序代码
                        // 不为绘图消息调用 CDialogEx::OnPaint()
 
+    const auto disable_d2d_after_recovery_failure = [this](const char* message) noexcept
+    {
+        theApp.m_taskbar_data.disable_d2d = true;
+        m_supported_render_enums.EnableDefaultOnly();
+        if (message != nullptr)
+            CCommon::WriteLog(message, theApp.m_log_path.c_str());
+    };
+
     try
     {
         ShowInfo(&dc);
     }
     catch (CD3D10Exception1& ex)
     {
-        DrawCommonHelper::DefaultD2DDrawCommonExceptionHandler{ex}(
-            [p_window_support_wrapper = &this->m_taskbar_draw_common_window_support](CHResultException& ex)
-            {
-                return DrawCommonHelper::HandleIfNeedRecreate(
-                    ex,
-                    [p_window_support_wrapper]()
-                    { p_window_support_wrapper->Get().RequestD3D10Device1Recreate(); });
-            });
+        try
+        {
+            DrawCommonHelper::DefaultD2DDrawCommonExceptionHandler{ex}(
+                [p_window_support_wrapper = &this->m_taskbar_draw_common_window_support](CHResultException& ex)
+                {
+                    return DrawCommonHelper::HandleIfNeedRecreate(
+                        ex,
+                        [p_window_support_wrapper]()
+                        { p_window_support_wrapper->Get().RequestD3D10Device1Recreate(); });
+                });
+        }
+        catch (std::exception& recovery_error)
+        {
+            disable_d2d_after_recovery_failure(recovery_error.what());
+        }
+        catch (...)
+        {
+            disable_d2d_after_recovery_failure("D3D recovery failed with an unknown exception.");
+        }
     }
     catch (CD2D1Exception& ex)
     {
-        DrawCommonHelper::DefaultD2DDrawCommonExceptionHandler{ex}(
-            [p_device_context_support_wrapper = &this->m_d2d1_device_context_support](CHResultException& ex)
-            {
-                return DrawCommonHelper::HandleIfD2D1DeviceNeedRecreate(
-                    ex,
-                    [&]()
-                    { p_device_context_support_wrapper->Get().RequestD2D1DeviceRecreate(ex.GetHResult()); });
-            });
+        try
+        {
+            DrawCommonHelper::DefaultD2DDrawCommonExceptionHandler{ex}(
+                [p_device_context_support_wrapper = &this->m_d2d1_device_context_support](CHResultException& ex)
+                {
+                    return DrawCommonHelper::HandleIfD2D1DeviceNeedRecreate(
+                        ex,
+                        [&]()
+                        { p_device_context_support_wrapper->Get().RequestD2D1DeviceRecreate(ex.GetHResult()); });
+                });
+        }
+        catch (std::exception& recovery_error)
+        {
+            disable_d2d_after_recovery_failure(recovery_error.what());
+        }
+        catch (...)
+        {
+            disable_d2d_after_recovery_failure("D2D recovery failed with an unknown exception.");
+        }
     }
     catch (CDCompositionException& ex)
     {
-        DrawCommonHelper::DefaultD2DDrawCommonExceptionHandler{ex}(
-            [p_device_context_support_wrapper = &this->m_d2d1_device_context_support](CHResultException& ex)
-            {
-                p_device_context_support_wrapper->Get().RequestDCompositionDeviceRecreate(ex.GetHResult());
-                return true;
-            });
+        try
+        {
+            DrawCommonHelper::DefaultD2DDrawCommonExceptionHandler{ex}(
+                [p_device_context_support_wrapper = &this->m_d2d1_device_context_support](CHResultException& ex)
+                {
+                    p_device_context_support_wrapper->Get().RequestDCompositionDeviceRecreate(ex.GetHResult());
+                    return true;
+                });
+        }
+        catch (std::exception& recovery_error)
+        {
+            disable_d2d_after_recovery_failure(recovery_error.what());
+        }
+        catch (...)
+        {
+            disable_d2d_after_recovery_failure("DirectComposition recovery failed with an unknown exception.");
+        }
     }
     catch (CHResultException& ex)
     {
@@ -1139,8 +1605,11 @@ void CTaskBarDlg::OnPaint()
     }
     catch (std::runtime_error& ex)
     {
-        auto* log = ex.what();
-        CCommon::WriteLog(log, theApp.m_log_path.c_str());
+        // A renderer can pass DLL capability checks and still fail during
+        // device/resource construction. Fall back to GDI after the first
+        // such failure so a broken graphics stack cannot keep throwing on
+        // every paint message.
+        disable_d2d_after_recovery_failure(ex.what());
         // 目前只有它会主动抛异常，所有异常全部算它头上
         DrawCommonHelper::DefaultD2DDrawCommonExceptionHandler::IncreaseErrorCountManually();
         DrawCommonHelper::DefaultD2DDrawCommonExceptionHandler::HandleErrorCountIncrement();
@@ -1183,7 +1652,9 @@ int CTaskBarDlg::CalculateNetspeedPercent(unsigned __int64 net_speed)
     if (net_speed >= max_value)
         percet = 100;
     else if (max_value > 0)
-        percet = net_speed * 100 / max_value;
+        // This branch guarantees net_speed < max_value, so the result is in
+        // [0, 99] and the explicit narrowing conversion is safe.
+        percet = static_cast<int>(net_speed * 100 / max_value);
     return percet;
 }
 
@@ -1229,10 +1700,18 @@ void CTaskBarDlg::TryDrawGraph(IDrawCommon& drawer, const CRect& value_rect, Com
 
 void CTaskBarDlg::OnClose()
 {
-    // TODO: 在此添加消息处理程序代码和/或调用默认值
-    ::SendMessage(theApp.m_pMainWnd->GetSafeHwnd(), WM_TASKBAR_WND_CLOSED, 0, 0);
+    // Keep the WM_CLOSE path equivalent to the explicit OnCancel path.
+    for (const auto& item : CBaseDialog::AllUniqueHandels())
+    {
+        if (::GetParent(item.second) == GetSafeHwnd())
+            ::SendMessage(item.second, WM_COMMAND, IDCANCEL, 0);
+    }
 
-    CDialogEx::OnClose();
+    if (!CloseAndRestore())
+        return;
+
+    ::SendMessage(theApp.m_pMainWnd->GetSafeHwnd(), WM_TASKBAR_WND_CLOSED, 0, 0);
+    DestroyWindow();
 }
 
 void CTaskBarDlg::OnLButtonUp(UINT nFlags, CPoint point)

@@ -36,7 +36,7 @@ protected:
 
     int m_icon_selected{};
 
-    bool m_atuo_adapt_notify_icon;
+    bool m_atuo_adapt_notify_icon{};
 
 protected:
     virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV 支持

@@ -2,6 +2,12 @@
 #include "SettingsHelper.h"
 #include "TaskbarMon.h"
 
+namespace
+{
+    constexpr size_t kMaximumTaskbarColorConfigLength = 512;
+    constexpr size_t kMaximumDisplayStringLength = 128;
+}
+
 CSettingsHelper::CSettingsHelper()
     : CIniHelper(theApp.m_config_path)
 {
@@ -40,6 +46,9 @@ void CSettingsHelper::LoadTaskbarWndColors(const wchar_t* AppName, const wchar_t
 {
     wstring str{ default_str };
     _GetString(AppName, KeyName, str);
+    if (str.size() > kMaximumTaskbarColorConfigLength)
+        str = default_str;
+
     std::vector<wstring> split_result;
     CCommon::StringSplit(str, L',', split_result);
     size_t index = 0;
@@ -88,6 +97,9 @@ void CSettingsHelper::LoadDisplayStr(const wchar_t* AppName, DispStrings& disp_s
     {
         std::wstring str{ CommonDisplayItem(display_item).DefaultString(is_main_window)};
         bool exist = GetString(AppName, CommonDisplayItem(display_item).GetItemIniKeyName(), str);
+        if (str.size() > kMaximumDisplayStringLength)
+            str = CommonDisplayItem(display_item).DefaultString(is_main_window);
+
         //主窗口只读取配置文件中存在的项，任务栏窗口读取所有项
         if (!is_main_window || exist)
             disp_str.Get(display_item) = str;

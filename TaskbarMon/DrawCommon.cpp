@@ -14,6 +14,8 @@ void CDrawCommon::Create(CDC* pDC, CWnd* pMainWnd)
 {
     m_pDC = pDC;
     m_pMainWnd = pMainWnd;
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL)
+        return;
     if (pMainWnd != nullptr)
         m_pfont = m_pMainWnd->GetFont();
     m_gdi_plus_drawer.Create(pDC);
@@ -21,22 +23,31 @@ void CDrawCommon::Create(CDC* pDC, CWnd* pMainWnd)
 
 void CDrawCommon::SetFont(CFont* pfont)
 {
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL || pfont == nullptr
+        || pfont->GetSafeHandle() == NULL)
+        return;
     m_pfont = pfont;
-    m_pDC->SelectObject(m_pfont);
+    if (m_pfont != nullptr && m_pfont->GetSafeHandle() != NULL)
+        m_pDC->SelectObject(m_pfont);
 }
 
 void CDrawCommon::SetDC(CDC* pDC)
 {
     m_pDC = pDC;
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL)
+        return;
     m_gdi_plus_drawer.Create(pDC);
 }
 
 void CDrawCommon::DrawWindowText(CRect rect, LPCTSTR lpszString, COLORREF color, Alignment align, bool draw_back_ground, bool multi_line, BYTE alpha)
 {
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL || lpszString == nullptr)
+        return;
     m_pDC->SetTextColor(color);
     if (!draw_back_ground)
         m_pDC->SetBkMode(TRANSPARENT);
-    m_pDC->SelectObject(m_pfont);
+    if (m_pfont != nullptr && m_pfont->GetSafeHandle() != NULL)
+        m_pDC->SelectObject(m_pfont);
     CSize text_size = m_pDC->GetTextExtent(lpszString);
 
     auto format = DrawCommonHelper::ProccessTextFormat(rect, text_size, align, multi_line);
@@ -48,6 +59,8 @@ void CDrawCommon::DrawWindowText(CRect rect, LPCTSTR lpszString, COLORREF color,
 
 void CDrawCommon::SetDrawRect(CRect rect)
 {
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL)
+        return;
     CRgn rgn;
     rgn.CreateRectRgnIndirect(rect);
     m_pDC->SelectClipRgn(&rgn);
@@ -55,6 +68,8 @@ void CDrawCommon::SetDrawRect(CRect rect)
 
 void CDrawCommon::SetDrawRect(CDC* pDC, CRect rect)
 {
+    if (pDC == nullptr || pDC->GetSafeHdc() == NULL)
+        return;
     CRgn rgn;
     rgn.CreateRectRgnIndirect(rect);
     pDC->SelectClipRgn(&rgn);
@@ -62,14 +77,23 @@ void CDrawCommon::SetDrawRect(CDC* pDC, CRect rect)
 
 void CDrawCommon::DrawBitmap(CBitmap& bitmap, CPoint start_point, CSize size, StretchMode stretch_mode)
 {
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL || bitmap.GetSafeHandle() == NULL
+        || size.cx < 0 || size.cy < 0)
+        return;
+
     CDC memDC;
 
     //获取图像实际大小
-    BITMAP bm;
-    GetObject(bitmap, sizeof(BITMAP), &bm);
+    BITMAP bm{};
+    if (::GetObject(bitmap.GetSafeHandle(), static_cast<int>(sizeof(bm)), &bm) != static_cast<int>(sizeof(bm))
+        || bm.bmWidth <= 0 || bm.bmHeight <= 0)
+        return;
 
-    memDC.CreateCompatibleDC(m_pDC);
-    memDC.SelectObject(&bitmap);
+    if (!memDC.CreateCompatibleDC(m_pDC) || memDC.SelectObject(&bitmap) == nullptr)
+    {
+        memDC.DeleteDC();
+        return;
+    }
     // 以下两行避免图片失真
     m_pDC->SetStretchBltMode(HALFTONE);
     m_pDC->SetBrushOrg(0, 0);
@@ -89,6 +113,9 @@ void CDrawCommon::DrawBitmap(UINT bitmap_id, CPoint start_point, CSize size, Str
 
 void CDrawCommon::DrawBitmap(HBITMAP hbitmap, CPoint start_point, CSize size, StretchMode stretch_mode, BYTE)
 {
+    if (hbitmap == NULL)
+        return;
+
     CBitmap bitmap;
     if (!bitmap.Attach(hbitmap))
         return;
@@ -98,7 +125,8 @@ void CDrawCommon::DrawBitmap(HBITMAP hbitmap, CPoint start_point, CSize size, St
 
 void CDrawCommon::DrawIcon(HICON hIcon, CPoint start_point, CSize size)
 {
-    if (m_pDC->GetSafeHdc() == NULL)
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL || hIcon == NULL
+        || size.cx < 0 || size.cy < 0)
         return;
     if (size.cx == 0 || size.cy == 0)
         ::DrawIconEx(m_pDC->GetSafeHdc(), start_point.x, start_point.y, hIcon, 0, 0, 0, NULL, DI_NORMAL | DI_DEFAULTSIZE);
@@ -108,44 +136,71 @@ void CDrawCommon::DrawIcon(HICON hIcon, CPoint start_point, CSize size)
 
 void CDrawCommon::BitmapStretch(CImage* pImage, CImage* ResultImage, CSize size)
 {
-    if (pImage->IsDIBSection())
+    if (pImage == nullptr || ResultImage == nullptr || !pImage->IsDIBSection() || size.cx <= 0 || size.cy <= 0)
+        return;
+
+    // CImage owns the temporary DCs returned here; every successful GetDC is
+    // paired with ReleaseDC, including all failure paths.
+    HDC image_hdc = pImage->GetDC();
+    if (image_hdc == NULL)
+        return;
+    CDC* pImageDC1 = CDC::FromHandle(image_hdc);
+    CBitmap* bitmap1 = pImageDC1 == nullptr ? nullptr : pImageDC1->GetCurrentBitmap();
+    BITMAP bmpInfo{};
+    if (bitmap1 == nullptr || bitmap1->GetBitmap(&bmpInfo) == 0)
     {
-        // 取得 pImage 的 DC
-        CDC* pImageDC1 = CDC::FromHandle(pImage->GetDC()); // Image 因為有自己的 DC, 所以必須使用 FromHandle 取得對應的 DC
-
-        CBitmap* bitmap1 = pImageDC1->GetCurrentBitmap();
-        BITMAP bmpInfo;
-        bitmap1->GetBitmap(&bmpInfo);
-
-        // 建立新的 CImage
-        ResultImage->Create(size.cx, size.cy, bmpInfo.bmBitsPixel);
-        CDC* ResultImageDC = CDC::FromHandle(ResultImage->GetDC());
-
-        // 當 Destination 比較小的時候, 會根據 Destination DC 上的 Stretch Blt mode 決定是否要保留被刪除點的資訊
-        ResultImageDC->SetStretchBltMode(HALFTONE);        // 使用最高品質的方式
-        ::SetBrushOrgEx(ResultImageDC->m_hDC, 0, 0, NULL); // 調整 Brush 的起點
-
-        // 把 pImage 畫到 ResultImage 上面
-        StretchBlt(*ResultImageDC, 0, 0, size.cx, size.cy, *pImageDC1, 0, 0, pImage->GetWidth(), pImage->GetHeight(), SRCCOPY);
-        // pImage->Draw(*ResultImageDC,0,0,StretchWidth,StretchHeight,0,0,pImage->GetWidth(),pImage->GetHeight());
-
         pImage->ReleaseDC();
-        ResultImage->ReleaseDC();
+        return;
     }
+
+    if (FAILED(ResultImage->Create(size.cx, size.cy, bmpInfo.bmBitsPixel)))
+    {
+        pImage->ReleaseDC();
+        return;
+    }
+
+    HDC result_hdc = ResultImage->GetDC();
+    if (result_hdc == NULL)
+    {
+        pImage->ReleaseDC();
+        return;
+    }
+    CDC* ResultImageDC = CDC::FromHandle(result_hdc);
+    if (ResultImageDC == nullptr)
+    {
+        ResultImage->ReleaseDC();
+        pImage->ReleaseDC();
+        return;
+    }
+
+    // 當 Destination 比較小的時候, 會根據 Destination DC 上的 Stretch Blt mode 決定是否要保留被刪除點的資訊
+    ResultImageDC->SetStretchBltMode(HALFTONE);        // 使用最高品質的方式
+    ::SetBrushOrgEx(ResultImageDC->m_hDC, 0, 0, NULL); // 調整 Brush 的起點
+
+    // 把 pImage 畫到 ResultImage 上面
+    StretchBlt(*ResultImageDC, 0, 0, size.cx, size.cy, *pImageDC1, 0, 0, pImage->GetWidth(), pImage->GetHeight(), SRCCOPY);
+    // pImage->Draw(*ResultImageDC,0,0,StretchWidth,StretchHeight,0,0,pImage->GetWidth(),pImage->GetHeight());
+
+    ResultImage->ReleaseDC();
+    pImage->ReleaseDC();
 }
 
 void CDrawCommon::FillRect(CRect rect, COLORREF color, BYTE alpha)
 {
-    m_pDC->FillSolidRect(rect, color);
+    if (m_pDC != nullptr && m_pDC->GetSafeHdc() != NULL)
+        m_pDC->FillSolidRect(rect, color);
 }
 
 void CDrawCommon::FillRectWithBackColor(CRect rect)
 {
-    m_pDC->FillSolidRect(rect, m_back_color);
+    if (m_pDC != nullptr && m_pDC->GetSafeHdc() != NULL)
+        m_pDC->FillSolidRect(rect, m_back_color);
 }
 
 void CDrawCommon::DrawRectOutLine(CRect rect, COLORREF color, int width, bool dot_line, BYTE alpha, int radius)
 {
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL || width <= 0)
+        return;
     if (radius > 0)
     {
         //半径大于0时绘制圆角矩形，使用GDI+绘制
@@ -154,9 +209,21 @@ void CDrawCommon::DrawRectOutLine(CRect rect, COLORREF color, int width, bool do
     else
     {
         CPen aPen, * pOldPen;
-        aPen.CreatePen((dot_line ? PS_DOT : PS_SOLID), width, color);
+        if (!aPen.CreatePen((dot_line ? PS_DOT : PS_SOLID), width, color))
+            return;
         pOldPen = m_pDC->SelectObject(&aPen);
+        if (pOldPen == nullptr)
+        {
+            aPen.DeleteObject();
+            return;
+        }
         CBrush* pOldBrush{ dynamic_cast<CBrush*>(m_pDC->SelectStockObject(NULL_BRUSH)) };
+        if (pOldBrush == nullptr)
+        {
+            m_pDC->SelectObject(pOldPen);
+            aPen.DeleteObject();
+            return;
+        }
 
         rect.DeflateRect(width / 2, width / 2);
         m_pDC->Rectangle(rect);
@@ -168,17 +235,24 @@ void CDrawCommon::DrawRectOutLine(CRect rect, COLORREF color, int width, bool do
 
 void CDrawCommon::GetRegionFromImage(CRgn& rgn, CBitmap& cBitmap, int threshold)
 {
+    rgn.DeleteObject();
+    if (cBitmap.GetSafeHandle() == NULL)
+        return;
+
     CDC memDC;
 
-    memDC.CreateCompatibleDC(NULL);
-    CBitmap* pOldMemBmp = NULL;
-    pOldMemBmp = memDC.SelectObject(&cBitmap);
+    if (!memDC.CreateCompatibleDC(NULL))
+        return;
+    CBitmap* pOldMemBmp = memDC.SelectObject(&cBitmap);
+    if (pOldMemBmp == nullptr)
+        return;
 
     //创建总的窗体区域，初始region为0
     rgn.CreateRectRgn(0, 0, 0, 0);
 
-    BITMAP bit;
-    cBitmap.GetBitmap(&bit); //取得位图参数，这里要用到位图的长和宽
+    BITMAP bit{};
+    if (cBitmap.GetBitmap(&bit) == 0 || bit.bmWidth <= 0 || bit.bmHeight <= 0)
+        return;
     int y;
     for (y = 0; y < bit.bmHeight; y++)
     {
@@ -213,25 +287,37 @@ int CDrawCommon::GetColorBritness(COLORREF color)
 
 void CDrawCommon::DrawLine(CPoint start_point, CPoint end_point, COLORREF color, BYTE alpha)
 {
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL)
+        return;
     CPen aPen, *pOldPen;
-    aPen.CreatePen(PS_SOLID, 1, color);
+    if (!aPen.CreatePen(PS_SOLID, 1, color))
+        return;
     pOldPen = m_pDC->SelectObject(&aPen);
-    CBrush* pOldBrush{dynamic_cast<CBrush*>(m_pDC->SelectStockObject(NULL_BRUSH))};
+    if (pOldPen == nullptr)
+    {
+        aPen.DeleteObject();
+        return;
+    }
 
     m_pDC->MoveTo(start_point);
     m_pDC->LineTo(end_point);
     m_pDC->SelectObject(pOldPen);
-    m_pDC->SelectObject(pOldBrush); // Restore the old brush
     aPen.DeleteObject();
 }
 
 int CDrawCommon::GetTextWidth(LPCTSTR lpszString)
 {
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL || lpszString == nullptr)
+        return 0;
     return m_pDC->GetTextExtent(lpszString).cx;
 }
 
 void CDrawCommon::GetTextExtent(const wchar_t* lpszString, int& w, int& h)
 {
+    w = 0;
+    h = 0;
+    if (m_pDC == nullptr || m_pDC->GetSafeHdc() == NULL || lpszString == nullptr)
+        return;
     CSize size = m_pDC->GetTextExtent(lpszString);
     w = size.cx;
     h = size.cy;

@@ -1,24 +1,49 @@
 #include "stdafx.h"
 #include "SimpleXML.h"
+#include <new>
 
 
 CSimpleXML::CSimpleXML(const wstring & xml_path)
 {
-	ifstream file_stream{ xml_path };
-	if (file_stream.fail())
-	{
+	ifstream file_stream{ xml_path, std::ios::binary };
+	if (!file_stream.is_open())
 		return;
-	}
-	//读取文件内容
+
+	constexpr size_t kMaxSimpleXmlBytes = 16 * 1024 * 1024;
 	string xml_str;
-	while (!file_stream.eof())
+	char read_buffer[4096];
+	for (;;)
 	{
-		xml_str.push_back(file_stream.get());
+		file_stream.read(read_buffer, static_cast<std::streamsize>(sizeof(read_buffer)));
+		const std::streamsize bytes_read = file_stream.gcount();
+		if (bytes_read == 0 && !file_stream.eof())
+			return;
+		if (bytes_read > 0)
+		{
+			const size_t chunk_size = static_cast<size_t>(bytes_read);
+			if (chunk_size > kMaxSimpleXmlBytes - xml_str.size())
+				return;
+			try
+			{
+				xml_str.append(read_buffer, chunk_size);
+			}
+			catch (const std::bad_alloc&)
+			{
+				xml_str.clear();
+				return;
+			}
+		}
+
+		if (file_stream.bad() || (!file_stream.eof() && file_stream.fail()))
+		{
+			xml_str.clear();
+			return;
+		}
+		if (file_stream.eof())
+			break;
 	}
-	xml_str.pop_back();
-	if (!xml_str.empty() && xml_str.back() != L'\n')		//确保文件末尾有回车符
-		xml_str.push_back(L'\n');
-	//判断文件是否是utf8编码
+	if (!xml_str.empty() && xml_str.back() != '\n')
+		xml_str.push_back('\n');
 	bool is_utf8;
 	if (xml_str.size() >= 3 && xml_str[0] == -17 && xml_str[1] == -69 && xml_str[2] == -65)
 	{
@@ -56,7 +81,9 @@ wstring CSimpleXML::GetNode(const wchar_t * node) const
 
 wstring CSimpleXML::_GetNode(const wchar_t * node, const wstring & content)
 {
-	wstring result;
+	if (node == nullptr || *node == L'\0')
+		return wstring();
+
 	wstring node_start{ L'<' };
 	wstring node_end{ L'<' };
 	node_start += node;
@@ -65,12 +92,14 @@ wstring CSimpleXML::_GetNode(const wchar_t * node, const wstring & content)
 	node_end += node;
 	node_end += L'>';
 
-	size_t index_start, index_end;
-	index_start = content.find(node_start);
-	index_end = content.find(node_end);
-	if (index_start == wstring::npos || index_end == wstring::npos)
+	const size_t index_start = content.find(node_start);
+	if (index_start == wstring::npos)
 		return wstring();
 
-	result = content.substr(index_start + node_start.size(), index_end - index_start - node_start.size());
-	return result;
+	const size_t content_start = index_start + node_start.size();
+	const size_t index_end = content.find(node_end, content_start);
+	if (index_end == wstring::npos)
+		return wstring();
+
+	return content.substr(content_start, index_end - content_start);
 }

@@ -4,11 +4,12 @@
 
 CSupportedRenderEnums::CSupportedRenderEnums()
 {
-    if (CDCompositionSupport::CheckSupport() && CDxgi1Support2::CheckSupport())
+    const bool d2d_supported = CTaskBarDlgDrawCommonSupport::CheckSupport();
+    if (d2d_supported && CDCompositionSupport::CheckSupport() && CDxgi1Support2::CheckSupport())
     {
         m_enums[D2D1_WITH_DCOMPOSITION_INDEX] = true;
     }
-    if (CTaskBarDlgDrawCommonSupport::CheckSupport())
+    if (d2d_supported)
     {
         m_enums[D2D1_INDEX] = true;
     }

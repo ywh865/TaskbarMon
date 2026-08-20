@@ -19,6 +19,9 @@
 #include "AboutDlg.h"
 #include "core/MonitorService.h"
 
+#include <atomic>
+#include <mutex>
+
 // CTrafficMonitorDlg 对话框（隐藏宿主窗口，仅承载任务栏窗口、托盘与监控调度）
 class CTrafficMonitorDlg : public CDialog
 {
@@ -56,6 +59,26 @@ public:
         std::map<std::wstring, float> AllCpuTemperature() const override;
         std::map<std::wstring, float> AllHddTemperature() const override;
         std::map<std::wstring, float> AllHddUsage() const override;
+
+    private:
+        // The monitor object is owned by the application and can be recreated
+        // from the UI thread. Cache a complete reading so MonitorService never
+        // dereferences it after releasing the application's monitor lock.
+        struct HardwareSnapshot
+        {
+            float cpu_temperature{ -1 };
+            float cpu_freq{ -1 };
+            float gpu_temperature{ -1 };
+            float hdd_temperature{ -1 };
+            float mainboard_temperature{ -1 };
+            int gpu_usage{ -1 };
+            std::map<std::wstring, float> all_cpu_temperature;
+            std::map<std::wstring, float> all_hdd_temperature;
+            std::map<std::wstring, float> all_hdd_usage;
+        };
+
+        HardwareSnapshot m_snapshot;
+        bool m_hardware_acquisition_failed{};
     };
 #endif
 
@@ -101,7 +124,9 @@ protected:
     uint64_t m_last_drawn_revision{ UINT64_MAX };   //上次重绘时的数据修订号（R1 脏标记）
     ULONGLONG m_last_paint_time{};  //上次重绘时间（R5 节流）
     int m_insert_to_taskbar_cnt{};  //用来统计尝试嵌入任务栏的次数
-    int m_cannot_insert_to_task_bar_warning{ true };   //指示是否会在无法嵌入任务栏时弹出提示框
+    int m_cannot_insert_to_task_bar_warning{ true };
+    UINT m_pending_dpi{};
+    unsigned int m_resume_connection_check_times{};
 
     static unsigned int m_WM_TASKBARCREATED;    //任务栏重启消息
 
@@ -122,12 +147,28 @@ protected:
     MonitorService::Config GetMonitorConfig() const;
 
     void DoMonitorAcquisition();    //获取一次监控信息并同步到全局成员
+    bool StartMonitorThread();
+    void RequestMonitorAcquisition();
+    void ScheduleTaskbarRestoreRetry();
+    void ScheduleCloseRetry();
+    bool PrepareForDestroy();
     static UINT MonitorThreadCallback(LPVOID dwUser);   //获取监控信息的线程函数
-    bool m_monitor_data_required{ false };          //线程中需要获取监控数据标志，当需要获取监控数据时置为true，获取到一次监控数据时置为false
-    bool m_is_thread_exit{ false }; //线程退出标志
-    CEvent m_threadExitEvent;       //用于通知主线程工作线程已退出
+    std::atomic_bool m_monitor_data_required{ false };
+    std::atomic_bool m_is_thread_exit{ false };
+    CEvent m_monitorWakeEvent{ FALSE, FALSE };
+    CEvent m_threadExitEvent{ FALSE, TRUE };
+    CWinThread* m_monitorThread{};
+    HWND m_monitorNotifyWindow{};
+    std::mutex m_pendingMonitorSnapshotMutex;
+    MonitorSnapshot m_pendingMonitorSnapshot{};
+    uint64_t m_pendingMonitorRevision{};
+    bool m_hasPendingMonitorSnapshot{};
+    bool m_closeInProgress{};
+    bool m_sessionEndApproved{};
+    bool m_destroyWindowAuthorized{};
 public:
-    void ExitMonitorThread();       //停止监控线程
+    bool ExitMonitorThread(DWORD timeout_ms = INFINITE);       //停止监控线程
+    BOOL DestroyWindow() override;
 
 protected:
     void GetScreenSize();           //获取屏幕的大小
@@ -136,7 +177,7 @@ protected:
     void IniTaskBarConnectionMenu();        //初始化任务栏窗口的“选择网络连接”菜单
     void SetConnectionMenuState(CMenu* pMenu);      //设置“选择网络连接”菜单中选中的项目
 
-    void CloseTaskBarWnd(); //关闭任务栏窗口
+    bool CloseTaskBarWnd(); //关闭任务栏窗口
     void OpenTaskBarWnd();  //打开任务栏窗口
 
     void AddNotifyIcon();       //添加通知区图标
@@ -147,9 +188,9 @@ protected:
     void UpdateNotifyIconTip();     //更新通知区图标的鼠标提示
 
     void SaveHistoryTraffic();        // 增量保存，只更新第一行和今天的记录
-    void SaveHistoryTrafficFull();    // 完整保存，用于程序退出时确保所有数据都保存
+    bool SaveHistoryTrafficFull();    // 完整保存，用于程序退出时确保所有数据都保存
     void LoadHistoryTraffic();
-    void BackupHistoryTrafficFile();
+    void BackupHistoryTrafficFile(bool history_save_succeeded);
 
     void _OnOptions(int tab, CWnd* pParent);   //打开“选项”对话框的处理，tab：打开时切换的标签
 
@@ -195,6 +236,7 @@ protected:
 public:
     afx_msg void OnShowNetSpeed();
     afx_msg BOOL OnQueryEndSession();
+    afx_msg LRESULT OnEndSessionMessage(WPARAM wParam, LPARAM lParam);
 protected:
     afx_msg LRESULT OnDpichanged(WPARAM wParam, LPARAM lParam);
     afx_msg LRESULT OnTaskbarWndClosed(WPARAM wParam, LPARAM lParam);

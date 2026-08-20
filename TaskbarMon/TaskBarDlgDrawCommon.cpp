@@ -6,6 +6,10 @@
 #include "DrawCommon.h"
 #include "WIC.h"
 
+#include <cstdint>
+#include <limits>
+#include <stdexcept>
+
 #undef min
 
 using Microsoft::WRL::ComPtr;
@@ -160,6 +164,11 @@ HDC DrawCommonHelper::Get1x1AlphaEqual1DC()
             auto& ref_old_hbitmap = std::get<1>(*p_content);
 
             ref_dc = ::CreateCompatibleDC(NULL);
+            if (ref_dc == nullptr)
+            {
+                throw std::runtime_error{
+                    TRAFFICMONITOR_ERROR_STR("Create 1x1 alpha helper DC failed.")};
+            }
             auto bitmap_info = TaskBarDlgUser32DrawTextHook::Details::GetArgb32BitmapInfo(1, 1);
             void* p_data{};
             auto current_hbitmap = ::CreateDIBSection(
@@ -169,12 +178,24 @@ HDC DrawCommonHelper::Get1x1AlphaEqual1DC()
                 &p_data,
                 NULL,
                 0);
-            if (!Win32HBITMAPVerifier::Verify(current_hbitmap))
+            if (!Win32HBITMAPVerifier::Verify(current_hbitmap) || p_data == nullptr)
             {
+                if (current_hbitmap != nullptr)
+                    ::DeleteObject(current_hbitmap);
+                ::DeleteDC(ref_dc);
+                ref_dc = nullptr;
                 throw std::runtime_error{
                     TRAFFICMONITOR_ERROR_STR("Create ARGB32 DIB (size = 1x1, alpha = 1) failed.")};
             }
             ref_old_hbitmap = ::SelectObject(ref_dc, current_hbitmap);
+            if (ref_old_hbitmap == nullptr || ref_old_hbitmap == HGDI_ERROR)
+            {
+                ::DeleteObject(current_hbitmap);
+                ::DeleteDC(ref_dc);
+                ref_dc = nullptr;
+                throw std::runtime_error{
+                    TRAFFICMONITOR_ERROR_STR("Select 1x1 alpha helper bitmap failed.")};
+            }
             ::GdiFlush();
             auto p_pixel_data = reinterpret_cast<BYTE*>(p_data);
             ::memset(p_data, 0, 3);
@@ -195,6 +216,11 @@ HDC DrawCommonHelper::Get1x1AlphaEqual1DC()
 bool CTaskBarDlgDrawCommonSupport::IsAllDevicesRecreatedByThisFunction()
 {
     auto p_d3d10_device1 = m_d3d10_device1.Get();
+    if (p_d3d10_device1 == nullptr)
+    {
+        RecreateAll();
+        return true;
+    }
     auto hr = p_d3d10_device1->GetDeviceRemovedReason();
     if (hr != S_OK)
     {
@@ -210,7 +236,13 @@ bool CTaskBarDlgDrawCommonSupport::IsAllDevicesRecreatedByThisFunction()
 
 void CTaskBarDlgDrawCommonSupport::InternalRecreateD3D10Device1()
 {
-    auto &&default_adapter1 = CD3D10Support1::GetDeviceList(true).front();
+    const auto& adapters = CD3D10Support1::GetDeviceList(true);
+    if (adapters.empty())
+    {
+        throw std::runtime_error{
+            TRAFFICMONITOR_ERROR_STR("No DXGI adapter is available for D3D10 rendering.")};
+    }
+    const auto& default_adapter1 = adapters.front();
     m_d3d10_device1.Recreate(default_adapter1);
 }
 
@@ -301,9 +333,12 @@ void CTaskBarDlgDrawCommonSupport::RecreateD2D1Device(const HRESULT recreate_rea
     {
         return;
     }
+    auto p_d3d10_device1 = m_d3d10_device1.Get();
+    if (p_d3d10_device1 == nullptr)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("D3D10 device not available.")};
     Microsoft::WRL::ComPtr<IDXGIDevice> p_dxgi_device{};
     ThrowIfFailed<CD3D10Exception1>(
-        m_d3d10_device1.Get()->QueryInterface(IID_PPV_ARGS(&p_dxgi_device)),
+        p_d3d10_device1->QueryInterface(IID_PPV_ARGS(&p_dxgi_device)),
         "Get IDXGIDevice form ID3D10Device1 failed.");
     m_d2d1_device.Recreate(p_dxgi_device);
 }
@@ -336,7 +371,37 @@ void CTaskBarDlgDrawCommonSupport::RecreateDCompositionDevice(const HRESULT recr
 
 bool CTaskBarDlgDrawCommonSupport::CheckSupport() noexcept
 {
-    return CD2D1Support1::CheckSupport() && CDWriteSupport::CheckSupport();
+    if (!CD2D1Support1::CheckSupport() || !CDWriteSupport::CheckSupport() ||
+        !CD3D10Support1::CheckSupport())
+    {
+        return false;
+    }
+
+    // A machine can expose the graphics DLLs but no usable DXGI adapter
+    // (for example in a restricted remote session). Treat that as an
+    // unsupported renderer so the caller can keep the GDI path enabled.
+    try
+    {
+        if (CD2D1Support1::GetFactory() == nullptr || CDWriteSupport::GetFactory() == nullptr)
+            return false;
+
+        const auto& adapters = CD3D10Support1::GetDeviceList();
+        if (adapters.empty())
+            return false;
+
+        // Verify the actual D3D10 device creation as well. DLL presence and
+        // adapter enumeration alone are insufficient in RDP or feature-level
+        // restricted environments.
+        CD3D10Device1 probe_device;
+        probe_device.SetFlags(D3D10_CREATE_DEVICE_BGRA_SUPPORT);
+        probe_device.Recreate(adapters.front());
+        return probe_device.Get() != nullptr;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
 }
 
 auto CTaskBarDlgDrawCommonWindowSupport::CD3DGdiInteropHelper::CreateDefaultTexture(ComPtr<ID3D10Device1> p_device1, D2D1_SIZE_U size)
@@ -449,6 +514,8 @@ bool CTaskBarDlgDrawCommonWindowSupport::CD3DGdiInteropHelper::HandleDeviceRecre
 
 void CTaskBarDlgDrawCommonWindowSupport::CD3DGdiInteropHelper::Resize(D2D1_SIZE_U size)
 {
+    if (!m_p_device1 || size.width == 0 || size.height == 0)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("Cannot resize GDI interop textures to an invalid size.")};
     m_p_gdi_initial_texture = CreateCpuWriteableTexture(m_p_device1, size);
     ThrowIfFailed<CD3D10Exception1>(
         m_p_gdi_initial_texture->QueryInterface(IID_PPV_ARGS(&m_p_gdi_initial_surface)),
@@ -484,6 +551,8 @@ void CTaskBarDlgDrawCommonWindowSupport::ResizeGdiInteropPart()
 {
     if (m_is_size_updated)
     {
+        if (m_size.width == 0 || m_size.height == 0)
+            throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("Cannot initialize zero-sized GDI interop textures.")};
         m_d3d_gdi_interop_helper.Resize(m_size);
         m_is_size_updated = false;
     }
@@ -492,6 +561,17 @@ void CTaskBarDlgDrawCommonWindowSupport::ResizeGdiInteropPart()
 void CTaskBarDlgDrawCommonWindowSupport::SetGdiInteropTexture(void* p_data, D2D1_SIZE_U size)
 {
     constexpr auto RGBA_SIZE = 4;
+
+    if (p_data == nullptr || !m_d3d_gdi_interop_helper.m_p_gdi_initial_texture
+        || size.width == 0 || size.height == 0
+        || size.width != m_size.width || size.height != m_size.height)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("Invalid GDI interop texture data.")};
+
+    if (size.width > (std::numeric_limits<std::size_t>::max)() / RGBA_SIZE)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("GDI interop texture row size overflow.")};
+    const auto input_pitch = static_cast<std::size_t>(size.width) * RGBA_SIZE;
+    if (input_pitch > (std::numeric_limits<std::size_t>::max)() / size.height)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("GDI interop texture size overflow.")};
 
     D3D10_MAPPED_TEXTURE2D mapped_texture{};
     ThrowIfFailed<CD3D10Exception1>(
@@ -503,7 +583,11 @@ void CTaskBarDlgDrawCommonWindowSupport::SetGdiInteropTexture(void* p_data, D2D1
         TRAFFICMONITOR_ERROR_STR("Map m_p_gdi_initial_texture failed."));
 
     auto p_gpu_data = mapped_texture.pData;
-    auto input_pitch = size.width * RGBA_SIZE;
+    if (p_gpu_data == nullptr || mapped_texture.RowPitch < input_pitch)
+    {
+        m_d3d_gdi_interop_helper.m_p_gdi_initial_texture->Unmap(0);
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("Invalid mapped GDI interop texture.")};
+    }
     if (mapped_texture.RowPitch == input_pitch)
     {
         std::size_t data_size = input_pitch * size.height;
@@ -580,18 +664,30 @@ auto CTaskBarDlgDrawCommonWindowSupport::DrawAlphaValueReduceEffect() noexcept
 
 void CTaskBarDlgDrawCommonWindowSupport::RequestD3D10Device1Recreate()
 {
+    if (!m_d3d_gdi_interop_helper.m_p_device1)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("D3D10 device is unavailable during recovery.")};
     auto hr = m_d3d_gdi_interop_helper.m_p_device1->GetDeviceRemovedReason();
     m_ref_taskbardlg_draw_common_support.RecreateD3D10Device1(hr);
 }
 
 void CTaskBarDlgDrawCommonWindowSupport::CDWriteHelper::SetFont(HFONT h_font)
 {
+    if (h_font == nullptr)
+        return;
+
     if (m_h_last_font != h_font)
     {
-        ::GetObject(h_font, sizeof(m_last_font), &m_last_font);
+        LOGFONTW new_font{};
+        if (::GetObjectW(h_font, sizeof(new_font), &new_font) != sizeof(new_font))
+            return;
+        m_last_font = new_font;
 
         auto abs_font_height_f =
-            static_cast<float>(std::abs(m_last_font.lfHeight));
+            static_cast<float>(m_last_font.lfHeight < 0
+                ? -(static_cast<std::int64_t>(m_last_font.lfHeight))
+                : static_cast<std::int64_t>(m_last_font.lfHeight));
+        if (abs_font_height_f <= 0.0f)
+            abs_font_height_f = 1.0f;
         auto dwrite_font_weight =
             static_cast<DWRITE_FONT_WEIGHT>(m_last_font.lfWeight);
         auto dwrite_font_style =
@@ -683,7 +779,8 @@ void CD2D1DeviceContextWindowSupport::CD2D1DeviceContextHelper::SetBackColor(COL
     auto new_d2d1_color = CRenderTarget::COLORREF_TO_D2DCOLOR(color, alpha);
     if (!IsBitwiseEquality(new_d2d1_color, m_background_color))
     {
-        m_p_background_color_brush->SetColor(new_d2d1_color);
+        if (m_p_background_color_brush)
+            m_p_background_color_brush->SetColor(new_d2d1_color);
         m_background_color = new_d2d1_color;
     };
 }
@@ -693,7 +790,8 @@ void CD2D1DeviceContextWindowSupport::CD2D1DeviceContextHelper::SetForeColor(COL
     auto new_d2d1_color = CRenderTarget::COLORREF_TO_D2DCOLOR(color, alpha);
     if (!IsBitwiseEquality(new_d2d1_color, m_foreground_color))
     {
-        m_p_foreground_color_brush->SetColor(new_d2d1_color);
+        if (m_p_foreground_color_brush)
+            m_p_foreground_color_brush->SetColor(new_d2d1_color);
         m_foreground_color = new_d2d1_color;
     };
 }
@@ -1133,6 +1231,8 @@ void CD2D1DeviceContextWindowSupport::RequestD3D10Device1Recreate()
           [this]()
           { return GetNullableD3DHelper().GetUnsafe().GetD3D10Device1(); }}});
     auto p_d3d10_device1 = nullable_p_d3d10_device1.GetUnsafe();
+    if (!p_d3d10_device1)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("D3D10 device is unavailable during recovery.")};
     auto recreate_reason = p_d3d10_device1->GetDeviceRemovedReason();
     m_ref_task_bar_dlg_draw_common_support.RecreateD3D10Device1(recreate_reason);
 }
@@ -1151,12 +1251,19 @@ namespace TaskBarDlgUser32DrawTextHook
 {
     namespace Details
     {
+        constexpr std::size_t MAX_TEXT_BITMAP_BYTES = 64U * 1024U * 1024U;
+
         auto GetArgb32BitmapInfo(CRect rect) noexcept
             -> ::BITMAPINFO
         {
-            LONG width = std::abs(rect.Width());
-            LONG height = std::abs(rect.Height());
-            return GetArgb32BitmapInfo(width, height);
+            const auto raw_width = static_cast<std::int64_t>(rect.right) - rect.left;
+            const auto raw_height = static_cast<std::int64_t>(rect.bottom) - rect.top;
+            const auto width = raw_width < 0 ? -raw_width : raw_width;
+            const auto height = raw_height < 0 ? -raw_height : raw_height;
+            if (width > (std::numeric_limits<LONG>::max)()
+                || height > (std::numeric_limits<LONG>::max)())
+                return GetArgb32BitmapInfo(0, 0);
+            return GetArgb32BitmapInfo(static_cast<LONG>(width), static_cast<LONG>(height));
         }
 
         auto GetArgb32BitmapInfo(LONG width, LONG height) noexcept
@@ -1166,8 +1273,10 @@ namespace TaskBarDlgUser32DrawTextHook
             memset(&result, 0, sizeof(BITMAPINFO));
             result.bmiHeader.biSize = sizeof(result.bmiHeader);
             // 保证是自上而下
-            result.bmiHeader.biWidth = static_cast<LONG>(width);
-            result.bmiHeader.biHeight = -static_cast<LONG>(height);
+            if (width <= 0 || height <= 0)
+                return result;
+            result.bmiHeader.biWidth = width;
+            result.bmiHeader.biHeight = -height;
             result.bmiHeader.biPlanes = 1;
             result.bmiHeader.biBitCount = 32;
             result.bmiHeader.biCompression = BI_RGB;
@@ -1188,6 +1297,8 @@ namespace TaskBarDlgUser32DrawTextHook
             auto input_hdc = std::get<hdc_index>(args_tuple);
             auto input_format = std::get<format_index>(args_tuple);
             bool is_only_calculate_size = input_format & DT_CALCRECT;
+            if (p_original_function == nullptr)
+                return 0;
             if (ref_this.m_state.m_on_draw_text_call_matched_hdc != input_hdc || is_only_calculate_size)
             {
                 return (*p_original_function)(std::forward<DrawTextArgs>(draw_text_args)...);
@@ -1197,6 +1308,8 @@ namespace TaskBarDlgUser32DrawTextHook
             {
                 return User32DrawTextManager::CUSTOM_SUCCESS;
             }
+            if (std::get<lpchText_index>(args_tuple) == nullptr || input_hdc == NULL)
+                return 0;
             // https://stackoverflow.com/questions/42221322/how-to-draw-text-with-transparency-using-gdi
             if (p_original_function)
             {
@@ -1212,8 +1325,32 @@ namespace TaskBarDlgUser32DrawTextHook
                 };
 
                 auto& ref_input_rect = std::get<lprc_index>(args_tuple);
-                auto bitmap_info = GetArgb32BitmapInfo(ref_input_rect);
-                void* p_data;
+                if (ref_input_rect == nullptr)
+                {
+                    clean_after_creating_dc();
+                    return 0;
+                }
+
+                const auto raw_width = static_cast<std::int64_t>(ref_input_rect->right)
+                    - static_cast<std::int64_t>(ref_input_rect->left);
+                const auto raw_height = static_cast<std::int64_t>(ref_input_rect->bottom)
+                    - static_cast<std::int64_t>(ref_input_rect->top);
+                const auto bitmap_width = raw_width < 0 ? -raw_width : raw_width;
+                const auto bitmap_height = raw_height < 0 ? -raw_height : raw_height;
+                if (bitmap_width <= 0 || bitmap_height <= 0
+                    || bitmap_width > (std::numeric_limits<LONG>::max)()
+                    || bitmap_height > (std::numeric_limits<LONG>::max)()
+                    || bitmap_width > (std::numeric_limits<std::size_t>::max)() / static_cast<std::size_t>(bitmap_height)
+                    || static_cast<std::size_t>(bitmap_width) * static_cast<std::size_t>(bitmap_height)
+                        > MAX_TEXT_BITMAP_BYTES / sizeof(std::uint32_t))
+                {
+                    clean_after_creating_dc();
+                    return 0;
+                }
+
+                auto bitmap_info = GetArgb32BitmapInfo(
+                    static_cast<LONG>(bitmap_width), static_cast<LONG>(bitmap_height));
+                void* p_data{};
                 auto text_hbitmap = ::CreateDIBSection(
                     text_dc,
                     &bitmap_info,
@@ -1221,7 +1358,7 @@ namespace TaskBarDlgUser32DrawTextHook
                     &p_data,
                     NULL,
                     0);
-                if (!Win32HBITMAPVerifier::Verify(text_hbitmap))
+                if (!Win32HBITMAPVerifier::Verify(text_hbitmap) || p_data == nullptr)
                 {
                     clean_after_creating_dc();
                     return 0;
@@ -1240,9 +1377,14 @@ namespace TaskBarDlgUser32DrawTextHook
                     ::SelectObject(text_dc, old_hbitmap);
                     clean_after_creating_text_hbitmap();
                 };
+                if (old_hbitmap == nullptr || old_hbitmap == HGDI_ERROR)
+                {
+                    clean_after_creating_text_hbitmap();
+                    return 0;
+                }
 
                 auto hfont = ::GetCurrentObject(input_hdc, OBJ_FONT);
-                if (!Win32HGDIOBJVerifier::Verify(
+                if (hfont == HGDI_ERROR || !Win32HGDIOBJVerifier::Verify(
                         hfont,
                         clean_after_selecting_text_hbitmap))
                 {
@@ -1255,6 +1397,11 @@ namespace TaskBarDlgUser32DrawTextHook
                     ::SelectObject(text_dc, old_hfont);
                     clean_after_selecting_text_hbitmap();
                 };
+                if (old_hfont == nullptr || old_hfont == HGDI_ERROR)
+                {
+                    clean_after_selecting_text_hbitmap();
+                    return 0;
+                }
 
                 if (!Win32COLORREFVerifier::Verify(
                         ::SetTextColor(text_dc, 0x00FFFFFF),
@@ -1291,6 +1438,13 @@ namespace TaskBarDlgUser32DrawTextHook
                 }
                 std::size_t width = modified_rect.right;
                 std::size_t height = modified_rect.bottom;
+                if (modified_rect.right <= 0 || modified_rect.bottom <= 0
+                    || static_cast<std::int64_t>(modified_rect.right) > bitmap_width
+                    || static_cast<std::int64_t>(modified_rect.bottom) > bitmap_height)
+                {
+                    clean_after_selecting_text_hfont();
+                    return 0;
+                }
                 auto p_pixel_data = reinterpret_cast<BYTE*>(p_data);
                 auto color = ::GetTextColor(input_hdc);
                 if (!Win32COLORREFVerifier::Verify(
@@ -1310,23 +1464,26 @@ namespace TaskBarDlgUser32DrawTextHook
                 }
                 // 切换显示器时可能引发越界访问（未证实）
                 // __try
+                const auto source_row_stride = static_cast<std::size_t>(bitmap_width) * sizeof(std::uint32_t);
                 for (std::size_t y = 0; y < height; ++y)
                 {
+                    auto* row_pixel_data = p_pixel_data + y * source_row_stride;
                     for (std::size_t x = 0; x < width; ++x)
                     {
+                        auto* pixel_data = row_pixel_data + x * sizeof(std::uint32_t);
                         std::uint16_t rgb_sum;
-                        rgb_sum = p_pixel_data[0] + p_pixel_data[1] + p_pixel_data[2];
+                        rgb_sum = pixel_data[0] + pixel_data[1] + pixel_data[2];
                         if (rgb_sum == 0)
                         {
-                            std::advance(p_pixel_data, 4);
+                            continue;
                         }
                         else
                         {
-                            *p_pixel_data++ = b;
-                            *p_pixel_data++ = g;
-                            *p_pixel_data++ = r;
+                            pixel_data[0] = b;
+                            pixel_data[1] = g;
+                            pixel_data[2] = r;
                             auto a = static_cast<BYTE>(rgb_sum * 0.334f);
-                            *p_pixel_data++ = a;
+                            pixel_data[3] = a;
                         }
                     }
                 }
@@ -1403,10 +1560,11 @@ static std::shared_ptr<CD2D1IconCache> sp_icon_cache;
 
 void CTaskBarDlgDrawCommon::ResetClippedStateIfSet()
 {
-    if (m_is_clipped)
+    if (m_is_clipped && m_p_device_context)
     {
         m_p_device_context->PopAxisAlignedClip();
     }
+    m_is_clipped = false;
 }
 
 void CTaskBarDlgDrawCommon::Create(
@@ -1416,13 +1574,14 @@ void CTaskBarDlgDrawCommon::Create(
 {
     const static auto transparent_black =
         CRenderTarget::COLORREF_TO_D2DCOLOR(RGB(0, 0, 0), 0);
-    const static auto gdi_back_color =
-        CRenderTarget::COLORREF_TO_D2DCOLOR(RGB(0, 0, 0), DEFAULT_GDI_OP_TEXTURE_ALPHA);
-
     m_p_window_support = &taskbar_dlg_draw_common_window_support;
+    if (size.width == 0 || size.height == 0)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("Cannot create a zero-sized D2D render target.")};
     m_p_window_support->Resize(size);
     m_p_d2d1_device_context_support = &ref_d2d1_device_window_support;
     m_p_device_context = m_p_d2d1_device_context_support->Resize(size);
+    if (!m_p_device_context)
+        throw std::runtime_error{TRAFFICMONITOR_ERROR_STR("Create D2D device context failed.")};
 
     m_p_device_context->BeginDraw();
     m_p_device_context->SetTransform(D2D1::Matrix3x2F::Identity());
@@ -1506,12 +1665,13 @@ CTaskBarDlgDrawCommon::~CTaskBarDlgDrawCommon()
     }
 
     ResetClippedStateIfSet();
+    if (!m_p_device_context)
+        return;
     try
     {
         if (m_gdi_interop_object.HasValue())
         {
             auto texture_size = m_p_window_support->GetSize();
-            auto data_size = texture_size.height * texture_size.width * 4;
             auto& ref_gdi_interop_object = m_gdi_interop_object.Get();
             m_p_window_support->ResizeGdiInteropPart();
             ::GdiFlush();
@@ -1552,23 +1712,36 @@ CTaskBarDlgDrawCommon::~CTaskBarDlgDrawCommon()
     {
         LogHResultException(ex);
     }
+    catch (std::runtime_error& ex)
+    {
+        CCommon::WriteLog(ex.what(), theApp.m_log_path.c_str());
+    }
 }
 
 void CTaskBarDlgDrawCommon::SetBackColor(COLORREF back_color, BYTE alpha)
 {
-    m_p_d2d1_device_context_support->SetBackColor(back_color, alpha);
+    if (m_p_d2d1_device_context_support != nullptr)
+        m_p_d2d1_device_context_support->SetBackColor(back_color, alpha);
 }
 
 void CTaskBarDlgDrawCommon::SetFont(CFont* pfont)
 {
-    m_p_window_support->SetFont(*pfont);
+    if (m_p_window_support != nullptr && pfont != nullptr && pfont->GetSafeHandle() != NULL)
+        m_p_window_support->SetFont(*pfont);
 }
 
 void CTaskBarDlgDrawCommon::DrawWindowText(CRect rect, LPCTSTR lpszString, COLORREF color, Alignment align, bool draw_back_ground, bool multi_line, BYTE alpha)
 {
+    if (m_p_window_support == nullptr || m_p_device_context == nullptr
+        || m_p_d2d1_device_context_support == nullptr || lpszString == nullptr)
+        return;
+    if (rect.right <= rect.left || rect.bottom <= rect.top)
+        return;
     auto length = ::wcslen(lpszString);
     auto length_u = static_cast<UINT>(length);
     auto p_text_format = m_p_window_support->GetTextFormat();
+    if (!p_text_format)
+        return;
     // 备份状态
     auto old_vertical_align = p_text_format->GetParagraphAlignment();
     auto old_horizontal_align = p_text_format->GetTextAlignment();
@@ -1644,6 +1817,8 @@ void CTaskBarDlgDrawCommon::DrawWindowText(CRect rect, LPCTSTR lpszString, COLOR
 
 void CTaskBarDlgDrawCommon::SetDrawRect(CRect rect)
 {
+    if (m_p_device_context == nullptr)
+        return;
     ResetClippedStateIfSet();
     D2D1_RECT_F d2d1_clip_rect;
     d2d1_clip_rect.left = static_cast<float>(rect.left);
@@ -1656,6 +1831,8 @@ void CTaskBarDlgDrawCommon::SetDrawRect(CRect rect)
 
 void CTaskBarDlgDrawCommon::FillRect(CRect rect, COLORREF color, BYTE alpha)
 {
+    if (m_p_device_context == nullptr || m_p_d2d1_device_context_support == nullptr)
+        return;
     auto rect_f = Convert(rect);
     m_p_d2d1_device_context_support->SetForeColor(color, alpha);
     m_p_device_context->FillRectangle(rect_f, m_p_d2d1_device_context_support->GetRawForeSolidColorBruch());
@@ -1663,6 +1840,9 @@ void CTaskBarDlgDrawCommon::FillRect(CRect rect, COLORREF color, BYTE alpha)
 
 void CTaskBarDlgDrawCommon::DrawRectOutLine(CRect rect, COLORREF color, int width, bool dot_line, BYTE alpha, int radius)
 {
+    if (m_p_device_context == nullptr || m_p_d2d1_device_context_support == nullptr
+        || m_p_window_support == nullptr || width <= 0)
+        return;
     // 缩进矩形，使边框居中绘制
     rect.DeflateRect(width / 2, width / 2);
     auto rect_f = Convert(rect);
@@ -1695,6 +1875,8 @@ void CTaskBarDlgDrawCommon::DrawRectOutLine(CRect rect, COLORREF color, int widt
 
 void CTaskBarDlgDrawCommon::DrawLine(CPoint start_point, CPoint end_point, COLORREF color, BYTE alpha)
 {
+    if (m_p_device_context == nullptr || m_p_d2d1_device_context_support == nullptr)
+        return;
     auto d2d1_start_point = Convert(start_point);
     auto d2d1_end_point = Convert(end_point);
     m_p_d2d1_device_context_support->SetForeColor(color, alpha);
@@ -1707,16 +1889,29 @@ void CTaskBarDlgDrawCommon::DrawLine(CPoint start_point, CPoint end_point, COLOR
 void CTaskBarDlgDrawCommon::SetTextColor(const COLORREF color, BYTE alpha)
 {
     m_text_color = color;
-    m_p_d2d1_device_context_support->SetForeColor(color, alpha);
+    if (m_p_d2d1_device_context_support != nullptr)
+        m_p_d2d1_device_context_support->SetForeColor(color, alpha);
 }
 
 void CTaskBarDlgDrawCommon::DrawBitmap(HBITMAP hbitmap, CPoint start_point, CSize size, StretchMode stretch_mode, BYTE alpha)
 {
+    if (hbitmap == NULL || m_p_device_context == nullptr || m_p_d2d1_device_context_support == nullptr)
+        return;
+
     auto p_d2d1_bitmap = m_p_d2d1_device_context_support->GetCachedBitmap(hbitmap);
     if (!p_d2d1_bitmap)
     {
         p_d2d1_bitmap = ResourceBitmapCreator<HBITMAP>::Create(m_p_device_context, hbitmap);
     }
+    if (!p_d2d1_bitmap)
+        return;
+
+    const auto bitmap_size = p_d2d1_bitmap->GetPixelSize();
+    if (bitmap_size.width == 0 || bitmap_size.height == 0
+        || bitmap_size.width > static_cast<UINT>((std::numeric_limits<int>::max)())
+        || bitmap_size.height > static_cast<UINT>((std::numeric_limits<int>::max)())
+        || size.cx < 0 || size.cy < 0)
+        return;
 
     float opacity = static_cast<float>(alpha) / 255.f;
     D2D1_RECT_F draw_rect_f;
@@ -1730,80 +1925,44 @@ void CTaskBarDlgDrawCommon::DrawBitmap(HBITMAP hbitmap, CPoint start_point, CSiz
         m_p_device_context->DrawBitmap(p_d2d1_bitmap.Get(), draw_rect_f, opacity);
         return;
     }
-    switch (stretch_mode)
+    CPoint draw_start = start_point;
+    CSize draw_size = size;
+    const bool clipped = stretch_mode == StretchMode::FILL;
+    if (clipped)
+        SetDrawRect(CRect(start_point, size));
+    DrawCommonHelper::ImageDrawAreaConvert(
+        CSize(static_cast<int>(bitmap_size.width), static_cast<int>(bitmap_size.height)),
+        draw_start,
+        draw_size,
+        stretch_mode);
+    if (draw_size.cx <= 0 || draw_size.cy <= 0)
     {
-    case StretchMode::STRETCH:
-    {
-        draw_rect_f.left = static_cast<float>(start_point.x);
-        draw_rect_f.top = static_cast<float>(start_point.y);
-        draw_rect_f.right = static_cast<float>(start_point.x + size.cx);
-        draw_rect_f.bottom = static_cast<float>(start_point.y + size.cy);
-        m_p_device_context->DrawBitmap(p_d2d1_bitmap.Get(), draw_rect_f, opacity);
+        if (clipped)
+            ResetClippedStateIfSet();
         return;
     }
-    case StretchMode::FILL:
-    {
-        auto draw_size = size;
-        SetDrawRect(CRect(start_point, draw_size));
-
-        auto bitmap_size = p_d2d1_bitmap->GetPixelSize();
-        float bitmap_aspect_ratio, draw_rect_acpect_ratio; // 图像的宽高比、绘制大小的宽高比
-        bitmap_aspect_ratio = static_cast<float>(bitmap_size.width) / static_cast<float>(bitmap_size.height);
-        draw_rect_acpect_ratio = static_cast<float>(size.cx) / size.cy;
-        if (bitmap_aspect_ratio > draw_rect_acpect_ratio) // 如果图像的宽高比大于绘制区域的宽高比，则需要裁剪两边的图像
-        {
-            int image_width; // 按比例缩放后的宽度
-            image_width = bitmap_size.width * draw_size.cy / bitmap_size.height;
-            start_point.x -= ((image_width - draw_size.cx) / 2);
-            draw_size.cx = image_width;
-        }
-        else
-        {
-            int image_height; // 按比例缩放后的高度
-            image_height = bitmap_size.height * draw_size.cx / bitmap_size.width;
-            start_point.y -= ((image_height - draw_size.cy) / 2);
-            draw_size.cy = image_height;
-        }
-        ResetClippedStateIfSet();
-        break;
-    }
-    case StretchMode::FIT:
-    {
-        auto draw_size = p_d2d1_bitmap->GetPixelSize();
-        // 图像宽高比
-        float bitmap_aspect_ratio = static_cast<float>(draw_size.width) / static_cast<float>(draw_size.height);
-        float draw_rect_acpect_ratio = static_cast<float>(size.cx) / static_cast<float>(size.cy);
-        if (bitmap_aspect_ratio > draw_rect_acpect_ratio) // 如果图像的宽高比大于绘制区域的宽高比
-        {
-            draw_size.height = draw_size.height * size.cx / draw_size.width;
-            draw_size.width = size.cx;
-            start_point.y += ((size.cy - draw_size.height) / 2);
-        }
-        else
-        {
-            draw_size.width = draw_size.width * size.cy / draw_size.height;
-            draw_size.height = size.cy;
-            start_point.x += ((size.cx - draw_size.width) / 2);
-        }
-        break;
-    }
-    default:
-        break;
-    }
-    draw_rect_f.left = static_cast<float>(start_point.x);
-    draw_rect_f.top = static_cast<float>(start_point.y);
-    draw_rect_f.right = draw_rect_f.left + size.cx;
-    draw_rect_f.bottom = draw_rect_f.top + size.cy;
+    draw_rect_f.left = static_cast<float>(draw_start.x);
+    draw_rect_f.top = static_cast<float>(draw_start.y);
+    draw_rect_f.right = draw_rect_f.left + static_cast<float>(draw_size.cx);
+    draw_rect_f.bottom = draw_rect_f.top + static_cast<float>(draw_size.cy);
     m_p_device_context->DrawBitmap(p_d2d1_bitmap.Get(), draw_rect_f, opacity);
+    if (clipped)
+        ResetClippedStateIfSet();
 }
 
 void CTaskBarDlgDrawCommon::DrawIcon(HICON hIcon, CPoint start_point, CSize size)
 {
+    if (hIcon == NULL || m_p_device_context == nullptr || sp_icon_cache == nullptr
+        || size.cx < 0 || size.cy < 0)
+        return;
+
     auto p_d2d1_bitmap = sp_icon_cache->GetCachedIcon(hIcon);
     if (!p_d2d1_bitmap) {
         // 如果缓存获取失败（极少发生），直接创建
         p_d2d1_bitmap = ResourceBitmapCreator<HICON>::Create(m_p_device_context, hIcon);
     }
+    if (!p_d2d1_bitmap)
+        return;
     D2D1_RECT_F draw_rect_f{};
     draw_rect_f.left = static_cast<float>(start_point.x);
     draw_rect_f.top = static_cast<float>(start_point.y);
@@ -1815,21 +1974,36 @@ void CTaskBarDlgDrawCommon::DrawIcon(HICON hIcon, CPoint start_point, CSize size
     }
     else
     {
-        draw_rect_f.right = static_cast<float>(start_point.x + size.cx);
-        draw_rect_f.bottom = static_cast<float>(start_point.y + size.cy);
+        if (size.cx < 0 || size.cy < 0)
+            return;
+        draw_rect_f.right = static_cast<float>(start_point.x) + static_cast<float>(size.cx);
+        draw_rect_f.bottom = static_cast<float>(start_point.y) + static_cast<float>(size.cy);
     }
     m_p_device_context->DrawBitmap(p_d2d1_bitmap.Get(), draw_rect_f);
 }
 
 CDC* CTaskBarDlgDrawCommon::GetDC()
 {
+    if (m_p_window_support == nullptr)
+        return nullptr;
+    const auto size = m_p_window_support->GetSize();
+    if (size.width == 0 || size.height == 0)
+        return nullptr;
     auto& ref_gdi_interop_object = m_gdi_interop_object.Get();
+    if (ref_gdi_interop_object.m_gdi_interop_cdc.GetSafeHdc() == NULL)
+        return nullptr;
     return &ref_gdi_interop_object.m_gdi_interop_cdc;
 }
 
 void CTaskBarDlgDrawCommon::GetTextExtent(const wchar_t* lpszString, int& w, int& h)
 {
+    w = 0;
+    h = 0;
+    if (lpszString == nullptr || m_p_window_support == nullptr)
+        return;
     CDC* pDC = GetDC();
+    if (pDC == nullptr || pDC->GetSafeHdc() == NULL)
+        return;
     CSize size = pDC->GetTextExtent(lpszString);
     w = size.cx;
     h = size.cy;
@@ -1902,7 +2076,11 @@ auto CTaskBarDlgDrawBuffer::GetDefaultBlendFunctionPointer() noexcept
 
 CTaskBarDlgDrawCommon::CGdiInteropObject::CGdiInteropObject(D2D1_SIZE_U size)
 {
-    m_gdi_interop_cdc.CreateCompatibleDC(NULL);
+    if (!m_gdi_interop_cdc.CreateCompatibleDC(NULL))
+    {
+        throw std::runtime_error{
+            TRAFFICMONITOR_ERROR_STR("Create GDI interop DC failed.")};
+    }
     auto bitmap_info = TaskBarDlgUser32DrawTextHook::Details::GetArgb32BitmapInfo(size.width, size.height);
     m_gdi_interop_hbitmap = ::CreateDIBSection(
         m_gdi_interop_cdc,
@@ -1911,28 +2089,61 @@ CTaskBarDlgDrawCommon::CGdiInteropObject::CGdiInteropObject(D2D1_SIZE_U size)
         &m_p_gdi_interop_hbitmap_data,
         NULL,
         0);
+    if (m_gdi_interop_hbitmap == nullptr || m_p_gdi_interop_hbitmap_data == nullptr)
+    {
+        m_gdi_interop_cdc.DeleteDC();
+        throw std::runtime_error{
+            TRAFFICMONITOR_ERROR_STR("Create GDI interop bitmap failed.")};
+    }
     m_gdi_interop_old_hbitmap = m_gdi_interop_cdc.SelectObject(m_gdi_interop_hbitmap);
+    if (m_gdi_interop_old_hbitmap == nullptr || m_gdi_interop_old_hbitmap == HGDI_ERROR)
+    {
+        ::DeleteObject(m_gdi_interop_hbitmap);
+        m_gdi_interop_hbitmap = nullptr;
+        m_gdi_interop_cdc.DeleteDC();
+        throw std::runtime_error{
+            TRAFFICMONITOR_ERROR_STR("Select GDI interop bitmap failed.")};
+    }
     ::SetBkColor(m_gdi_interop_cdc, TRANSPARENT);
-    auto gdi_no_modified_alpha_dc = DrawCommonHelper::Get1x1AlphaEqual1DC();
-    ::BLENDFUNCTION blend_function{
-        AC_SRC_OVER,
-        0,
-        0xFF,
-        AC_SRC_ALPHA};
-    ::AlphaBlend(
-        m_gdi_interop_cdc,
-        0, 0,
-        size.width, size.height,
-        gdi_no_modified_alpha_dc,
-        0, 0,
-        1, 1,
-        blend_function);
+    try
+    {
+        auto gdi_no_modified_alpha_dc = DrawCommonHelper::Get1x1AlphaEqual1DC();
+        ::BLENDFUNCTION blend_function{
+            AC_SRC_OVER,
+            0,
+            0xFF,
+            AC_SRC_ALPHA};
+        if (!::AlphaBlend(
+                m_gdi_interop_cdc,
+                0, 0,
+                size.width, size.height,
+                gdi_no_modified_alpha_dc,
+                0, 0,
+                1, 1,
+                blend_function))
+        {
+            throw std::runtime_error{
+                TRAFFICMONITOR_ERROR_STR("Initialize GDI interop bitmap alpha failed.")};
+        }
+    }
+    catch (...)
+    {
+        m_gdi_interop_cdc.SelectObject(m_gdi_interop_old_hbitmap);
+        ::DeleteObject(m_gdi_interop_hbitmap);
+        m_gdi_interop_hbitmap = nullptr;
+        m_gdi_interop_cdc.DeleteDC();
+        throw;
+    }
 }
 
 CTaskBarDlgDrawCommon::CGdiInteropObject::~CGdiInteropObject()
 {
-    m_gdi_interop_cdc.SelectObject(m_gdi_interop_old_hbitmap);
-    ::DeleteObject(m_gdi_interop_hbitmap);
+    if (m_gdi_interop_old_hbitmap != nullptr && m_gdi_interop_old_hbitmap != HGDI_ERROR)
+        m_gdi_interop_cdc.SelectObject(m_gdi_interop_old_hbitmap);
+    if (m_gdi_interop_hbitmap != nullptr)
+        ::DeleteObject(m_gdi_interop_hbitmap);
+    m_gdi_interop_hbitmap = nullptr;
+    m_gdi_interop_cdc.DeleteDC();
 }
 
 CTaskBarDlgDrawBufferUseDComposition::CTaskBarDlgDrawBufferUseDComposition(CD2D1DeviceContextWindowSupport& ref_d2d1_device_context_support)

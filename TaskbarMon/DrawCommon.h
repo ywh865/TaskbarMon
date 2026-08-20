@@ -20,7 +20,8 @@ public:
     void SetBackColor(COLORREF back_color, BYTE alpha = 255) override { m_back_color = back_color; }
     void SetTextColor(const COLORREF text_color, BYTE alpha = 255) override
     {
-        m_pDC->SetTextColor(text_color);
+        if (m_pDC != nullptr && m_pDC->GetSafeHdc() != NULL)
+            m_pDC->SetTextColor(text_color);
     }
 
     void DrawWindowText(CRect rect, LPCTSTR lpszString, COLORREF color, Alignment align = Alignment::LEFT, bool draw_back_ground = false, bool multi_line = false, BYTE alpha = 255) override; //在指定的矩形区域内绘制文本

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "IDrawCommon.h"
 
 //用于双缓冲绘图的类
@@ -8,29 +8,34 @@ public:
     CDrawDoubleBuffer(CDC* pDC, CRect rect)
         : m_pDC(pDC), m_rect(rect)
     {
-        if (m_pDC != nullptr)
+        if (m_pDC != nullptr && m_pDC->GetSafeHdc() != NULL
+            && rect.Width() > 0 && rect.Height() > 0
+            && m_memDC.CreateCompatibleDC(m_pDC)
+            && m_memBitmap.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height()))
         {
-            m_memDC.CreateCompatibleDC(NULL);
-            m_memBitmap.CreateCompatibleBitmap(pDC, rect.Width(), rect.Height());
             m_pOldBit = m_memDC.SelectObject(&m_memBitmap);
+            m_ready = m_pOldBit != nullptr;
         }
     }
 
     ~CDrawDoubleBuffer()
     {
-        if (m_pDC != nullptr)
+        if (m_ready)
         {
-            m_pDC->BitBlt(m_rect.left, m_rect.top, m_rect.Width(), m_rect.Height(), &m_memDC, 0, 0, SRCCOPY);
+            if (m_pDC != nullptr && m_pDC->GetSafeHdc() != NULL)
+                m_pDC->BitBlt(m_rect.left, m_rect.top, m_rect.Width(), m_rect.Height(), &m_memDC, 0, 0, SRCCOPY);
             m_memDC.SelectObject(m_pOldBit);
-            m_memBitmap.DeleteObject();
-            m_memDC.DeleteDC();
         }
+        m_memBitmap.DeleteObject();
+        m_memDC.DeleteDC();
     }
 
     CDC* GetMemDC()
     {
-        return &m_memDC;
+        return m_ready ? &m_memDC : nullptr;
     }
+
+    bool IsValid() const noexcept { return m_ready; }
 
 private:
     CDC* m_pDC{};
@@ -38,6 +43,7 @@ private:
     CBitmap m_memBitmap;
     CBitmap* m_pOldBit{};
     CRect m_rect;
+    bool m_ready{false};
 };
 
 namespace DrawCommonHelper
@@ -80,6 +86,6 @@ namespace DrawCommonHelper
 
     //修正位图中文本部分的Alpha通道
     //使用了UpdateLayeredWindow后，使用GDI绘制的文本也会变得透明，此函数会遍历bitmap中alpha值为0，但是不在alpha_points中的像素，将其修正为正确的alpha值
-    void FixBitmapTextAlpha(HBITMAP hBitmap, BYTE alpha, std::set<Point> alpha_points);
+    void FixBitmapTextAlpha(HBITMAP hBitmap, BYTE alpha, const std::set<Point>& alpha_points);
 };
 

@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "TaskbarMon.h"
+#include <memory>
 #include "TrafficMonitorDlg.h"
 #include "core/ConfigStore.h"
 #include "crashtool.h"
@@ -35,6 +36,86 @@ END_MESSAGE_MAP()
 
 
 CTaskbarMonApp* CTaskbarMonApp::self = NULL;
+
+namespace
+{
+#ifndef WITHOUT_TEMPERATURE
+    struct OpenHardwareMonitorInitializationRequest
+    {
+        uint64_t generation{};
+        unsigned int enabled_items{};
+    };
+#endif
+
+    bool ReadRegistryStringValue(CRegKey& key, LPCTSTR value_name, wstring& value)
+    {
+        value.clear();
+
+        // CRegKey reports this count in TCHARs. Keep a small, explicit limit
+        // so the extra sentinel below cannot overflow or allocate unbounded
+        // memory when the registry value is malformed.
+        constexpr ULONG kMaxRegistryStringCharacters = 32768;
+        ULONG character_count{};
+        const LONG size_result = key.QueryStringValue(value_name, nullptr, &character_count);
+        if (size_result != ERROR_SUCCESS && size_result != ERROR_MORE_DATA)
+            return false;
+        if (character_count == 0 || character_count > kMaxRegistryStringCharacters)
+            return false;
+
+        const ULONG queried_character_count = character_count;
+        const ULONG buffer_character_count = queried_character_count + 1;
+        vector<wchar_t> buffer(static_cast<size_t>(buffer_character_count), L'\0');
+
+        character_count = buffer_character_count;
+        if (key.QueryStringValue(value_name, buffer.data(), &character_count) != ERROR_SUCCESS)
+            return false;
+
+        // The value can change between the sizing query and the read. Do not
+        // consume a value larger than the validated initial bound. The final
+        // zero-initialized element is only a sentinel; it is never read as
+        // registry data.
+        if (character_count == 0 || character_count > queried_character_count)
+            return false;
+
+        size_t string_length{};
+        const size_t returned_character_count = static_cast<size_t>(character_count);
+        while (string_length < returned_character_count && buffer[string_length] != L'\0')
+            ++string_length;
+        value.assign(buffer.data(), string_length);
+        return true;
+    }
+
+    wstring StripSurroundingQuotes(wstring value)
+    {
+        if (value.size() >= 2 && value.front() == L'\"' && value.back() == L'\"')
+            return value.substr(1, value.size() - 2);
+        return value;
+    }
+
+    bool SameWindowsPath(const wstring& left, const wstring& right)
+    {
+        return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
+    }
+
+    bool GetCurrentModulePath(wstring& path)
+    {
+        std::vector<wchar_t> buffer(MAX_PATH);
+        while (buffer.size() <= 32768)
+        {
+            const DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+            if (length == 0)
+                return false;
+            if (length < buffer.size())
+            {
+                path.assign(buffer.data(), length);
+                return true;
+            }
+            buffer.resize(buffer.size() * 2);
+        }
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return false;
+    }
+}
 
 
 // CTaskbarMonApp 构造
@@ -122,7 +203,7 @@ void CTaskbarMonApp::LoadGlobalConfig()
 {
     bool portable_mode_default{ false };
     wstring global_cfg_path{ m_module_dir + L"global_cfg.ini" };
-    if (!CCommon::FileExist(global_cfg_path.c_str()))       //如果global_cfg.ini不存在，则根据AppData/Roaming/TrafficMonitor目录下是否存在config.ini来判断配置文件的保存位置
+    if (!CCommon::FileExist(global_cfg_path.c_str()))       //如果global_cfg.ini不存在，则根据AppData/Roaming/TaskbarMon目录下是否存在config.ini来判断配置文件的保存位置
     {
         portable_mode_default = !CCommon::FileExist((m_appdata_dir + L"config.ini").c_str());
     }
@@ -181,7 +262,12 @@ void CTaskbarMonApp::DPIFromWindow(CWnd* pWnd)
 {
     CWindowDC dc(pWnd);
     HDC hDC = dc.GetSafeHdc();
-    m_dpi = GetDeviceCaps(hDC, LOGPIXELSY);
+    if (hDC != nullptr)
+    {
+        const int dpi = GetDeviceCaps(hDC, LOGPIXELSY);
+        if (dpi > 0)
+            m_dpi = dpi;
+    }
 }
 
 void CTaskbarMonApp::CheckUpdate(bool message)
@@ -240,9 +326,9 @@ void CTaskbarMonApp::CheckUpdate(bool message)
         else
             contents_lan = contents_en;
         if (contents_lan.empty())
-            info.Format(CCommon::LoadText(IDS_UPDATE_AVLIABLE), version.c_str());
+            info = CCommon::LoadTextFormat(IDS_UPDATE_AVLIABLE, { version });
         else
-            info.Format(CCommon::LoadText(IDS_UPDATE_AVLIABLE2), version.c_str(), contents_lan.c_str());
+            info = CCommon::LoadTextFormat(IDS_UPDATE_AVLIABLE2, { version, contents_lan });
 
         if (AfxMessageBox(info, MB_YESNO | MB_ICONQUESTION) == IDYES)
         {
@@ -258,29 +344,51 @@ void CTaskbarMonApp::CheckUpdate(bool message)
 
 void CTaskbarMonApp::CheckUpdateInThread(bool message)
 {
-    AfxBeginThread(CheckUpdateThreadFunc, (LPVOID)message);
-}
+    // Update checks intentionally fail closed until this project owns an
+    // authenticated release manifest.  Do this on the UI thread so a manual
+    // check never opens an MFC message box from a worker thread.
+    CUpdateHelper update_helper;
+    if (!update_helper.IsUpdateCheckSupported())
+    {
+        if (message)
+            AfxMessageBox(CCommon::LoadText(IDS_CHECK_UPDATE_FAILD), MB_OK | MB_ICONWARNING);
+        return;
+    }
 
-UINT CTaskbarMonApp::CheckUpdateThreadFunc(LPVOID lpParam)
-{
-    CCommon::SetThreadLanguage(theApp.m_general_data.language.language_id);     //设置线程语言
-#ifndef _DEBUG      //DEBUG下不在启动时检查更新
-    theApp.CheckUpdate(lpParam);        //检查更新
-#endif
-    return 0;
+    // A future project-owned update channel must provide a worker-to-UI
+    // result callback. Do not run the legacy implementation on a worker: it
+    // displays MFC dialogs and would violate UI-thread affinity.
+    if (message)
+        AfxMessageBox(CCommon::LoadText(IDS_CHECK_UPDATE_FAILD), MB_OK | MB_ICONWARNING);
 }
 
 UINT CTaskbarMonApp::InitOpenHardwareMonitorLibThreadFunc(LPVOID lpParam)
 {
 #ifndef WITHOUT_TEMPERATURE
-    CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
-    theApp.m_pMonitor = OpenHardwareMonitorApi::CreateInstance();
-    if (theApp.m_pMonitor == nullptr)
+    std::unique_ptr<OpenHardwareMonitorInitializationRequest> request(
+        static_cast<OpenHardwareMonitorInitializationRequest*>(lpParam));
+    if (request == nullptr || request->enabled_items == 0)
+        return 0;
+
+    // Initialization can block in the managed hardware library. Keep it out
+    // of the application lock, then publish only if the UI has not changed the
+    // requested hardware configuration in the meantime.
+    const auto monitor = OpenHardwareMonitorApi::CreateInstance();
+    if (monitor == nullptr)
     {
-        AfxMessageBox(OpenHardwareMonitorApi::GetErrorMessage().c_str(), MB_ICONERROR | MB_OK);
+        ::OutputDebugStringW(L"TaskbarMon: OpenHardwareMonitor initialization failed.\n");
+        return 0;
     }
-    //设置硬件监控的启用状态
-    theApp.UpdateOpenHardwareMonitorEnableState();
+
+    CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
+    if (request->generation != theApp.m_hardware_monitor_generation.load(std::memory_order_acquire))
+        return 0;
+
+    monitor->SetCpuEnable((request->enabled_items & HI_CPU) != 0);
+    monitor->SetGpuEnable((request->enabled_items & HI_GPU) != 0);
+    monitor->SetHddEnable((request->enabled_items & HI_HDD) != 0);
+    monitor->SetMainboardEnable((request->enabled_items & HI_MBD) != 0);
+    theApp.m_pMonitor = monitor;
 #endif
     return 0;
 }
@@ -318,26 +426,18 @@ bool CTaskbarMonApp::GetAutoRun(wstring* auto_run_path, bool task_scheduler)
             //打开注册表“Software\\Microsoft\\Windows\\CurrentVersion\\Run”失败，则返回false
             return false;
         }
-        wchar_t buff[256];
-        ULONG size{ 256 };
-        if (key.QueryStringValue(APP_NAME, buff, &size) == ERROR_SUCCESS)       //如果找到了“TrafficMonitor”键
-        {
-            if (auto_run_path != nullptr)
-            {
-                //保存路径
-                *auto_run_path = buff;
-                //去掉前后的引号
-                if (auto_run_path->front() == L'\"')
-                    *auto_run_path = auto_run_path->substr(1);
-                if (auto_run_path->back() = L'\"')
-                    auto_run_path->pop_back();
-            }
-            return (m_module_path_reg == buff); //如果“TrafficMonitor”的值是当前程序的路径，就返回true，否则返回false
-        }
-        else
-        {
-            return false;       //没有找到“TrafficMonitor”键，返回false
-        }
+        wstring registered_path;
+        if (!ReadRegistryStringValue(key, APP_NAME, registered_path))
+            return false;
+
+        const wstring executable_path = StripSurroundingQuotes(registered_path);
+        if (auto_run_path != nullptr)
+            *auto_run_path = executable_path;
+
+        // A value with our display name may belong to another installation or
+        // have been modified. It is not an active TaskbarMon autorun entry
+        // unless it resolves to this executable.
+        return SameWindowsPath(executable_path, m_module_path);
     }
 }
 
@@ -353,7 +453,8 @@ bool CTaskbarMonApp::SetAutoRunByRegistry(bool auto_run)
     if (auto_run)       //写入注册表项
     {
         //通过注册表设置开机自启动项时删除计划任务中的自启动项
-        SetAutoRunByTaskScheduler(false);
+        if (!SetAutoRunByTaskScheduler(false))
+            return false;
 
         if (key.SetStringValue(APP_NAME, m_module_path_reg.c_str()) != ERROR_SUCCESS)
         {
@@ -363,11 +464,13 @@ bool CTaskbarMonApp::SetAutoRunByRegistry(bool auto_run)
     }
     else        //删除注册表项
     {
-        //删除前先检查注册表项是否存在，如果不存在，则直接返回
-        wchar_t buff[256];
-        ULONG size{ 256 };
-        if (key.QueryStringValue(APP_NAME, buff, &size) != ERROR_SUCCESS)
-            return false;
+        // Only remove an entry that points at this executable. Never delete
+        // a same-named entry created by another installation or application.
+        wstring registered_path;
+        if (!ReadRegistryStringValue(key, APP_NAME, registered_path))
+            return true;
+        if (!SameWindowsPath(StripSurroundingQuotes(registered_path), m_module_path))
+            return true;
         if (key.DeleteValue(APP_NAME) != ERROR_SUCCESS)
         {
             AfxMessageBox(CCommon::LoadText(IDS_AUTORUN_DELETE_FAILED), MB_OK | MB_ICONWARNING);
@@ -379,15 +482,23 @@ bool CTaskbarMonApp::SetAutoRunByRegistry(bool auto_run)
 
 bool CTaskbarMonApp::SetAutoRunByTaskScheduler(bool auto_run)
 {
-    bool succeed = delete_auto_start_task_for_this_user();     //先删除开机自启动
-    if (auto_run)
-    {
-        //通过计划任务设置开机自启动项时删除注册表中的自启动项
-        SetAutoRunByRegistry(false);
+    if (!auto_run)
+        return delete_auto_start_task_for_this_user();
 
-        succeed = create_auto_start_task_for_this_user(true);
-    }
-    return succeed;
+    // Create and verify the scheduled task before disabling the registry
+    // fallback. This avoids losing a working autorun entry on scheduler
+    // failure, and the helper refuses to replace an unverified same-name
+    // task.
+    if (!create_auto_start_task_for_this_user())
+        return false;
+
+    if (SetAutoRunByRegistry(false))
+        return true;
+
+    // Keep the two mechanisms mutually exclusive. The helper deletes only a
+    // task whose full definition still matches this executable and user.
+    delete_auto_start_task_for_this_user();
+    return false;
 }
 
 CString CTaskbarMonApp::GetSystemInfoString()
@@ -530,9 +641,14 @@ BOOL CTaskbarMonApp::InitInstance()
     AfxRegisterClass(&wc);
 
     //设置配置文件的路径
-    wchar_t path[MAX_PATH];
-    GetModuleFileNameW(NULL, path, MAX_PATH);
-    m_module_path = path;
+    if (!GetCurrentModulePath(m_module_path))
+    {
+        ::MessageBoxW(nullptr,
+            L"TaskbarMon could not determine its executable path safely. The application will not start.",
+            L"TaskbarMon",
+            MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
     if (m_module_path.find(L' ') != wstring::npos)
     {
         //如果路径中有空格，则在程序路径前后添加双引号
@@ -544,9 +660,32 @@ BOOL CTaskbarMonApp::InitInstance()
     {
         m_module_path_reg = m_module_path;
     }
-    m_module_dir = CCommon::GetModuleDir();
+    const size_t module_directory_separator = m_module_path.find_last_of(L"\\/");
+    if (module_directory_separator == wstring::npos)
+    {
+        ::MessageBoxW(nullptr,
+            L"TaskbarMon could not determine its executable directory safely. The application will not start.",
+            L"TaskbarMon",
+            MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
+    m_module_dir = m_module_path.substr(0, module_directory_separator + 1);
     m_system_dir = CCommon::GetSystemDir();
-    m_appdata_dir = CCommon::GetAppDataConfigDir();
+    if (!CCommon::GetAppDataConfigDir(m_appdata_dir))
+    {
+        ::MessageBoxW(nullptr,
+            L"TaskbarMon could not access its per-user configuration directory. The application will not start.",
+            L"TaskbarMon",
+            MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
+    if (!CCommon::MigrateLegacyAppDataConfig(m_appdata_dir))
+    {
+        ::MessageBoxW(nullptr,
+            L"TaskbarMon could not fully migrate legacy TrafficMonitor files. The original files were left unchanged.",
+            L"TaskbarMon",
+            MB_OK | MB_ICONWARNING);
+    }
 
     LoadGlobalConfig();
 
@@ -600,41 +739,56 @@ BOOL CTaskbarMonApp::InitInstance()
     m_show_dot_net_notinstalled_tip = other_settings.show_dot_net_notinstalled_tip;
     LPCTSTR mutex_name{};
 #ifdef _DEBUG
-    mutex_name = _T("TrafficMonitor-e8Ahk24HP6JC8hDy");
+    mutex_name = _T("Local\\TaskbarMon-e8Ahk24HP6JC8hDy");
 #else
-    mutex_name = _T("TrafficMonitor-1419J3XLKL1w8OZc");
+    mutex_name = _T("Local\\TaskbarMon-1419J3XLKL1w8OZc");
 #endif
-    HANDLE hMutex = ::CreateMutex(NULL, TRUE, mutex_name);
-    if (hMutex != NULL)
+    m_instance_mutex = ::CreateMutex(nullptr, FALSE, mutex_name);
+    const DWORD mutex_error = GetLastError();
+    if (m_instance_mutex == nullptr)
     {
-        if (GetLastError() == ERROR_ALREADY_EXISTS)
+        ::MessageBoxW(nullptr,
+            L"TaskbarMon could not create its single-instance guard. The application will not start.",
+            L"TaskbarMon",
+            MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
+    if (mutex_error == ERROR_ALREADY_EXISTS)
+    {
+        ::CloseHandle(m_instance_mutex);
+        m_instance_mutex = nullptr;
+
+        //char buff[128];
+        //string cmd_line_str{ CCommon::UnicodeToStr(cmd_line.c_str()) };
+        //sprintf_s(buff, "when_start=%d, m_no_multistart_warning=%d, cmd_line=%s", when_start, m_no_multistart_warning, cmd_line_str.c_str());
+        //CCommon::WriteLog(buff, _T(".\\start.log"));
+        if (!m_no_multistart_warning)
         {
-            //char buff[128];
-            //string cmd_line_str{ CCommon::UnicodeToStr(cmd_line.c_str()) };
-            //sprintf_s(buff, "when_start=%d, m_no_multistart_warning=%d, cmd_line=%s", when_start, m_no_multistart_warning, cmd_line_str.c_str());
-            //CCommon::WriteLog(buff, _T(".\\start.log"));
-            if (!m_no_multistart_warning)
+            //查找已存在 TaskbarMon 进程的主窗口的句柄
+            HWND exist_handel = ::FindWindow(APP_CLASS_NAME, NULL);
+            if (exist_handel != NULL)
             {
-                //查找已存在TrafficMonitor进程的主窗口的句柄
-                HWND exist_handel = ::FindWindow(APP_CLASS_NAME, NULL);
-                if (exist_handel != NULL)
-                {
-                    //弹出“TrafficMonitor已在运行”对话框
-                    CAppAlreadyRuningDlg dlg(exist_handel);
-                    dlg.DoModal();
-                }
-                else
-                {
-                    AfxMessageBox(CCommon::LoadText(IDS_AN_INSTANCE_RUNNING));
-                }
+                //弹出“TaskbarMon 已在运行”对话框
+                CAppAlreadyRuningDlg dlg(exist_handel);
+                dlg.DoModal();
             }
-            return FALSE;
+            else
+            {
+                AfxMessageBox(CCommon::LoadText(IDS_AN_INSTANCE_RUNNING));
+            }
         }
+        return FALSE;
     }
 
     //初始化GDI+
     Gdiplus::GdiplusStartupInput gdiplusStartupInput;
-    GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, NULL);
+    if (Gdiplus::GdiplusStartup(&m_gdiplusToken, &gdiplusStartupInput, nullptr) != Gdiplus::Ok)
+    {
+        m_gdiplusToken = 0;
+        ::MessageBoxW(nullptr, L"TaskbarMon could not initialize GDI+.", L"TaskbarMon",
+                      MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
 
     //从ini文件载入设置
     LoadConfig();
@@ -651,9 +805,15 @@ BOOL CTaskbarMonApp::InitInstance()
     // 将它设置为包括所有要在应用程序中使用的
     // 公共控件类。
     InitCtrls.dwICC = ICC_WIN95_CLASSES;
-    InitCommonControlsEx(&InitCtrls);
+    if (!InitCommonControlsEx(&InitCtrls))
+    {
+        ::MessageBoxW(nullptr, L"TaskbarMon could not initialize Windows common controls.",
+                      L"TaskbarMon", MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
 
-    CWinApp::InitInstance();
+    if (!CWinApp::InitInstance())
+        return FALSE;
 
 
     AfxEnableControlContainer();
@@ -744,10 +904,28 @@ BOOL CTaskbarMonApp::InitInstance()
     return FALSE;
 }
 
+void CTaskbarMonApp::InvalidateOpenHardwareInitialization()
+{
+#ifndef WITHOUT_TEMPERATURE
+    m_hardware_monitor_generation.fetch_add(1, std::memory_order_acq_rel);
+#endif
+}
+
 void CTaskbarMonApp::InitOpenHardwareLibInThread()
 {
 #ifndef WITHOUT_TEMPERATURE
-    AfxBeginThread(InitOpenHardwareMonitorLibThreadFunc, NULL);
+    auto request = std::make_unique<OpenHardwareMonitorInitializationRequest>();
+    request->generation = m_hardware_monitor_generation.fetch_add(1, std::memory_order_acq_rel) + 1;
+    request->enabled_items = m_general_data.hardware_monitor_item;
+    if (request->enabled_items == 0)
+        return;
+
+    if (AfxBeginThread(InitOpenHardwareMonitorLibThreadFunc, request.get()) == nullptr)
+    {
+        ::OutputDebugStringW(L"TaskbarMon: unable to start OpenHardwareMonitor initialization worker.\n");
+        return;
+    }
+    request.release();
 #endif
 }
 
@@ -755,13 +933,14 @@ void CTaskbarMonApp::InitOpenHardwareLibInThread()
 void CTaskbarMonApp::UpdateOpenHardwareMonitorEnableState()
 {
 #ifndef WITHOUT_TEMPERATURE
+    const unsigned int enabled_items = m_general_data.hardware_monitor_item;
+    CSingleLock sync(&m_minitor_lib_critical, TRUE);
     if (m_pMonitor != nullptr)
     {
-        CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
-        m_pMonitor->SetCpuEnable(m_general_data.IsHardwareEnable(HI_CPU));
-        m_pMonitor->SetGpuEnable(m_general_data.IsHardwareEnable(HI_GPU));
-        m_pMonitor->SetHddEnable(m_general_data.IsHardwareEnable(HI_HDD));
-        m_pMonitor->SetMainboardEnable(m_general_data.IsHardwareEnable(HI_MBD));
+        m_pMonitor->SetCpuEnable((enabled_items & HI_CPU) != 0);
+        m_pMonitor->SetGpuEnable((enabled_items & HI_GPU) != 0);
+        m_pMonitor->SetHddEnable((enabled_items & HI_HDD) != 0);
+        m_pMonitor->SetMainboardEnable((enabled_items & HI_MBD) != 0);
     }
 #endif
 }
@@ -851,61 +1030,46 @@ void CTaskbarMonApp::SetThemeColor(COLORREF color)
 
 void CTaskbarMonApp::OnHelp()
 {
-    // TODO: 在此添加命令处理程序代码
-    CString help_url;
-    if (m_str_table.IsSimplifiedChinese())
-        help_url = _T("https://github.com/zhongyang219/TrafficMonitor/wiki");
-    else
-        help_url = _T("https://github.com/zhongyang219/TrafficMonitor/wiki/Home_en");
-    ShellExecute(NULL, _T("open"), help_url, NULL, NULL, SW_SHOW);
+    // Do not send TaskbarMon users to an upstream project's mutable docs.
+    // The fork's repository is the only currently supported help endpoint.
+    ShellExecuteW(nullptr, L"open", L"https://github.com/ywh865/TaskbarMon", nullptr, nullptr, SW_SHOW);
 }
 
 
 void CTaskbarMonApp::OnFrequentyAskedQuestions()
 {
-    // TODO: 在此添加命令处理程序代码
-    CString url_domain;
-    if (static_cast<CUpdateHelper::UpdateSource>(m_general_data.update_source) == CUpdateHelper::UpdateSource::GiteeSource)
-        url_domain = _T("gitee.com");
-    else
-        url_domain = _T("github.com");
-    CString file_name;
-    if (m_str_table.IsSimplifiedChinese())
-        file_name = _T("Help.md");
-    else
-        file_name = _T("Help_en-us.md");
-    CString url;
-    url.Format(_T("https://%s/zhongyang219/TrafficMonitor/blob/master/%s"), url_domain.GetString(), file_name.GetString());
-    ShellExecute(NULL, _T("open"), url, NULL, NULL, SW_SHOW);
+    ShellExecuteW(nullptr, L"open", L"https://github.com/ywh865/TaskbarMon", nullptr, nullptr, SW_SHOW);
 }
 
 
 void CTaskbarMonApp::OnUpdateLog()
 {
-    // TODO: 在此添加命令处理程序代码
-    CString url_domain;
-    if (static_cast<CUpdateHelper::UpdateSource>(m_general_data.update_source) == CUpdateHelper::UpdateSource::GiteeSource)
-        url_domain = _T("gitee.com");
-    else
-        url_domain = _T("github.com");
-    wstring language_tag = m_str_table.GetLanguageInfo().bcp_47;
-    CString file_name;
-    if (language_tag == L"zh-CN")
-        file_name = _T("update_log.md");
-    else if (language_tag == L"zh-TW")
-        file_name = _T("update_log_zh-tw.md");
-    else
-        file_name = _T("update_log_en-us.md");
-    CString url;
-    url.Format(_T("https://%s/zhongyang219/TrafficMonitor/blob/master/UpdateLog/%s"), url_domain.GetString(), file_name.GetString());
-    ShellExecute(NULL, _T("open"), url, NULL, NULL, SW_SHOW);
+    ShellExecuteW(nullptr, L"open", L"https://github.com/ywh865/TaskbarMon", nullptr, nullptr, SW_SHOW);
 }
 
 
 int CTaskbarMonApp::ExitInstance()
 {
+    InvalidateOpenHardwareInitialization();
+#ifndef WITHOUT_TEMPERATURE
+    {
+        CSingleLock sync(&m_minitor_lib_critical, TRUE);
+        m_pMonitor.reset();
+    }
+#endif
+
     // 释放GDI+
-    Gdiplus::GdiplusShutdown(m_gdiplusToken);
+    if (m_gdiplusToken != 0)
+    {
+        Gdiplus::GdiplusShutdown(m_gdiplusToken);
+        m_gdiplusToken = 0;
+    }
+
+    if (m_instance_mutex != nullptr)
+    {
+        ::CloseHandle(m_instance_mutex);
+        m_instance_mutex = nullptr;
+    }
 
     return CWinApp::ExitInstance();
 }

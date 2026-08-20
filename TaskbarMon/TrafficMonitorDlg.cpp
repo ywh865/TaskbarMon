@@ -20,6 +20,13 @@
 #define new DEBUG_NEW
 #endif
 
+namespace
+{
+    constexpr UINT_PTR kTaskbarRestoreRetryTimer = 0xD101;
+    constexpr UINT_PTR kCloseRetryTimer = 0xD102;
+    constexpr UINT kRetryIntervalMs = 500;
+    constexpr DWORD kMonitorThreadExitTimeoutMs = 2000;
+}
 
 
 // CTrafficMonitorDlg 对话框
@@ -40,11 +47,15 @@ CTrafficMonitorDlg::CTrafficMonitorDlg(CWnd* pParent /*=NULL*/)
 
 CTrafficMonitorDlg::~CTrafficMonitorDlg()
 {
-    if (m_tBarDlg != nullptr)
-    {
-        delete m_tBarDlg;
-        m_tBarDlg = nullptr;
-    }
+    // OnClose normally joins the worker before MFC starts destroying this
+    // object. Keep the same invariant for all unexpected teardown paths.
+    ExitMonitorThread(INFINITE);
+
+    // Explorer recovery is only safe while the owner HWND and its retry
+    // timers still exist. PrepareForDestroy() must have completed it before
+    // this destructor is reached; trying (and failing) here used to discard
+    // the only object that could verify the restoration.
+    ASSERT(m_tBarDlg == nullptr);
 
     ::ReleaseDC(NULL, m_desktop_dc);
 
@@ -106,6 +117,7 @@ BEGIN_MESSAGE_MAP(CTrafficMonitorDlg, CDialog)
     ON_COMMAND(ID_SHOW_NOTIFY_ICON, &CTrafficMonitorDlg::OnShowNotifyIcon)
     ON_WM_DESTROY()
     ON_COMMAND(ID_SHOW_TASK_BAR_WND, &CTrafficMonitorDlg::OnShowTaskBarWnd)
+    ON_COMMAND(ID_APP_EXIT, &CTrafficMonitorDlg::OnClose)
     ON_COMMAND(ID_APP_ABOUT, &CTrafficMonitorDlg::OnAppAbout)
     ON_COMMAND(ID_SHOW_CPU_MEMORY2, &CTrafficMonitorDlg::OnShowCpuMemory2)
     ON_REGISTERED_MESSAGE(m_WM_TASKBARCREATED, &CTrafficMonitorDlg::OnTaskBarCreated)
@@ -117,6 +129,7 @@ BEGIN_MESSAGE_MAP(CTrafficMonitorDlg, CDialog)
     ON_MESSAGE(WM_TASKBAR_MENU_POPED_UP, &CTrafficMonitorDlg::OnTaskbarMenuPopedUp)
     ON_COMMAND(ID_SHOW_NET_SPEED, &CTrafficMonitorDlg::OnShowNetSpeed)
     ON_WM_QUERYENDSESSION()
+    ON_MESSAGE(WM_ENDSESSION, &CTrafficMonitorDlg::OnEndSessionMessage)
     ON_MESSAGE(WM_DPICHANGED, &CTrafficMonitorDlg::OnDpichanged)
     ON_MESSAGE(WM_TASKBAR_WND_CLOSED, &CTrafficMonitorDlg::OnTaskbarWndClosed)
     ON_MESSAGE(WM_MONITOR_INFO_UPDATED, &CTrafficMonitorDlg::OnMonitorInfoUpdated)
@@ -174,7 +187,7 @@ void CTrafficMonitorDlg::IniConnectionMenu(CMenu* pMenu)
         }
 
         CString connection_descr;
-        const auto& connections = m_monitor_service.Connections();
+        const auto connections = m_monitor_service.ConnectionsSnapshot();
         for (size_t i{}; i < connections.size(); i++)
         {
             connection_descr = CCommon::StrToUnicode(connections[i].description.c_str()).c_str();
@@ -195,36 +208,60 @@ void CTrafficMonitorDlg::IniTaskBarConnectionMenu()
 
 void CTrafficMonitorDlg::SetConnectionMenuState(CMenu* pMenu)
 {
-    int item_count = static_cast<int>(m_monitor_service.Connections().size()) + 1;
+    const auto network_state = m_monitor_service.GetNetworkStateSnapshot();
+    const int item_count = static_cast<int>(network_state.connections.size()) + 1;
+    const int selected_index = network_state.selected_index;
     if (theApp.m_cfg_data.m_select_all)
         pMenu->CheckMenuRadioItem(0, item_count, 1, MF_BYPOSITION | MF_CHECKED);
-    else if (theApp.m_cfg_data.m_auto_select)       //m_auto_select为true时为自动选择，选中菜单的第1项
+    else if (theApp.m_cfg_data.m_auto_select)
         pMenu->CheckMenuRadioItem(0, item_count, 0, MF_BYPOSITION | MF_CHECKED);
-    else        //m_auto_select为false时非自动选择，根据m_connection_selected的值选择对应的项
-        pMenu->CheckMenuRadioItem(0, item_count, m_monitor_service.SelectedIndex() + 2, MF_BYPOSITION | MF_CHECKED);
+    else
+        pMenu->CheckMenuRadioItem(0, item_count, selected_index + 2, MF_BYPOSITION | MF_CHECKED);
 
-    //没有设置为“选择全部”时，将当前选择项设置为默认菜单项（加粗显示）
     if (!theApp.m_cfg_data.m_select_all)
-        pMenu->SetDefaultItem(m_monitor_service.SelectedIndex() + 2, TRUE);
+        pMenu->SetDefaultItem(selected_index + 2, TRUE);
     else
         pMenu->SetDefaultItem(-1, TRUE);
 }
 
-void CTrafficMonitorDlg::CloseTaskBarWnd()
+bool CTrafficMonitorDlg::CloseTaskBarWnd()
 {
-    if (m_tBarDlg != nullptr)
+    if (m_tBarDlg == nullptr)
     {
-        if (IsTaskbarWndValid())
-            m_tBarDlg->OnCancel();
-        delete m_tBarDlg;
-        m_tBarDlg = nullptr;
-        theApp.m_taskbar_data.update_layered_window_error_code = 0;
+        KillTimer(kTaskbarRestoreRetryTimer);
+        return true;
     }
+
+    // CloseAndRestore verifies every captured Explorer mutation. A failure
+    // leaves the dialog alive so the next retry can restore the same state.
+    if (!m_tBarDlg->CloseAndRestore())
+    {
+        ScheduleTaskbarRestoreRetry();
+        return false;
+    }
+
+    if (IsTaskbarWndValid())
+        m_tBarDlg->OnCancel();
+    delete m_tBarDlg;
+    m_tBarDlg = nullptr;
+    theApp.m_taskbar_data.update_layered_window_error_code = 0;
+    KillTimer(kTaskbarRestoreRetryTimer);
+    return true;
 }
 
 void CTrafficMonitorDlg::OpenTaskBarWnd()
 {
-    // 强制初始化theApp.m_is_windows11_taskbar的值
+    // A pending process close may only restore/tear down existing state; it
+    // must never create a new Explorer attachment.
+    if (m_closeInProgress)
+        return;
+
+    // Never replace an instance that may still be responsible for restoring
+    // Explorer state.
+    if (m_tBarDlg != nullptr)
+        return;
+
+    // Refresh the cached Windows 11 taskbar detection before selecting a host.
     theApp.CheckWindows11Taskbar();
     if (theApp.m_win_version.IsWine())
         m_tBarDlg = new CWineTaskbarDlg();
@@ -235,43 +272,71 @@ void CTrafficMonitorDlg::OpenTaskBarWnd()
 
     CSupportedRenderEnums supported_render_enums{};
     CTaskBarDlg::DisableRenderFeatureIfNecessary(supported_render_enums);
-    auto render_type = supported_render_enums.GetAutoFitEnum();
-    // WS_EX_LAYERED 和 WS_EX_NOREDIRECTIONBITMAP 可以共存，见微软示例代码
-    // https://github.com/microsoft/Windows-classic-samples/blob/7cbd99ac1d2b4a0beffbaba29ea63d024ceff700/Samples/DynamicDPI/cpp/SampleDesktopWindow.cpp#L179
-    // 但是WS_EX_NOREDIRECTIONBITMAP似乎会导致UpdateLayeredWindowIndirect失败
+    const auto render_type = supported_render_enums.GetAutoFitEnum();
+    BOOL created{};
     switch (render_type)
     {
         using namespace DrawCommonHelper;
     case RenderType::D2D1_WITH_DCOMPOSITION:
-        m_tBarDlg->Create(IDD_TASK_BAR_DIALOG_NOREDIRECTIONBITMAP, this);
+        created = m_tBarDlg->Create(IDD_TASK_BAR_DIALOG_NOREDIRECTIONBITMAP, this);
         break;
-    // 包括RenderType::D2D1在内的其他值
     default:
-        m_tBarDlg->Create(IDD_TASK_BAR_DIALOG, this);
+        created = m_tBarDlg->Create(IDD_TASK_BAR_DIALOG, this);
         break;
     }
+
+    if (!created)
+    {
+        // Create can fail after the dialog has already captured taskbar state.
+        // Preserve it for retry if that state cannot yet be verified restored.
+        if (!m_tBarDlg->CloseAndRestore())
+        {
+            ScheduleTaskbarRestoreRetry();
+            return;
+        }
+        if (IsTaskbarWndValid())
+            m_tBarDlg->OnCancel();
+        delete m_tBarDlg;
+        m_tBarDlg = nullptr;
+        return;
+    }
+
     m_tBarDlg->ShowWindow(SW_SHOW);
-    //m_tBarDlg->ShowInfo();
-    //IniTaskBarConnectionMenu();
+}
+
+void CTrafficMonitorDlg::ScheduleTaskbarRestoreRetry()
+{
+    if (GetSafeHwnd() != NULL)
+        SetTimer(kTaskbarRestoreRetryTimer, kRetryIntervalMs, NULL);
+}
+
+void CTrafficMonitorDlg::ScheduleCloseRetry()
+{
+    if (GetSafeHwnd() != NULL)
+        SetTimer(kCloseRetryTimer, kRetryIntervalMs, NULL);
 }
 
 void CTrafficMonitorDlg::AddNotifyIcon()
 {
-    if (theApp.m_cfg_data.m_show_task_bar_wnd)
-        CloseTaskBarWnd();
-    //添加通知栏图标
+    const bool reopen_taskbar = theApp.m_cfg_data.m_show_task_bar_wnd;
+    if (reopen_taskbar && !CloseTaskBarWnd())
+        return;
+
+    // Add the notification-area icon.
     ::Shell_NotifyIcon(NIM_ADD, &m_ntIcon);
-    if (theApp.m_cfg_data.m_show_task_bar_wnd)
+    if (reopen_taskbar)
         OpenTaskBarWnd();
 }
 
 void CTrafficMonitorDlg::DeleteNotifyIcon()
 {
-    if (theApp.m_cfg_data.m_show_task_bar_wnd)
-        CloseTaskBarWnd();
-    //删除通知栏图标
+    const bool reopen_taskbar = theApp.m_cfg_data.m_show_task_bar_wnd;
+    if (reopen_taskbar && !CloseTaskBarWnd())
+        return;
+
+    // Remove the notification-area icon.
     ::Shell_NotifyIcon(NIM_DELETE, &m_ntIcon);
-    if (theApp.m_cfg_data.m_show_task_bar_wnd)
+    if (reopen_taskbar)
         OpenTaskBarWnd();
 }
 
@@ -341,13 +406,12 @@ void CTrafficMonitorDlg::UpdateNotifyIconTip()
 void CTrafficMonitorDlg::SaveHistoryTraffic()
 {
     // 使用增量保存，只更新第一行和今天的记录，减少I/O操作
-    m_monitor_service.HistoryFile().SaveTodayOnly();
+    m_monitor_service.SaveHistoryTraffic(true);
 }
 
-void CTrafficMonitorDlg::SaveHistoryTrafficFull()
+bool CTrafficMonitorDlg::SaveHistoryTrafficFull()
 {
-    // 完整保存，用于程序退出时确保所有数据都保存
-    m_monitor_service.HistoryFile().Save();
+    return m_monitor_service.SaveHistoryTraffic(false);
 }
 
 void CTrafficMonitorDlg::LoadHistoryTraffic()
@@ -355,23 +419,15 @@ void CTrafficMonitorDlg::LoadHistoryTraffic()
     auto& history_traffic = m_monitor_service.HistoryFile();
     history_traffic.Load();
     CHistoryTrafficFile backup_file(theApp.m_history_traffic_path + L".bak");
-    backup_file.LoadSize();     //读取备份文件中流量记录的数量
-    
-    // 如果备份文件中流量记录的数量大于当前的数量，尝试从备份文件中恢复
-    if (backup_file.Size() > history_traffic.Size())
+    backup_file.Load();
+
+    const size_t size_before = history_traffic.Size();
+    if (backup_file.IsLoadValid() && history_traffic.IsLoadFailed())
     {
-        size_t size_before = history_traffic.Size();
-        backup_file.Load();     //加载备份文件（会清理"未来"的记录）
-        size_t backup_size_after_load = backup_file.Size();  //加载后实际的记录数（可能因为清理"未来"记录而减少）
-        
-        // 加载后，如果备份文件的记录数仍然大于当前文件，才进行恢复
-        if (backup_size_after_load > history_traffic.Size())
+        if (history_traffic.RecoverFromBackup(backup_file))
         {
-            history_traffic.Merge(backup_file, true);
-            size_t size_after = history_traffic.Size();
-            size_t recovered_count = size_after - size_before;  //实际恢复的记录数
-            
-            // 只有当实际恢复了记录时才记录日志
+            const size_t size_after = history_traffic.Size();
+            const size_t recovered_count = size_after > size_before ? size_after - size_before : 0;
             if (recovered_count > 0)
             {
                 CString log_info = CCommon::LoadTextFormat(IDS_HISTORY_TRAFFIC_LOST_ERROR_LOG, { size_before, recovered_count });
@@ -379,13 +435,29 @@ void CTrafficMonitorDlg::LoadHistoryTraffic()
             }
         }
     }
-
-    theApp.m_today_up_traffic = history_traffic.GetTodayUpTraffic();
-    theApp.m_today_down_traffic = history_traffic.GetTodayDownTraffic();
+    else if (backup_file.IsLoadValid())
+    {
+        history_traffic.Merge(backup_file, true);
+        const size_t size_after = history_traffic.Size();
+        const size_t recovered_count = size_after > size_before ? size_after - size_before : 0;
+        if (recovered_count > 0)
+        {
+            CString log_info = CCommon::LoadTextFormat(IDS_HISTORY_TRAFFIC_LOST_ERROR_LOG, { size_before, recovered_count });
+            CCommon::WriteLog(log_info, theApp.m_log_path.c_str());
+        }
+    }
+    // The service owns the sampling baseline. Seed it only after recovery has
+    // merged the final history file and before the monitor worker starts.
+    m_monitor_service.InitializeTodayTrafficFromHistory();
+    const MonitorSnapshot snapshot = m_monitor_service.Snapshot();
+    theApp.m_today_up_traffic = snapshot.today_up_traffic;
+    theApp.m_today_down_traffic = snapshot.today_down_traffic;
 }
 
-void CTrafficMonitorDlg::BackupHistoryTrafficFile()
+void CTrafficMonitorDlg::BackupHistoryTrafficFile(bool history_save_succeeded)
 {
+    if (!history_save_succeeded)
+        return;
     // 确保文件已保存到磁盘
     wstring latest_file_path = theApp.m_history_traffic_path;
     wstring backup_file_path = latest_file_path + L".bak";
@@ -437,6 +509,11 @@ void CTrafficMonitorDlg::ApplySettings(COptionsDlg& optionsDlg)
 
     CGeneralSettingsDlg::CheckTaskbarDisplayItem();
 
+    // The connection rebuild below consults MonitorService::Config. Publish
+    // the new options first so visibility/hidden-interface changes are applied
+    // to this rebuild rather than being deferred until a later refresh.
+    m_monitor_service.ApplyConfig(GetMonitorConfig());
+
     //打开了D2D渲染后自动开启“背景透明”并关闭“根据任务栏颜色自动设置背景色”
     if (d2d_turned_on)
     {
@@ -445,20 +522,21 @@ void CTrafficMonitorDlg::ApplySettings(COptionsDlg& optionsDlg)
     }
 
     //CTaskBarDlg::SaveConfig();
-    if (IsTaskbarWndValid())
+    if (IsTaskbarWndValid() && !m_tBarDlg->IsRestorationPending())
     {
         m_tBarDlg->ApplySettings();
-        //如果更改了任务栏窗口字体或显示的文本，则任务栏窗口可能要变化，于是关闭再打开任务栏窗口
         if (taskbar_changed)
         {
-            CloseTaskBarWnd();
-            OpenTaskBarWnd();
+            if (CloseTaskBarWnd())
+                OpenTaskBarWnd();
         }
-        else
+        else if (IsTaskbarWndValid())
         {
             m_tBarDlg->WidthChanged();
         }
-        m_tBarDlg->ApplyWindowTransparentColor();
+
+        if (IsTaskbarWndValid() && !m_tBarDlg->IsRestorationPending())
+            m_tBarDlg->ApplyWindowTransparentColor();
     }
 
     if (optionsDlg.m_tab2_dlg.IsAutoRunModified())
@@ -485,19 +563,24 @@ void CTrafficMonitorDlg::ApplySettings(COptionsDlg& optionsDlg)
 #ifndef WITHOUT_TEMPERATURE
     if (is_hardware_monitor_item_changed)
     {
+        theApp.InvalidateOpenHardwareInitialization();
         //如果关闭了硬件监控，则析构硬件监控类
         if (theApp.m_general_data.hardware_monitor_item == 0)
         {
             CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
             theApp.m_pMonitor.reset();
         }
-        else if (theApp.m_pMonitor != nullptr)
+        else
         {
-            theApp.UpdateOpenHardwareMonitorEnableState();
-        }
-        else if (IsTemperatureNeeded())
-        {
-            theApp.InitOpenHardwareLibInThread();
+            bool monitor_initialized = false;
+            {
+                CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
+                monitor_initialized = theApp.m_pMonitor != nullptr;
+            }
+            if (monitor_initialized)
+                theApp.UpdateOpenHardwareMonitorEnableState();
+            else if (IsTemperatureNeeded())
+                theApp.InitOpenHardwareLibInThread();
         }
     }
 #endif
@@ -513,8 +596,6 @@ void CTrafficMonitorDlg::ApplySettings(COptionsDlg& optionsDlg)
     }
 
     //同步采样引擎配置
-    m_monitor_service.ApplyConfig(GetMonitorConfig());
-
     theApp.SaveConfig();
     theApp.SaveGlobalConfig();
 }
@@ -584,81 +665,103 @@ bool CTrafficMonitorDlg::IsTemperatureNeeded() const
 // CHardwareDataProvider 实现（封装 OpenHardwareMonitor 访问）
 bool CTrafficMonitorDlg::CHardwareDataProvider::IsAvailable() const
 {
-    CTrafficMonitorDlg* pMainWnd = CTrafficMonitorDlg::Instance();
-    if (pMainWnd == nullptr)
-        return false;
-    return pMainWnd->IsTemperatureNeeded() && theApp.m_pMonitor != nullptr;
+    CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
+    return theApp.m_pMonitor != nullptr;
 }
 
 void CTrafficMonitorDlg::CHardwareDataProvider::Acquire()
 {
-    if (theApp.m_pMonitor == nullptr)
-        return;
-    CString error_info = CCommon::LoadText(IDS_HARDWARE_INFO_ACQUIRE_FAILED_ERROR);
-    CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
-    auto getHardwareInfo = [&]() {
-        __try
+    HardwareSnapshot snapshot;
+    bool acquired = false;
+    {
+        CSingleLock sync(&theApp.m_minitor_lib_critical, TRUE);
+        const auto monitor = theApp.m_pMonitor;
+        if (monitor != nullptr)
         {
-            theApp.m_pMonitor->GetHardwareInfo();
+            auto acquire_hardware_info = [&]() {
+                __try
+                {
+                    monitor->GetHardwareInfo();
+                    snapshot.cpu_temperature = monitor->CpuTemperature();
+                    snapshot.cpu_freq = monitor->CpuFreq();
+                    snapshot.gpu_temperature = monitor->GpuTemperature();
+                    snapshot.hdd_temperature = monitor->HDDTemperature();
+                    snapshot.mainboard_temperature = monitor->MainboardTemperature();
+                    snapshot.gpu_usage = monitor->GpuUsage();
+                    snapshot.all_cpu_temperature = monitor->AllCpuTemperature();
+                    snapshot.all_hdd_temperature = monitor->AllHDDTemperature();
+                    snapshot.all_hdd_usage = monitor->AllHDDUsage();
+                    acquired = true;
+                }
+                __except (EXCEPTION_EXECUTE_HANDLER)
+                {
+                    // Do not show UI while the sampling worker owns the monitor
+                    // lock: shutdown and settings changes can both be waiting on
+                    // the UI thread. The default snapshot marks this sample as
+                    // unavailable and the next timer tick may retry safely.
+                }
+            };
+            acquire_hardware_info();
         }
-        __except (EXCEPTION_EXECUTE_HANDLER)
-        {
-            AfxMessageBox(error_info, MB_ICONERROR | MB_OK);
-        }
-    };
-    getHardwareInfo();
+    }
+
+    m_snapshot = std::move(snapshot);
+    if (!acquired)
+    {
+        if (!m_hardware_acquisition_failed)
+            ::OutputDebugStringW(L"TaskbarMon: hardware monitor acquisition failed.\n");
+        m_hardware_acquisition_failed = true;
+    }
+    else
+    {
+        m_hardware_acquisition_failed = false;
+    }
 }
 
 float CTrafficMonitorDlg::CHardwareDataProvider::CpuTemperature() const
 {
-    return (theApp.m_pMonitor != nullptr) ? theApp.m_pMonitor->CpuTemperature() : -1;
+    return m_snapshot.cpu_temperature;
 }
 
 float CTrafficMonitorDlg::CHardwareDataProvider::CpuFreq() const
 {
-    return (theApp.m_pMonitor != nullptr) ? theApp.m_pMonitor->CpuFreq() : -1;
+    return m_snapshot.cpu_freq;
 }
 
 float CTrafficMonitorDlg::CHardwareDataProvider::GpuTemperature() const
 {
-    return (theApp.m_pMonitor != nullptr) ? theApp.m_pMonitor->GpuTemperature() : -1;
+    return m_snapshot.gpu_temperature;
 }
 
 float CTrafficMonitorDlg::CHardwareDataProvider::HddTemperature() const
 {
-    return (theApp.m_pMonitor != nullptr) ? theApp.m_pMonitor->HDDTemperature() : -1;
+    return m_snapshot.hdd_temperature;
 }
 
 float CTrafficMonitorDlg::CHardwareDataProvider::MainboardTemperature() const
 {
-    return (theApp.m_pMonitor != nullptr) ? theApp.m_pMonitor->MainboardTemperature() : -1;
+    return m_snapshot.mainboard_temperature;
 }
 
 int CTrafficMonitorDlg::CHardwareDataProvider::GpuUsage() const
 {
-    return (theApp.m_pMonitor != nullptr) ? theApp.m_pMonitor->GpuUsage() : -1;
+    return m_snapshot.gpu_usage;
 }
 
 
 std::map<std::wstring, float> CTrafficMonitorDlg::CHardwareDataProvider::AllCpuTemperature() const
 {
-    if (theApp.m_pMonitor == nullptr)
-        return {};
-    return theApp.m_pMonitor->AllCpuTemperature();
+    return m_snapshot.all_cpu_temperature;
 }
 
 std::map<std::wstring, float> CTrafficMonitorDlg::CHardwareDataProvider::AllHddTemperature() const
 {
-    if (theApp.m_pMonitor == nullptr)
-        return {};
-    return theApp.m_pMonitor->AllHDDTemperature();
+    return m_snapshot.all_hdd_temperature;
 }
 
 std::map<std::wstring, float> CTrafficMonitorDlg::CHardwareDataProvider::AllHddUsage() const
 {
-    if (theApp.m_pMonitor == nullptr)
-        return {};
-    return theApp.m_pMonitor->AllHDDUsage();
+    return m_snapshot.all_hdd_usage;
 }
 
 #endif // !WITHOUT_TEMPERATURE
@@ -722,7 +825,11 @@ BOOL CTrafficMonitorDlg::OnInitDialog()
     SetTimer(MAIN_TIMER, 1000, NULL);
 
     SetTimer(MONITOR_TIMER, theApp.m_general_data.monitor_time_span, NULL);
-    AfxBeginThread(MonitorThreadCallback, (LPVOID)this);
+    if (!StartMonitorThread())
+    {
+        KillTimer(MONITOR_TIMER);
+        MessageBox(_T("Unable to start the monitor worker. Monitoring has been disabled."), APP_NAME, MB_ICONERROR | MB_OK);
+    }
 
     //获取启动时的时间
     GetLocalTime(&m_start_time);
@@ -743,82 +850,214 @@ BOOL CTrafficMonitorDlg::OnInitDialog()
 
 
 
+bool CTrafficMonitorDlg::StartMonitorThread()
+{
+    if (m_monitorThread != nullptr)
+        return true;
+
+    m_is_thread_exit.store(false);
+    m_monitor_data_required.store(false);
+    m_monitorWakeEvent.ResetEvent();
+    m_threadExitEvent.ResetEvent();
+    m_monitorNotifyWindow = GetSafeHwnd();
+    {
+        std::lock_guard<std::mutex> lock(m_pendingMonitorSnapshotMutex);
+        m_hasPendingMonitorSnapshot = false;
+        m_pendingMonitorRevision = 0;
+    }
+
+    CWinThread* monitor_thread = AfxBeginThread(
+        MonitorThreadCallback,
+        this,
+        THREAD_PRIORITY_NORMAL,
+        0,
+        CREATE_SUSPENDED);
+    if (monitor_thread == nullptr)
+    {
+        m_monitorNotifyWindow = NULL;
+        return false;
+    }
+
+    monitor_thread->m_bAutoDelete = FALSE;
+    m_monitorThread = monitor_thread;
+    if (m_monitorThread->ResumeThread() == static_cast<DWORD>(-1))
+    {
+        delete m_monitorThread;
+        m_monitorThread = nullptr;
+        m_monitorNotifyWindow = NULL;
+        return false;
+    }
+    return true;
+}
+
+void CTrafficMonitorDlg::RequestMonitorAcquisition()
+{
+    if (m_monitorThread == nullptr || m_is_thread_exit.load())
+        return;
+
+    m_monitor_data_required.store(true);
+    m_monitorWakeEvent.SetEvent();
+}
+
 void CTrafficMonitorDlg::DoMonitorAcquisition()
 {
-    //委托统一采样引擎执行一次完整采样
     m_monitor_service.Sample();
 
-    //将快照数据同步到 App 全局成员（供任务栏窗口/托盘等 UI 读取）
-    const MonitorSnapshot& snapshot = m_monitor_service.Snapshot();
-    theApp.m_in_speed = snapshot.in_speed;
-    theApp.m_out_speed = snapshot.out_speed;
-    theApp.m_cpu_usage = snapshot.cpu_usage;
-    theApp.m_memory_usage = snapshot.memory_usage;
-    theApp.m_used_memory = snapshot.used_memory;
-    theApp.m_total_memory = snapshot.total_memory;
-    theApp.m_cpu_temperature = snapshot.cpu_temperature;
-    theApp.m_cpu_freq = snapshot.cpu_freq;
-    theApp.m_gpu_temperature = snapshot.gpu_temperature;
-    theApp.m_hdd_temperature = snapshot.hdd_temperature;
-    theApp.m_main_board_temperature = snapshot.main_board_temperature;
-    theApp.m_gpu_usage = snapshot.gpu_usage;
-    theApp.m_hdd_usage = snapshot.hdd_usage;
-    theApp.m_today_up_traffic = snapshot.today_up_traffic;
-    theApp.m_today_down_traffic = snapshot.today_down_traffic;
-    //数据修订号（供 UI 脏检测）
-    theApp.m_monitor_revision = m_monitor_service.Revision();
+    // The worker publishes a complete immutable copy. Only the UI thread
+    // consumes it and updates legacy application state.
+    const MonitorSnapshot snapshot = m_monitor_service.Snapshot();
+    const uint64_t revision = m_monitor_service.Revision();
+    {
+        std::lock_guard<std::mutex> lock(m_pendingMonitorSnapshotMutex);
+        m_pendingMonitorSnapshot = snapshot;
+        m_pendingMonitorRevision = revision;
+        m_hasPendingMonitorSnapshot = true;
+    }
 
-    //发送监控信息更新消息
-    SendMessage(WM_MONITOR_INFO_UPDATED);
+    if (m_monitorNotifyWindow != NULL)
+        ::PostMessage(m_monitorNotifyWindow, WM_MONITOR_INFO_UPDATED, 0, 0);
 }
 
 UINT CTrafficMonitorDlg::MonitorThreadCallback(LPVOID dwUser)
 {
-    CTrafficMonitorDlg* pThis = (CTrafficMonitorDlg*)dwUser;
-    while (true)
+    CTrafficMonitorDlg* pThis = static_cast<CTrafficMonitorDlg*>(dwUser);
+    try
     {
-        //获取一次监控数据
-        if (pThis->m_monitor_data_required)
+        while (!pThis->m_is_thread_exit.load())
         {
-            pThis->DoMonitorAcquisition();
-            //获取到监控数据后重置flag
-            pThis->m_monitor_data_required = false;
-        }
-        else
-        {
-            Sleep(10);
-        }
+            const DWORD wait_result = ::WaitForSingleObject(pThis->m_monitorWakeEvent.m_hObject, INFINITE);
+            if (pThis->m_is_thread_exit.load())
+                break;
+            if (wait_result != WAIT_OBJECT_0)
+                break;
 
-        // 检查退出标志
-        if (pThis->m_is_thread_exit)
-        {
-            // 触发事件，通知主线程工作线程已退出
-            pThis->m_threadExitEvent.SetEvent();
-            return 0;
+            if (pThis->m_monitor_data_required.exchange(false))
+                pThis->DoMonitorAcquisition();
         }
     }
+    catch (...)
+    {
+        // A failed sample must still release the main window from the worker
+        // lifetime contract during shutdown.
+        pThis->m_is_thread_exit.store(true);
+    }
 
+    pThis->m_threadExitEvent.SetEvent();
     return 0;
 }
 
-
-void CTrafficMonitorDlg::ExitMonitorThread()
+bool CTrafficMonitorDlg::ExitMonitorThread(DWORD timeout_ms)
 {
-    // 通知线程退出
-    m_is_thread_exit = true;
+    CWinThread* monitor_thread = m_monitorThread;
+    if (monitor_thread == nullptr)
+        return true;
 
-    // 等待线程退出
-    ::WaitForSingleObject(m_threadExitEvent.m_hObject, 1000);
+    m_is_thread_exit.store(true);
+    m_monitor_data_required.store(false);
+    m_monitorWakeEvent.SetEvent();
+
+    if (monitor_thread->m_hThread == NULL ||
+        ::WaitForSingleObject(monitor_thread->m_hThread, timeout_ms) != WAIT_OBJECT_0)
+    {
+        return false;
+    }
+
+    delete monitor_thread;
+    m_monitorThread = nullptr;
+    m_monitorNotifyWindow = NULL;
+    return true;
 }
-
 
 void CTrafficMonitorDlg::OnTimer(UINT_PTR nIDEvent)
 {
     // TODO: 在此添加消息处理程序代码和/或调用默认值
+    if (nIDEvent == kCloseRetryTimer)
+    {
+        KillTimer(kCloseRetryTimer);
+        if (m_closeInProgress)
+        {
+            // Permit the retry to re-enter OnClose while retaining the close
+            // intent, so taskbar recovery cannot trigger a reopen in between.
+            m_closeInProgress = false;
+            OnClose();
+        }
+        return;
+    }
+
+    if (nIDEvent == kTaskbarRestoreRetryTimer)
+    {
+        if (m_tBarDlg == nullptr || !m_tBarDlg->IsRestorationPending())
+        {
+            KillTimer(kTaskbarRestoreRetryTimer);
+        }
+        else if (CloseTaskBarWnd())
+        {
+            if (theApp.m_cfg_data.m_show_task_bar_wnd && !m_closeInProgress)
+                OpenTaskBarWnd();
+        }
+        return;
+    }
+
+    if (nIDEvent == DPI_CHANGE_TIMER)
+    {
+        CRect rect;
+        GetWindowRect(rect);
+        UINT dpi_x{};
+        UINT dpi_y{};
+        if (theApp.DPIFromRect(rect, &dpi_x, &dpi_y))
+            m_pending_dpi = dpi_x;
+
+        if (m_pending_dpi != 0)
+        {
+            TRACE("Dpi changed: %u\n", m_pending_dpi);
+            theApp.SetDPI(m_pending_dpi);
+            if (IsTaskbarWndValid() && !theApp.m_win_version.IsWindows8Point1OrLater())
+            {
+                m_tBarDlg->SetDPI(m_pending_dpi);
+                m_tBarDlg->SetTextFont();
+            }
+        }
+        KillTimer(DPI_CHANGE_TIMER);
+        return;
+    }
+
+    if (nIDEvent == RESTART_TASKBAR_TIMER)
+    {
+        KillTimer(RESTART_TASKBAR_TIMER);
+        if (!m_closeInProgress)
+            PostMessage(WM_REOPEN_TASKBAR_WND, 0, 0);
+        return;
+    }
+
+    if (nIDEvent == INIT_CONNECT_TIMER)
+    {
+        m_monitor_service.InitConnections();
+        if (m_monitor_service.ConsumeDelayedAutoSelectPending())
+            SetTimer(DELAY_TIMER, 5000, NULL);
+
+        ++m_resume_connection_check_times;
+        CString info = CCommon::LoadTextFormat(IDS_RESTORE_FROM_SLEEP_LOG,
+            { m_monitor_service.RestartCount() });
+        CCommon::WriteLog(info, theApp.m_log_path.c_str());
+
+        if (m_monitor_service.ConnectionsSnapshot().empty())
+        {
+            if (m_resume_connection_check_times >= 20)
+            {
+                KillTimer(INIT_CONNECT_TIMER);
+                m_resume_connection_check_times = 0;
+            }
+        }
+        else
+        {
+            KillTimer(INIT_CONNECT_TIMER);
+            m_resume_connection_check_times = 0;
+        }
+        return;
+    }
     if (nIDEvent == MONITOR_TIMER)
     {
-        //通知线程获取监控数据
-        m_monitor_data_required = true;
+        RequestMonitorAcquisition();
     }
 
     if (nIDEvent == MAIN_TIMER)
@@ -853,45 +1092,43 @@ void CTrafficMonitorDlg::OnTimer(UINT_PTR nIDEvent)
         }
 
         //每隔10秒钟检测一次是否可以嵌入任务栏
+        // Retry a failed attach by replacing the bar only after its previous
+        // instance has verified a complete restore.
         if (!theApp.m_win_version.IsWine() && IsTaskbarWndValid() && m_timer_cnt % 10 == 1)
         {
             if (m_tBarDlg->GetCannotInsertToTaskBar() && m_insert_to_taskbar_cnt < MAX_INSERT_TO_TASKBAR_CNT)
             {
-                CloseTaskBarWnd();
-                OpenTaskBarWnd();
-                m_insert_to_taskbar_cnt++;
-                if (m_tBarDlg->GetCannotInsertToTaskBar() && m_insert_to_taskbar_cnt >= WARN_INSERT_TO_TASKBAR_CNT)
+                if (CloseTaskBarWnd())
                 {
-                    //写入错误日志
-                    CString info = CCommon::LoadText(IDS_CONNOT_INSERT_TO_TASKBAR_ERROR_LOG);
-                    info.Replace(_T("<%cnt%>"), CCommon::IntToString(m_insert_to_taskbar_cnt));
-                    info.Replace(_T("<%error_code%>"), CCommon::IntToString(m_tBarDlg->GetErrorCode()));
-                    CCommon::WriteLog(info, theApp.m_log_path.c_str());
-                    if (m_cannot_insert_to_task_bar_warning)      //确保提示信息只弹出一次
+                    OpenTaskBarWnd();
+                    ++m_insert_to_taskbar_cnt;
+                    if (IsTaskbarWndValid() && m_tBarDlg->GetCannotInsertToTaskBar() &&
+                        m_insert_to_taskbar_cnt >= WARN_INSERT_TO_TASKBAR_CNT)
                     {
-                        //弹出错误信息
-                        m_cannot_insert_to_task_bar_warning = false;
-                        MessageBox(CCommon::LoadText(IDS_CONNOT_INSERT_TO_TASKBAR, CCommon::IntToString(m_tBarDlg->GetErrorCode())), NULL, MB_ICONWARNING);
+                        CString info = CCommon::LoadText(IDS_CONNOT_INSERT_TO_TASKBAR_ERROR_LOG);
+                        info.Replace(_T("<%cnt%>"), CCommon::IntToString(m_insert_to_taskbar_cnt));
+                        info.Replace(_T("<%error_code%>"), CCommon::IntToString(m_tBarDlg->GetErrorCode()));
+                        CCommon::WriteLog(info, theApp.m_log_path.c_str());
+                        if (m_cannot_insert_to_task_bar_warning)
+                        {
+                            m_cannot_insert_to_task_bar_warning = false;
+                            MessageBox(CCommon::LoadText(IDS_CONNOT_INSERT_TO_TASKBAR,
+                                CCommon::IntToString(m_tBarDlg->GetErrorCode())), NULL, MB_ICONWARNING);
+                        }
                     }
                 }
             }
-            if (!m_tBarDlg->GetCannotInsertToTaskBar())
-            {
+            if (IsTaskbarWndValid() && !m_tBarDlg->GetCannotInsertToTaskBar())
                 m_insert_to_taskbar_cnt = 0;
-            }
         }
 
-        //检查是否需要弹出鼠标提示
-        //setting_data: 消息提示的设置数据
-        //value: 当前的值
-        //last_value: 传递一个static或可以在此lambda表达式调用结束后继续存在的变量，用于保存上一次的值
-        //notify_time: 传递一个static或可以在此lambda表达式调用结束后继续存在的变量，用于记录上次弹出提示的时间（定时器触发次数）
-        //tip_str: 要提示的消息
-        auto checkNotifyTip = [&](GeneralSettingData::NotifyTipSettings setting_data, int value, int& last_value, int& notify_time, LPCTSTR tip_str)
+        // Notification threshold helper.
+        auto checkNotifyTip = [&]<typename T>(GeneralSettingData::NotifyTipSettings setting_data, T value, T& last_value, int& notify_time, LPCTSTR tip_str)
         {
+            const T threshold = static_cast<T>(setting_data.tip_value);
             if (setting_data.enable)
             {
-                if (last_value < setting_data.tip_value && value >= setting_data.tip_value && (m_timer_cnt - notify_time > static_cast<unsigned int>(theApp.m_notify_interval)))
+                if (last_value < threshold && value >= threshold && (m_timer_cnt - notify_time > static_cast<unsigned int>(theApp.m_notify_interval)))
                 {
                     ShowNotifyTip(CCommon::LoadText(_T("TrafficMonitor "), IDS_NOTIFY, _T("")), tip_str);
                     notify_time = m_timer_cnt;
@@ -902,32 +1139,32 @@ void CTrafficMonitorDlg::OnTimer(UINT_PTR nIDEvent)
 
         //检查是否要弹出内存使用率超出提示
         CString info;
-        info.Format(CCommon::LoadText(IDS_MEMORY_UDAGE_EXCEED, _T(" %d%%!")), theApp.m_memory_usage);
+        info = CCommon::LoadText(IDS_MEMORY_UDAGE_EXCEED) + CCommon::StringFormat(_T(" <%1%>%!"), { theApp.m_memory_usage });
         static int last_memory_usage;
         static int memory_usage_notify_time{ -theApp.m_notify_interval };       //记录上次弹出提示时的时间
         checkNotifyTip(theApp.m_general_data.memory_usage_tip, theApp.m_memory_usage, last_memory_usage, memory_usage_notify_time, info.GetString());
 
         //检查是否要弹出CPU温度使用率超出提示
-        info.Format(CCommon::LoadText(IDS_CPU_TEMPERATURE_EXCEED, _T(" %d°C!")), static_cast<int>(theApp.m_cpu_temperature));
-        static int last_cpu_temp;
+        info = CCommon::LoadText(IDS_CPU_TEMPERATURE_EXCEED) + CCommon::StringFormat(_T(" <%1%>\x2103!"), { static_cast<int>(theApp.m_cpu_temperature) });
+        static float last_cpu_temp;
         static int cpu_temp_notify_time{ -theApp.m_notify_interval };       //记录上次弹出提示时的时间
         checkNotifyTip(theApp.m_general_data.cpu_temp_tip, theApp.m_cpu_temperature, last_cpu_temp, cpu_temp_notify_time, info.GetString());
 
         //检查是否要弹出显卡温度使用率超出提示
-        info.Format(CCommon::LoadText(IDS_GPU_TEMPERATURE_EXCEED, _T(" %d°C!")), static_cast<int>(theApp.m_gpu_temperature));
-        static int last_gpu_temp;
+        info = CCommon::LoadText(IDS_GPU_TEMPERATURE_EXCEED) + CCommon::StringFormat(_T(" <%1%>\x2103!"), { static_cast<int>(theApp.m_gpu_temperature) });
+        static float last_gpu_temp;
         static int gpu_temp_notify_time{ -theApp.m_notify_interval };       //记录上次弹出提示时的时间
         checkNotifyTip(theApp.m_general_data.gpu_temp_tip, theApp.m_gpu_temperature, last_gpu_temp, gpu_temp_notify_time, info.GetString());
 
         //检查是否要弹出硬盘温度使用率超出提示
-        info.Format(CCommon::LoadText(IDS_HDD_TEMPERATURE_EXCEED, _T(" %d°C!")), static_cast<int>(theApp.m_hdd_temperature));
-        static int last_hdd_temp;
+        info = CCommon::LoadText(IDS_HDD_TEMPERATURE_EXCEED) + CCommon::StringFormat(_T(" <%1%>\x2103!"), { static_cast<int>(theApp.m_hdd_temperature) });
+        static float last_hdd_temp;
         static int hdd_temp_notify_time{ -theApp.m_notify_interval };       //记录上次弹出提示时的时间
         checkNotifyTip(theApp.m_general_data.hdd_temp_tip, theApp.m_hdd_temperature, last_hdd_temp, hdd_temp_notify_time, info.GetString());
 
         //检查是否要弹出主板温度使用率超出提示
-        info.Format(CCommon::LoadText(IDS_MBD_TEMPERATURE_EXCEED, _T(" %d°C!")), static_cast<int>(theApp.m_main_board_temperature));
-        static int last_main_board_temp;
+        info = CCommon::LoadText(IDS_MBD_TEMPERATURE_EXCEED) + CCommon::StringFormat(_T(" <%1%>\x2103!"), { static_cast<int>(theApp.m_main_board_temperature) });
+        static float last_main_board_temp;
         static int main_board_temp_notify_time{ -theApp.m_notify_interval };        //记录上次弹出提示时的时间
         checkNotifyTip(theApp.m_general_data.mainboard_temp_tip, theApp.m_main_board_temperature, last_main_board_temp, main_board_temp_notify_time, info.GetString());
 
@@ -1031,7 +1268,8 @@ void CTrafficMonitorDlg::OnTimer(UINT_PTR nIDEvent)
         //根据任务栏颜色自动设置任务栏窗口背景色
         if (theApp.m_taskbar_data.auto_set_background_color && theApp.m_win_version.IsWindows8OrLater()
             && IsTaskbarWndValid() && theApp.m_taskbar_data.transparent_color != 0
-            && !m_is_foreground_fullscreen && theApp.m_taskbar_data.disable_d2d)
+            && !m_is_foreground_fullscreen && theApp.m_taskbar_data.disable_d2d
+            && m_desktop_dc != nullptr)
         {
             CRect rect;
             ::GetWindowRect(m_tBarDlg->GetSafeHwnd(), rect);
@@ -1096,10 +1334,7 @@ void CTrafficMonitorDlg::OnTimer(UINT_PTR nIDEvent)
                 last_taskbar_num = taskbar_num;
                 //延迟一段时间后重启任务栏窗口
                 KillTimer(RESTART_TASKBAR_TIMER);
-                SetTimer(RESTART_TASKBAR_TIMER, 500, [](HWND, UINT, UINT_PTR, DWORD) {
-                    theApp.m_pMainWnd->SendMessage(WM_REOPEN_TASKBAR_WND);
-                    ::KillTimer(theApp.m_pMainWnd->GetSafeHwnd(), RESTART_TASKBAR_TIMER);
-                });
+                SetTimer(RESTART_TASKBAR_TIMER, 500, NULL);
             }
         }
 
@@ -1154,46 +1389,98 @@ void CTrafficMonitorDlg::OnTimer(UINT_PTR nIDEvent)
 
 void CTrafficMonitorDlg::OnNetworkInfo()
 {
-    // TODO: 在此添加命令处理程序代码
-    //弹出“连接详情”对话框
-    CNetworkInfoDlg aDlg(m_monitor_service.Connections(), m_monitor_service.IfTable()->table, m_monitor_service.SelectedIndex());
+    auto network_state = m_monitor_service.GetNetworkStateSnapshot();
+    std::vector<NetWorkConection> valid_connections;
+    valid_connections.reserve(network_state.connections.size());
+    int selected_index = -1;
+    for (size_t source_index = 0; source_index < network_state.connections.size(); ++source_index)
+    {
+        const NetWorkConection& connection = network_state.connections[source_index];
+        if (connection.index < 0 ||
+            static_cast<size_t>(connection.index) >= network_state.interface_rows.size())
+        {
+            continue;
+        }
+
+        if (static_cast<int>(source_index) == network_state.selected_index)
+            selected_index = static_cast<int>(valid_connections.size());
+        valid_connections.push_back(connection);
+    }
+    if (selected_index < 0 && !valid_connections.empty())
+        selected_index = 0;
+
+    MIB_IFROW empty_row{};
+    MIB_IFROW* rows = network_state.interface_rows.empty()
+        ? &empty_row
+        : network_state.interface_rows.data();
+    CNetworkInfoDlg aDlg(valid_connections, rows, network_state.interface_rows.size(), selected_index);
     aDlg.m_start_time = m_start_time;
     aDlg.DoModal();
-    if (m_tBarDlg != nullptr)
-        m_tBarDlg->m_tool_tips.SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);  //重新设置任务栏窗口的提示信息置顶
+    if (IsTaskbarWndValid())
+        m_tBarDlg->m_tool_tips.SetWindowPos(&wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-void CTrafficMonitorDlg::OnClose()
+bool CTrafficMonitorDlg::PrepareForDestroy()
 {
-    // TODO: 在此添加消息处理程序代码和/或调用默认值
+    if (m_destroyWindowAuthorized)
+        return true;
+    if (m_closeInProgress)
+        return false;
+
+    m_closeInProgress = true;
+    KillTimer(MAIN_TIMER);
+    KillTimer(MONITOR_TIMER);
+    KillTimer(TASKBAR_TIMER);
+    KillTimer(DELAY_TIMER);
+    KillTimer(DELETE_NOTIFY_ICON_TIMER);
+    KillTimer(DPI_CHANGE_TIMER);
+    KillTimer(RESTART_TASKBAR_TIMER);
+    KillTimer(INIT_CONNECT_TIMER);
+
+    // Explorer must be restored before any path can destroy this main window.
+    if (!CloseTaskBarWnd())
+    {
+        ScheduleCloseRetry();
+        return false;
+    }
+
+    // The worker can still be using this object and its history file. Do not
+    // continue to MFC destruction unless it has actually terminated.
+    if (!ExitMonitorThread(kMonitorThreadExitTimeoutMs))
+    {
+        ScheduleCloseRetry();
+        return false;
+    }
+
+    KillTimer(kCloseRetryTimer);
     theApp.m_cannot_save_config_warning = true;
     theApp.m_cannot_save_global_config_warning = true;
-    theApp.SaveConfig();    //退出前保存设置到ini文件
+    BackupHistoryTrafficFile(SaveHistoryTrafficFull());
+    theApp.SaveConfig();
     theApp.SaveGlobalConfig();
-    SaveHistoryTrafficFull();  // 退出时使用完整保存，确保所有数据都保存
-    BackupHistoryTrafficFile();
 
-    if (IsTaskbarWndValid())
-        m_tBarDlg->OnCancel();
-
-    //确保在退出前关闭所有窗口
     for (const auto& item : CBaseDialog::AllUniqueHandels())
     {
         ::SendMessage(item.second, WM_COMMAND, IDCANCEL, 0);
     }
 
-    CDialog::OnClose();
+    m_destroyWindowAuthorized = true;
+    return true;
+}
+
+void CTrafficMonitorDlg::OnClose()
+{
+    if (PrepareForDestroy())
+        CDialog::OnClose();
+}
+
+BOOL CTrafficMonitorDlg::DestroyWindow()
+{
+    // MFC modeless destruction can bypass WM_CLOSE. Do not let it tear down
+    // the host until the same preflight has restored Explorer and joined the worker.
+    if (!m_destroyWindowAuthorized && !PrepareForDestroy())
+        return FALSE;
+    return CDialog::DestroyWindow();
 }
 
 
@@ -1201,6 +1488,11 @@ BOOL CTrafficMonitorDlg::OnCommand(WPARAM wParam, LPARAM lParam)
 {
     // TODO: 在此添加专用代码和/或调用基类
     UINT uMsg = LOWORD(wParam);
+    if (uMsg == IDOK || uMsg == IDCANCEL || uMsg == ID_APP_EXIT)
+    {
+        OnClose();
+        return TRUE;
+    }
     if (uMsg == ID_SELECT_ALL_CONNECTION)
     {
         m_monitor_service.SetSelectAll(true);
@@ -1215,7 +1507,7 @@ BOOL CTrafficMonitorDlg::OnCommand(WPARAM wParam, LPARAM lParam)
         theApp.m_cfg_data.m_select_all = false;
         theApp.SaveConfig();
     }
-    if (uMsg > ID_SELECT_ALL_CONNECTION && uMsg <= ID_SELECT_ALL_CONNECTION + m_monitor_service.Connections().size()) //选择了一个网络连接
+    if (uMsg > ID_SELECT_ALL_CONNECTION && uMsg <= ID_SELECT_ALL_CONNECTION + m_monitor_service.ConnectionsSnapshot().size()) //选择了一个网络连接
     {
         int connection_index = uMsg - ID_SELECT_ALL_CONNECTION - 1;
         m_monitor_service.SelectConnection(connection_index);
@@ -1333,13 +1625,29 @@ void CTrafficMonitorDlg::OnShowNotifyIcon()
 
 void CTrafficMonitorDlg::OnDestroy()
 {
-    CDialog::OnDestroy();
+    // WM_DESTROY is already irreversible: recovery and retry must have
+    // completed in PrepareForDestroy(), before MFC begins native teardown.
+    // Do not pretend a failed restoration can be retried after timers and the
+    // owner HWND are gone.
+    ASSERT(m_tBarDlg == nullptr);
 
-    //程序退出时删除通知栏图标
+    // OnClose normally joined the worker. This is intentionally idempotent so
+    // an unexpected destruction path cannot leave the worker with a dangling
+    // CTrafficMonitorDlg pointer.
+    KillTimer(MAIN_TIMER);
+    KillTimer(MONITOR_TIMER);
+    KillTimer(TASKBAR_TIMER);
+    KillTimer(DELAY_TIMER);
+    KillTimer(DELETE_NOTIFY_ICON_TIMER);
+    KillTimer(DPI_CHANGE_TIMER);
+    KillTimer(RESTART_TASKBAR_TIMER);
+    KillTimer(INIT_CONNECT_TIMER);
+    KillTimer(kCloseRetryTimer);
+    KillTimer(kTaskbarRestoreRetryTimer);
+    ExitMonitorThread(INFINITE);
+
     ::Shell_NotifyIcon(NIM_DELETE, &m_ntIcon);
-
-    // 停止监控线程
-    ExitMonitorThread();
+    CDialog::OnDestroy();
 }
 
 
@@ -1375,30 +1683,28 @@ void CTrafficMonitorDlg::OnShowCpuMemory2()
 
 void CTrafficMonitorDlg::OnShowTaskBarWnd()
 {
-    // TODO: 在此添加命令处理程序代码
-    if (m_tBarDlg != nullptr)
+    // Persist the requested state before attempting restoration. If Explorer
+    // needs retries, the retry handler then knows whether to reopen or hide.
+    const bool show_taskbar = !theApp.m_cfg_data.m_show_task_bar_wnd;
+    theApp.m_cfg_data.m_show_task_bar_wnd = show_taskbar;
+
+    if (m_tBarDlg != nullptr && !CloseTaskBarWnd())
     {
-        CloseTaskBarWnd();
+        theApp.SaveConfig();
+        return;
     }
-    if (!theApp.m_cfg_data.m_show_task_bar_wnd)
+
+    if (show_taskbar)
     {
-        theApp.m_cfg_data.m_show_task_bar_wnd = true;
         OpenTaskBarWnd();
     }
-    else
+    else if (!theApp.m_general_data.show_notify_icon && theApp.IsForceShowNotifyIcon())
     {
-        theApp.m_cfg_data.m_show_task_bar_wnd = false;
-        //关闭任务栏窗口后，如果没有显示通知区图标，且没有显示主窗口或设置了鼠标穿透，则将通知区图标显示出来
-        if (!theApp.m_general_data.show_notify_icon && theApp.IsForceShowNotifyIcon())
-        {
-            AddNotifyIcon();
-            theApp.m_general_data.show_notify_icon = true;
-        }
+        AddNotifyIcon();
+        theApp.m_general_data.show_notify_icon = true;
     }
     theApp.SaveConfig();
 }
-
-
 void CTrafficMonitorDlg::OnAppAbout()
 {
     // TODO: 在此添加命令处理程序代码
@@ -1411,34 +1717,20 @@ void CTrafficMonitorDlg::OnAppAbout()
 //当资源管理器重启时会触发此消息
 LRESULT CTrafficMonitorDlg::OnTaskBarCreated(WPARAM wParam, LPARAM lParam)
 {
-    if (m_tBarDlg != nullptr)
-    {
-        CloseTaskBarWnd();
-        if (theApp.m_general_data.show_notify_icon)
-        {
-            //重新添加通知栏图标
-            ::Shell_NotifyIcon(NIM_ADD, &m_ntIcon);
-        }
+    if (m_tBarDlg != nullptr && !CloseTaskBarWnd())
+        return 0;
+
+    if (theApp.m_general_data.show_notify_icon)
+        ::Shell_NotifyIcon(NIM_ADD, &m_ntIcon);
+    if (theApp.m_cfg_data.m_show_task_bar_wnd)
         OpenTaskBarWnd();
-    }
-    else
-    {
-        if (theApp.m_general_data.show_notify_icon)
-            ::Shell_NotifyIcon(NIM_ADD, &m_ntIcon);
-    }
-    return LRESULT();
+    return 0;
 }
-
-
-
-
-
-
 
 void CTrafficMonitorDlg::OnTrafficHistory()
 {
-    // TODO: 在此添加命令处理程序代码
-    CHistoryTrafficDlg historyDlg(m_monitor_service.HistoryFile().GetTraffics());
+    auto history_traffics = m_monitor_service.HistoryTrafficSnapshot();
+    CHistoryTrafficDlg historyDlg(history_traffics);
     historyDlg.DoModal();
 }
 
@@ -1514,75 +1806,126 @@ BOOL CTrafficMonitorDlg::OnQueryEndSession()
     if (!CDialog::OnQueryEndSession())
         return FALSE;
 
-    // TODO:  在此添加专用的查询结束会话代码
-    theApp.SaveConfig();
-    theApp.SaveGlobalConfig();
-    SaveHistoryTrafficFull();  // 系统关机时使用完整保存，确保所有数据都保存
-    BackupHistoryTrafficFile();
-
-    if (theApp.m_debug_log)
+    // QueryEndSession can still be vetoed by another application. Only the
+    // reversible Explorer restore happens here; worker/file teardown waits
+    // for WM_ENDSESSION(TRUE).
+    m_destroyWindowAuthorized = false;
+    m_sessionEndApproved = false;
+    m_closeInProgress = true;
+    if (!CloseTaskBarWnd())
     {
-        CCommon::WriteLog(_T("TrafficMonitor进程已被终止，设置已保存。"), (theApp.m_config_dir + L".\\debug.log").c_str());
+        m_closeInProgress = false;
+        return FALSE;
     }
 
+    m_sessionEndApproved = true;
     return TRUE;
 }
 
-
-
-
-afx_msg LRESULT CTrafficMonitorDlg::OnDpichanged(WPARAM wParam, LPARAM lParam)
+afx_msg LRESULT CTrafficMonitorDlg::OnEndSessionMessage(WPARAM wParam, LPARAM lParam)
 {
-    static int dpi;
-    static CTrafficMonitorDlg* pThis;
-    dpi = LOWORD(wParam);
-    pThis = this;
-
-    //由于窗口在不同DPI的显示器上移动时，会短时间内触发多次DPI更改消息，因此这里在收到消息后延迟一段时间后再处理
-    KillTimer(DPI_CHANGE_TIMER);
-    SetTimer(DPI_CHANGE_TIMER, 500, [](HWND, UINT, UINT_PTR, DWORD) {
-        //根据窗口的位置获取DPI
-        CRect rect;
-        pThis->GetWindowRect(rect);
-        UINT dpi_x, dpi_y;
-        if (theApp.DPIFromRect(rect, &dpi_x, &dpi_y))   //获取成功，则使用根据窗口位置得到的dpi
-            dpi = dpi_x;
-        TRACE("Dpi changed: %d\n", dpi);
-
-        theApp.SetDPI(dpi);
-        //当系统版本小于Windows 8.1时使用原来的行为
-        if (pThis->IsTaskbarWndValid() && !theApp.m_win_version.IsWindows8Point1OrLater())
+    if (wParam != FALSE)
+    {
+        if (m_sessionEndApproved)
         {
-            //为任务栏窗口重新指定DPI
-            pThis->m_tBarDlg->SetDPI(dpi);
-            //根据新的DPI重新设置任务栏窗口字体
-            pThis->m_tBarDlg->SetTextFont();
+            KillTimer(MAIN_TIMER);
+            KillTimer(MONITOR_TIMER);
+            KillTimer(TASKBAR_TIMER);
+            KillTimer(DELAY_TIMER);
+            KillTimer(DELETE_NOTIFY_ICON_TIMER);
+            KillTimer(DPI_CHANGE_TIMER);
+            KillTimer(RESTART_TASKBAR_TIMER);
+            KillTimer(INIT_CONNECT_TIMER);
+            KillTimer(kCloseRetryTimer);
+            KillTimer(kTaskbarRestoreRetryTimer);
+            if (!ExitMonitorThread(INFINITE))
+            {
+                ASSERT(FALSE);
+                return 0;
+            }
+
+            theApp.m_cannot_save_config_warning = true;
+            theApp.m_cannot_save_global_config_warning = true;
+            BackupHistoryTrafficFile(SaveHistoryTrafficFull());
+            theApp.SaveConfig();
+            theApp.SaveGlobalConfig();
+            m_destroyWindowAuthorized = true;
+
+            if (theApp.m_debug_log)
+                CCommon::WriteLog(_T("TaskbarMon session end accepted after state restoration."),
+                    (theApp.m_config_dir + L".\\debug.log").c_str());
         }
+        return 0;
+    }
 
-        pThis->KillTimer(DPI_CHANGE_TIMER);
-    });
-
+    // Windows can cancel a logoff after every application has approved it.
+    // QueryEndSession only closed the bar, so restoring the UI is sufficient;
+    // the worker was deliberately left running.
+    m_destroyWindowAuthorized = false;
+    if (m_sessionEndApproved)
+    {
+        m_sessionEndApproved = false;
+        m_closeInProgress = false;
+        if (theApp.m_cfg_data.m_show_task_bar_wnd)
+            OpenTaskBarWnd();
+    }
     return 0;
 }
 
+afx_msg LRESULT CTrafficMonitorDlg::OnDpichanged(WPARAM wParam, LPARAM lParam)
+{
+    m_pending_dpi = LOWORD(wParam);
+    KillTimer(DPI_CHANGE_TIMER);
+    SetTimer(DPI_CHANGE_TIMER, 500, NULL);
+    return 0;
+}
 
 afx_msg LRESULT CTrafficMonitorDlg::OnTaskbarWndClosed(WPARAM wParam, LPARAM lParam)
 {
     theApp.m_cfg_data.m_show_task_bar_wnd = false;
-    //关闭任务栏窗口后，如果没有显示通知区图标，且没有显示主窗口或设置了鼠标穿透，则将通知区图标显示出来
     if (!theApp.m_general_data.show_notify_icon && theApp.IsForceShowNotifyIcon())
     {
         AddNotifyIcon();
         theApp.m_general_data.show_notify_icon = true;
     }
+
+    // CTaskBarDlg sends this synchronously before it destroys its HWND. Defer
+    // deletion until its OnClose stack has returned, then only clean up.
+    PostMessage(WM_REOPEN_TASKBAR_WND, 0, 0);
     return 0;
 }
 
-
-
 afx_msg LRESULT CTrafficMonitorDlg::OnMonitorInfoUpdated(WPARAM wParam, LPARAM lParam)
 {
-    //更新任务栏窗口鼠标提示
+    MonitorSnapshot snapshot;
+    uint64_t revision{};
+    {
+        std::lock_guard<std::mutex> lock(m_pendingMonitorSnapshotMutex);
+        if (!m_hasPendingMonitorSnapshot)
+            return 0;
+        snapshot = m_pendingMonitorSnapshot;
+        revision = m_pendingMonitorRevision;
+    }
+
+    // Legacy consumers render from the UI-thread copy only; the worker never
+    // writes these fields directly.
+    theApp.m_in_speed = snapshot.in_speed;
+    theApp.m_out_speed = snapshot.out_speed;
+    theApp.m_cpu_usage = snapshot.cpu_usage;
+    theApp.m_memory_usage = snapshot.memory_usage;
+    theApp.m_used_memory = snapshot.used_memory;
+    theApp.m_total_memory = snapshot.total_memory;
+    theApp.m_cpu_temperature = snapshot.cpu_temperature;
+    theApp.m_cpu_freq = snapshot.cpu_freq;
+    theApp.m_gpu_temperature = snapshot.gpu_temperature;
+    theApp.m_hdd_temperature = snapshot.hdd_temperature;
+    theApp.m_main_board_temperature = snapshot.main_board_temperature;
+    theApp.m_gpu_usage = snapshot.gpu_usage;
+    theApp.m_hdd_usage = snapshot.hdd_usage;
+    theApp.m_today_up_traffic = snapshot.today_up_traffic;
+    theApp.m_today_down_traffic = snapshot.today_down_traffic;
+    theApp.m_monitor_revision = revision;
+
     if (IsTaskbarWndValid())
         m_tBarDlg->UpdateToolTips();
     return 0;
@@ -1601,15 +1944,16 @@ LRESULT CTrafficMonitorDlg::OnDisplaychange(WPARAM wParam, LPARAM lParam)
 
 LRESULT CTrafficMonitorDlg::OnReopenTaksbarWnd(WPARAM wParam, LPARAM lParam)
 {
-    CloseTaskBarWnd();
-    OpenTaskBarWnd();
+    if (CloseTaskBarWnd() && theApp.m_cfg_data.m_show_task_bar_wnd)
+        OpenTaskBarWnd();
     return 0;
 }
 
 
 void CTrafficMonitorDlg::OnOpenTaskManager()
 {
-    ShellExecuteW(NULL, _T("open"), (theApp.m_system_dir + L"\\Taskmgr.exe").c_str(), NULL, NULL, SW_NORMAL);       //打开任务管理器
+    if (!theApp.m_system_dir.empty())
+        ShellExecuteW(NULL, _T("open"), (theApp.m_system_dir + L"\\Taskmgr.exe").c_str(), NULL, NULL, SW_NORMAL);       //打开任务管理器
 }
 
 
@@ -1667,43 +2011,14 @@ afx_msg LRESULT CTrafficMonitorDlg::OnTabletQuerysystemgesturestatus(WPARAM wPar
 
 UINT CTrafficMonitorDlg::OnPowerBroadcast(UINT nPowerEvent, LPARAM nEventData)
 {
-    // 系统从休眠恢复
     if (nPowerEvent == PBT_APMRESUMESUSPEND)
     {
-        //延迟一段时间后重新初始化网络连接
+        m_resume_connection_check_times = 0;
         KillTimer(INIT_CONNECT_TIMER);
-        static CTrafficMonitorDlg* pThis = this;
-        static int check_times = 0;
-        SetTimer(INIT_CONNECT_TIMER, 10000, [](HWND, UINT, UINT_PTR, DWORD) {
-            pThis->m_monitor_service.InitConnections();
-
-            //重新初始化连接后，如果需要延迟自动选择，则设置延迟定时器
-            if (pThis->m_monitor_service.ConsumeDelayedAutoSelectPending())
-                pThis->SetTimer(DELAY_TIMER, 5000, NULL);
-            check_times++;
-
-            //写入日志
-            CString info = CCommon::LoadTextFormat(IDS_RESTORE_FROM_SLEEP_LOG, {pThis->m_monitor_service.RestartCount() });
-            CCommon::WriteLog(info, theApp.m_log_path.c_str());
-
-            //如果连接为空，定时器继续运行，每隔一段时间重新初始化连接
-            if (pThis->m_monitor_service.Connections().size() == 0)
-            {
-                //超过20次，结束定时器
-                if (check_times >= 20)
-                    pThis->KillTimer(INIT_CONNECT_TIMER);
-            }
-            //成功获取到连接，结束定时器
-            else
-            {
-                pThis->KillTimer(INIT_CONNECT_TIMER);
-                check_times = 0;
-            }
-        });
+        SetTimer(INIT_CONNECT_TIMER, 10000, NULL);
     }
     return CDialog::OnPowerBroadcast(nPowerEvent, nEventData);
 }
-
 
 void CTrafficMonitorDlg::OnColorizationColorChanged(DWORD dwColorizationColor, BOOL bOpacity)
 {

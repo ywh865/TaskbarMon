@@ -3,6 +3,28 @@
 #include "Common.h"
 #include "IniHelper.h"
 #include "TaskbarMon.h"
+
+namespace
+{
+    constexpr size_t kMaxExternalLanguageFiles = 32;
+    constexpr size_t kMaxLanguageListEntries = 128;
+    constexpr size_t kMaxLanguageDisplayNameLength = 128;
+    constexpr size_t kMaxLanguageBcp47Length = 128;
+    constexpr size_t kMaxLanguageFontNameLength = 128;
+    constexpr size_t kMaxLanguageTranslatorLength = 256;
+    constexpr size_t kMaxLanguageTranslatorUrlLength = 2048;
+
+    bool IsValidExternalLanguageInfo(const LanguageInfo& language_info)
+    {
+        return !language_info.bcp_47.empty()
+            && language_info.display_name.size() <= kMaxLanguageDisplayNameLength
+            && language_info.bcp_47.size() <= kMaxLanguageBcp47Length
+            && language_info.default_font_name.size() <= kMaxLanguageFontNameLength
+            && language_info.translator.size() <= kMaxLanguageTranslatorLength
+            && language_info.translator_url.size() <= kMaxLanguageTranslatorUrlLength;
+    }
+}
+
 CStrTable::CStrTable()
 {
 }
@@ -84,24 +106,35 @@ void CStrTable::Init()
 #else
     language_dir = theApp.m_module_dir + L"language";
 #endif
-    CCommon::GetFiles((language_dir + L"\\*.ini").c_str(), files);
+    CCommon::GetFiles((language_dir + L"\\*.ini").c_str(), files, kMaxExternalLanguageFiles);
+    std::set<wstring> language_codes;
+    for (const auto& language_info : m_language_list)
+        language_codes.insert(language_info.bcp_47);
+
+    bool external_current_language_loaded{};
     for (const wstring& file_name : files)
     {
         std::wstring file_path{ language_dir + file_name };
         CIniHelper ini_file(file_path, true);
         LanguageInfo language_info;
         LanguageInfoFromIni(language_info, ini_file);
-        language_info.language_id = LocaleNameToLCID(language_info.bcp_47.c_str(), 0);  //根据语言bcp-47代码获取语言id
+        if (!IsValidExternalLanguageInfo(language_info))
+            continue;
+
+        const LCID locale_id = LocaleNameToLCID(language_info.bcp_47.c_str(), 0);
+        if (locale_id == 0)
+            continue;
+        language_info.language_id = LANGIDFROMLCID(locale_id);  //根据语言bcp-47代码获取语言id
         //从外部语言文件读取到当前语言，先从外部语言文件加载
-        if (language_info == theApp.m_general_data.language)
+        if (!external_current_language_loaded && language_info == theApp.m_general_data.language)
         {
             m_language_info = language_info;
             ReadStringtableFronIni(ini_file);
+            external_current_language_loaded = true;
         }
 
-        //如果语言不在m_language_list，添加到该列表
-        auto iter = std::find(m_language_list.begin(), m_language_list.end(), language_info);
-        if (iter == m_language_list.end())
+        //只按 BCP-47 代码保留一项，避免重复的外部文件使去重退化为 O(n²)。
+        if (language_codes.insert(language_info.bcp_47).second && m_language_list.size() < kMaxLanguageListEntries)
             m_language_list.push_back(language_info);
     }
 }
@@ -137,12 +170,10 @@ const wstring& CStrTable::LoadText(const wstring& key, const wstring& section)
 
 void CStrTable::ReadStringtableFronIni(const CIniHelper& ini)
 {
-    std::set<std::wstring> sections{ L"general", L"text", L"menu" };
-    auto section_list = ini.GetAllAppName(L"");
-    for (const auto& section : section_list)
-        sections.insert(section);
-
-    for (const auto& section : sections)
+    // Language files only define these sections.  Enumerating arbitrary
+    // section names lets a malformed external INI turn this into repeated
+    // whole-file scans and unbounded string-table growth.
+    for (const wchar_t* section : { L"general", L"text", L"menu" })
     {
         auto& value_map = m_string_table[section];
         ini.GetAllKeyValues(section, value_map);

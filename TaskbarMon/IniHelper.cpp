@@ -2,44 +2,181 @@
 #include "IniHelper.h"
 #include "Common.h"
 
+#include <limits>
+
+namespace
+{
+    constexpr std::streamoff kMaxIniFileSize = 1024 * 1024;
+    constexpr size_t kMaxIniStringListItems = 256;
+    constexpr size_t kMaxIniStringListItemLength = 256;
+    constexpr size_t kMaxIniSections = 128;
+    constexpr size_t kMaxIniSectionNameLength = 128;
+    constexpr size_t kMaxIniKeyValuesPerSection = 1024;
+    constexpr size_t kMaxIniLinesPerSection = 4096;
+    constexpr size_t kMaxIniKeyLength = 256;
+    constexpr size_t kMaxIniValueLength = 4096;
+    constexpr size_t kUtf8BomLength = 3;
+
+    bool IsMissingFileError(DWORD error)
+    {
+        return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+    }
+
+    bool TryDecodeIniText(const string& encoded, bool utf8, wstring& decoded)
+    {
+        if (encoded.empty())
+        {
+            decoded.clear();
+            return true;
+        }
+
+        if (encoded.size() > static_cast<size_t>((std::numeric_limits<int>::max)()))
+            return false;
+
+        const UINT code_page = utf8 ? CP_UTF8 : CP_ACP;
+        const DWORD flags = utf8 ? MB_ERR_INVALID_CHARS : 0;
+        const int source_length = static_cast<int>(encoded.size());
+        const int decoded_length = ::MultiByteToWideChar(code_page, flags, encoded.data(), source_length, nullptr, 0);
+        if (decoded_length <= 0)
+            return false;
+
+        wstring converted(static_cast<size_t>(decoded_length), L'\0');
+        if (::MultiByteToWideChar(code_page, flags, encoded.data(), source_length, &converted[0], decoded_length) != decoded_length)
+            return false;
+
+        decoded.swap(converted);
+        return true;
+    }
+
+    bool TryEncodeIniText(const wstring& decoded, bool utf8, string& encoded)
+    {
+        if (decoded.empty())
+        {
+            encoded.clear();
+            return true;
+        }
+
+        if (decoded.size() > static_cast<size_t>((std::numeric_limits<int>::max)()))
+            return false;
+
+        const UINT code_page = utf8 ? CP_UTF8 : CP_ACP;
+        const DWORD flags = utf8 ? WC_ERR_INVALID_CHARS : 0;
+        const int source_length = static_cast<int>(decoded.size());
+        const int encoded_length = ::WideCharToMultiByte(code_page, flags, decoded.data(), source_length, nullptr, 0, nullptr, nullptr);
+        if (encoded_length <= 0)
+            return false;
+
+        string converted(static_cast<size_t>(encoded_length), '\0');
+        if (::WideCharToMultiByte(code_page, flags, decoded.data(), source_length, &converted[0], encoded_length, nullptr, nullptr) != encoded_length)
+            return false;
+
+        encoded.swap(converted);
+        return true;
+    }
+}
+
 CIniHelper::CIniHelper(const wstring& file_path, bool force_utf8)
 {
     m_file_path = file_path;
-    ifstream file_stream{ file_path };
-    if (!file_stream.is_open())
+    if (m_file_path.empty())
+    {
+        m_load_failed = true;
         return;
-    // 获取文件大小
-    file_stream.seekg(0, std::ios::end);
-    size_t file_size = static_cast<size_t>(file_stream.tellg());
-    file_stream.seekg(0, std::ios::beg);
-    // 读取文件内容
-    string ini_str;
-    ini_str.resize(file_size + 1);
-    file_stream.read(&ini_str[0], file_size);
-    // 检查并添加末尾的空行
-    if (!ini_str.empty() && ini_str.back() != L'\n')
-        ini_str.push_back(L'\n');
-    bool is_utf8;
-    if (force_utf8)
-    {
-        is_utf8 = true;
     }
-    else
+
+    const DWORD attributes = ::GetFileAttributesW(m_file_path.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES)
     {
-        //判断文件是否是utf8编码
-        if (ini_str.size() >= 3 && ini_str[0] == -17 && ini_str[1] == -69 && ini_str[2] == -65)
+        if (IsMissingFileError(::GetLastError()))
+            return; // A missing file is the only case in which Save may create one.
+        m_load_failed = true;
+        return;
+    }
+    if ((attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_DEVICE | FILE_ATTRIBUTE_REPARSE_POINT)) != 0)
+    {
+        // Configuration is written back atomically. Refuse a directory,
+        // device, or reparse point so a user-controlled link cannot redirect
+        // that replacement outside the application data directory.
+        m_load_failed = true;
+        return;
+    }
+
+    try
+    {
+        ifstream file_stream{ m_file_path, std::ios::binary | std::ios::ate };
+        if (!file_stream.is_open())
         {
-            //如果有UTF8的BOM，则删除BOM
-            is_utf8 = true;
+            m_load_failed = true;
+            return;
+        }
+
+        const std::streampos end_position = file_stream.tellg();
+        if (end_position == std::streampos(-1))
+        {
+            m_load_failed = true;
+            return;
+        }
+        const std::streamoff file_size = static_cast<std::streamoff>(end_position);
+        if (file_size < 0 || file_size > kMaxIniFileSize)
+        {
+            m_load_failed = true;
+            return;
+        }
+
+        file_stream.seekg(0, std::ios::beg);
+        if (!file_stream)
+        {
+            m_load_failed = true;
+            return;
+        }
+
+        string ini_str(static_cast<size_t>(file_size), '\0');
+        if (file_size > 0)
+        {
+            file_stream.read(&ini_str[0], static_cast<std::streamsize>(file_size));
+            if (file_stream.gcount() != static_cast<std::streamsize>(file_size))
+            {
+                m_load_failed = true;
+                return;
+            }
+        }
+
+        // INI text cannot contain embedded NUL characters.  Reject it instead
+        // of parsing a different prefix than the persisted bytes represent.
+        if (ini_str.find('\0') != string::npos)
+        {
+            m_load_failed = true;
+            return;
+        }
+
+        if (!ini_str.empty() && ini_str.back() != '\n')
+            ini_str.push_back('\n');
+
+        const bool has_utf8_bom = ini_str.size() >= 3 &&
+            static_cast<unsigned char>(ini_str[0]) == 0xEF &&
+            static_cast<unsigned char>(ini_str[1]) == 0xBB &&
+            static_cast<unsigned char>(ini_str[2]) == 0xBF;
+        const bool is_utf8 = force_utf8 || has_utf8_bom;
+        if (has_utf8_bom)
+        {
             ini_str = ini_str.substr(3);
         }
-        else
+
+        wstring decoded;
+        if (!TryDecodeIniText(ini_str, is_utf8, decoded))
         {
-            is_utf8 = false;
+            m_load_failed = true;
+            return;
         }
+
+        m_ini_str.swap(decoded);
+        m_file_existed_at_load = true;
     }
-    //转换成Unicode
-    m_ini_str = CCommon::StrToUnicode(ini_str.c_str(), is_utf8);
+    catch (...)
+    {
+        m_ini_str.clear();
+        m_load_failed = true;
+    }
 }
 
 CIniHelper::CIniHelper(UINT id, bool is_utf8)
@@ -148,7 +285,7 @@ void CIniHelper::GetIntArray(const wchar_t * AppName, const wchar_t * KeyName, i
     CCommon::StringSplit(str, L',', split_result);
     for (int i = 0; i < size; i++)
     {
-        if (i < split_result.size())
+        if (static_cast<size_t>(i) < split_result.size())
             values[i] = _wtoi(split_result[i].c_str());
         else if (i > 0)
             values[i] = values[i - 1];
@@ -193,15 +330,28 @@ void CIniHelper::GetStringList(const wchar_t* AppName, const wchar_t* KeyName, v
 vector<wstring> CIniHelper::GetAllAppName(const wstring& prefix) const
 {
     vector<wstring> list;
+    if (prefix.size() > kMaxIniSectionNameLength)
+        return list;
+
+    const wstring section_prefix = L"\n[" + prefix;
     size_t pos{};
-    while ((pos = m_ini_str.find(L"\n[" + prefix, pos)) != wstring::npos)
+    while (list.size() < kMaxIniSections && (pos = m_ini_str.find(section_prefix, pos)) != wstring::npos)
     {
-        size_t end = m_ini_str.find(L']', pos + 1);
-        if (end != wstring::npos)
+        const size_t name_begin = pos + section_prefix.size();
+        const size_t line_end = m_ini_str.find(L'\n', name_begin);
+        const size_t end = m_ini_str.find(L']', name_begin);
+        if (end != wstring::npos && (line_end == wstring::npos || end < line_end))
         {
-            wstring tmp(m_ini_str.begin() + pos + prefix.size() + 2, m_ini_str.begin() + end);
-            list.push_back(std::move(tmp));
+            const size_t name_length = end - name_begin;
+            if (name_length <= kMaxIniSectionNameLength)
+                list.emplace_back(m_ini_str, name_begin, name_length);
             pos = end + 1;
+        }
+        else
+        {
+            // A malformed section header must still advance the scan.  This
+            // also prevents an oversized header from being copied repeatedly.
+            pos = line_end == wstring::npos ? m_ini_str.size() : line_end + 1;
         }
     }
     return list;
@@ -209,37 +359,54 @@ vector<wstring> CIniHelper::GetAllAppName(const wstring& prefix) const
 
 void CIniHelper::GetAllKeyValues(const wstring& AppName, std::map<wstring, wstring>& map) const
 {
+    if (AppName.empty() || AppName.size() > kMaxIniSectionNameLength)
+        return;
+
     wstring app_str{ L"[" };
     app_str.append(AppName).append(L"]");
-    size_t app_pos{}, app_end_pos{};
-    app_pos = m_ini_str.find(app_str);
+    const size_t app_pos = m_ini_str.find(app_str);
     if (app_pos == wstring::npos)
         return;
-    app_end_pos = m_ini_str.find(L"\n[", app_pos + 2);
-    if (app_end_pos != wstring::npos)
-        app_end_pos++;
-    app_str = m_ini_str.substr(app_pos, app_end_pos - app_pos);
-    vector<wstring> line;
-    CCommon::StringSplit(app_str, L'\n', line);
-    for (wstring str : line)
+
+    const size_t next_section = m_ini_str.find(L"\n[", app_pos + app_str.size());
+    const size_t section_end = next_section == wstring::npos ? m_ini_str.size() : next_section + 1;
+    size_t line_begin = m_ini_str.find(L'\n', app_pos);
+    if (line_begin == wstring::npos || line_begin >= section_end)
+        return;
+    ++line_begin;
+
+    size_t key_value_count{};
+    size_t line_count{};
+    while (line_begin < section_end && key_value_count < kMaxIniKeyValuesPerSection && line_count < kMaxIniLinesPerSection)
     {
-        // CCommon::StringSplit会跳过空字符串，str一定非空
-        if (str[0] == L';' || str[0] == L'#')   // 跳过注释行（只支持行首注释）
-            continue;
-        size_t pos = str.find_first_of(L'=');
-        if (pos == wstring::npos)
-            continue;
-        wstring key{ str.substr(0, pos) };
-        wstring value{ str.substr(pos + 1) };
-        CCommon::StringNormalize(key);
-        CCommon::StringNormalize(value);
-        if (!key.empty() && !value.empty())
+        const size_t line_end = (std::min)(m_ini_str.find(L'\n', line_begin), section_end);
+        ++line_count;
+        if (line_begin < line_end && m_ini_str[line_begin] != L';' && m_ini_str[line_begin] != L'#')
         {
-            if (value.front() == L'\"' && value.back() == L'\"')
-                value = value.substr(1, value.size() - 2);
-            UnEscapeString(value);
-            map[key] = value;
+            const auto separator_iter = std::find(m_ini_str.begin() + line_begin, m_ini_str.begin() + line_end, L'=');
+            if (separator_iter != m_ini_str.begin() + line_end)
+            {
+                const size_t separator = static_cast<size_t>(separator_iter - m_ini_str.begin());
+                if (separator - line_begin <= kMaxIniKeyLength
+                    && line_end - separator - 1 <= kMaxIniValueLength)
+                {
+                    wstring key(m_ini_str, line_begin, separator - line_begin);
+                    wstring value(m_ini_str, separator + 1, line_end - separator - 1);
+                    CCommon::StringNormalize(key);
+                    CCommon::StringNormalize(value);
+                    if (!key.empty() && !value.empty()
+                        && key.size() <= kMaxIniKeyLength && value.size() <= kMaxIniValueLength)
+                    {
+                        if (value.front() == L'\"' && value.back() == L'\"')
+                            value = value.substr(1, value.size() - 2);
+                        UnEscapeString(value);
+                        map[key] = std::move(value);
+                        ++key_value_count;
+                    }
+                }
+            }
         }
+        line_begin = line_end == section_end ? section_end : line_end + 1;
     }
 }
 
@@ -265,22 +432,59 @@ bool CIniHelper::RemoveSection(const wstring& AppName)
 
 bool CIniHelper::Save()
 {
-    if (m_file_path.empty())
+    if (m_file_path.empty() || m_load_failed)
         return false;
-    ofstream file_stream{ m_file_path };
-    if(file_stream.fail())
+
+    if (m_ini_str.find(L'\0') != wstring::npos)
         return false;
-    string ini_str{ CCommon::UnicodeToStr(m_ini_str.c_str(), m_save_as_utf8) };
-    if (m_save_as_utf8)     //如果以UTF8编码保存，先插入BOM
+
+    string serialized_ini;
+    try
     {
-        string utf8_bom;
-        utf8_bom.push_back(-17);
-        utf8_bom.push_back(-69);
-        utf8_bom.push_back(-65);
-        file_stream << utf8_bom;
+        if (!TryEncodeIniText(m_ini_str, m_save_as_utf8, serialized_ini))
+            return false;
+    }
+    catch (...)
+    {
+        return false;
     }
 
-    file_stream << ini_str;
+    const size_t bom_length = m_save_as_utf8 ? kUtf8BomLength : 0;
+    if (serialized_ini.size() > kMaxIniFileSize - bom_length)
+        return false;
+
+    const size_t separator = m_file_path.find_last_of(L"\\/");
+    const wstring directory = separator == wstring::npos ? L"." : m_file_path.substr(0, separator);
+    wchar_t temporary_path[MAX_PATH]{};
+    if (::GetTempFileNameW(directory.c_str(), L"TBM", 0, temporary_path) == 0)
+        return false;
+
+    ofstream temporary_stream{ temporary_path, std::ios::binary | std::ios::trunc };
+    if (!temporary_stream.is_open())
+    {
+        ::DeleteFileW(temporary_path);
+        return false;
+    }
+
+    if (m_save_as_utf8)
+    {
+        const char utf8_bom[] = { static_cast<char>(-17), static_cast<char>(-69), static_cast<char>(-65) };
+        temporary_stream.write(utf8_bom, sizeof(utf8_bom));
+    }
+    temporary_stream << serialized_ini;
+    temporary_stream.flush();
+    const bool write_succeeded = temporary_stream.good();
+    temporary_stream.close();
+    const bool close_succeeded = temporary_stream.good();
+    const DWORD move_flags = MOVEFILE_WRITE_THROUGH | (m_file_existed_at_load ? MOVEFILE_REPLACE_EXISTING : 0);
+    if (!write_succeeded || !close_succeeded || !::MoveFileExW(temporary_path, m_file_path.c_str(), move_flags))
+    {
+        ::DeleteFileW(temporary_path);
+        return false;
+    }
+    // A helper constructed for a missing file can be reused.  Once the first
+    // atomic creation succeeds, later saves must replace that file.
+    m_file_existed_at_load = true;
     return true;
 }
 
@@ -434,11 +638,42 @@ wstring CIniHelper::MergeStringList(const vector<wstring>& values)
 
 void CIniHelper::SplitStringList(vector<wstring>& values, const wstring& str_value)
 {
-    CCommon::StringSplit(str_value, wstring(L"\",\""), values);
-    if (!values.empty())
+    values.clear();
+    size_t item_begin{};
+    while (item_begin < str_value.size())
     {
-        //结果中第一项前面和最后一项的后面各还有一个引号，将它们删除
-        values.front() = values.front().substr(1);
-        values.back().pop_back();
+        // String lists are serialized as "item1","item2".  Do not try to
+        // repair a malformed value: this input originates in a user-editable
+        // INI file, and stripping characters from an empty item used to call
+        // pop_back() on an empty string.
+        if (str_value[item_begin] != L'\"')
+        {
+            values.clear();
+            return;
+        }
+
+        const size_t item_end = str_value.find(L'\"', item_begin + 1);
+        if (item_end == wstring::npos)
+        {
+            values.clear();
+            return;
+        }
+
+        const size_t item_length = item_end - item_begin - 1;
+        if (values.size() >= kMaxIniStringListItems || item_length > kMaxIniStringListItemLength)
+        {
+            values.clear();
+            return;
+        }
+        values.emplace_back(str_value, item_begin + 1, item_length);
+        item_begin = item_end + 1;
+        if (item_begin == str_value.size())
+            return;
+        if (str_value[item_begin] != L',' || item_begin + 1 >= str_value.size())
+        {
+            values.clear();
+            return;
+        }
+        ++item_begin;
     }
 }

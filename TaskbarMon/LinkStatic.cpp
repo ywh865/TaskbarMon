@@ -4,6 +4,18 @@
 #include "TaskbarMon.h"
 #include "LinkStatic.h"
 
+namespace
+{
+    bool IsAllowedExternalLinkUri(const CString& uri)
+    {
+        if (uri.IsEmpty() || uri.Find(_T('\r')) >= 0 || uri.Find(_T('\n')) >= 0)
+            return false;
+
+        CString normalized{ uri };
+        normalized.MakeLower();
+        return normalized.Left(8) == _T("https://") || normalized.Left(7) == _T("mailto:");
+    }
+}
 
 // CLinkStatic
 
@@ -26,7 +38,8 @@ void CLinkStatic::SetBackgroundColor(COLORREF background_color)
 
 void CLinkStatic::SetURL(CString strURL)
 {
-	m_strURL = strURL;
+    strURL.Trim();
+    m_strURL = IsAllowedExternalLinkUri(strURL) ? strURL : CString{};
 }
 
 CString CLinkStatic::GetURL() const

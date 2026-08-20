@@ -419,7 +419,7 @@ BOOL CTaskBarSettingsDlg::OnInitDialog()
         m_modify_default_style_menu.AppendMenu(MF_STRING | MF_ENABLED, ID_MODIFY_DEFAULT_STYLE1 + i, item_name);
     }
     m_default_style_menu.AppendMenu(MF_SEPARATOR);
-    m_default_style_menu.AppendMenu(MF_POPUP | MF_STRING, (UINT)m_modify_default_style_menu.m_hMenu, CCommon::LoadText(IDS_MODIFY_PRESET));
+    m_default_style_menu.AppendMenu(MF_POPUP | MF_STRING, reinterpret_cast<UINT_PTR>(m_modify_default_style_menu.m_hMenu), CCommon::LoadText(IDS_MODIFY_PRESET));
 
     //获取副显示器的数量
     std::vector<HWND> secondary_displays;
@@ -436,10 +436,13 @@ BOOL CTaskBarSettingsDlg::OnInitDialog()
     }
     else
     {
-        int combo_index = m_data.secondary_display_index + 1;
         int combo_item_count = m_displays_combo.GetCount();
-        if (combo_index >= combo_item_count)
-            combo_index = combo_item_count - 1;
+        int combo_index{};
+        if (m_data.secondary_display_index >= 0 &&
+            m_data.secondary_display_index < combo_item_count - 1)
+        {
+            combo_index = m_data.secondary_display_index + 1;
+        }
         m_displays_combo.SetCurSel(combo_index);
     }
 
@@ -555,8 +558,7 @@ void CTaskBarSettingsDlg::OnOK()
     font_size = m_font_size_edit.GetValue();
     if (font_size > MAX_FONT_SIZE || font_size < MIN_FONT_SIZE)
     {
-        CString info;
-        info.Format(CCommon::LoadText(IDS_FONT_SIZE_WARNING), MIN_FONT_SIZE, MAX_FONT_SIZE);
+        CString info = CCommon::LoadTextFormat(IDS_FONT_SIZE_WARNING, { MIN_FONT_SIZE, MAX_FONT_SIZE });
         MessageBox(info, NULL, MB_OK | MB_ICONWARNING);
     }
     else

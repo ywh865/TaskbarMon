@@ -4,6 +4,8 @@
 #include "stdafx.h"
 #include "CTabCtrlEx.h"
 
+#include <limits>
+
 
 // CTabCtrlEx
 
@@ -23,7 +25,12 @@ void CTabCtrlEx::AddWindow(CWnd* pWnd, LPCTSTR lable_text)
 	if (pWnd == nullptr || pWnd->GetSafeHwnd() == NULL)
 		return;
 
-    InsertItem(m_tab_list.size(), lable_text, m_tab_list.size());
+    const size_t tab_count = m_tab_list.size();
+    if (tab_count > static_cast<size_t>((std::numeric_limits<int>::max)()))
+        return;
+
+    const int tab_index = static_cast<int>(tab_count);
+    InsertItem(tab_index, lable_text, tab_index);
 
 	pWnd->SetParent(this);
 	pWnd->MoveWindow(m_tab_rect);
@@ -33,14 +40,15 @@ void CTabCtrlEx::AddWindow(CWnd* pWnd, LPCTSTR lable_text)
 
 void CTabCtrlEx::SetCurTab(int index)
 {
-    if (index < 0 || index >= static_cast<int>(m_tab_list.size()))
+    if (index < 0 || static_cast<size_t>(index) >= m_tab_list.size())
         index = 0;
 	SetCurSel(index);
 
-	int tab_size = m_tab_list.size();
-	for (int i = 0; i < tab_size; i++)
+	const size_t tab_size = m_tab_list.size();
+    const size_t selected_tab = static_cast<size_t>(index);
+	for (size_t i = 0; i < tab_size; i++)
 	{
-		if (i == index)
+		if (i == selected_tab)
 		{
 			m_tab_list[i]->ShowWindow(SW_SHOW);
 			m_tab_list[i]->SetFocus();
@@ -55,7 +63,7 @@ void CTabCtrlEx::SetCurTab(int index)
 CWnd* CTabCtrlEx::GetCurrentTab()
 {
     int cur_tab_index = GetCurSel();
-    if (cur_tab_index >= 0 && cur_tab_index < m_tab_list.size())
+    if (cur_tab_index >= 0 && static_cast<size_t>(cur_tab_index) < m_tab_list.size())
     {
         return m_tab_list[cur_tab_index];
     }

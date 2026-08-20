@@ -37,6 +37,9 @@ void CPdhDiskUsage::ExtractDiskNames()
 
 int CPdhDiskUsage::CalculateUtilization(double idleTime) const
 {
+    if (!std::isfinite(idleTime))
+        return 0;
+
     // 关键处理：NVMe/RAID等多队列磁盘的空闲时间可能 >100%
     // 例如: 4队列磁盘空闲时间=400% → 实际空闲=100% → 利用率=0%
     if (idleTime > 100.0)

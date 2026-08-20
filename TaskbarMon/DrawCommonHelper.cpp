@@ -1,5 +1,77 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "DrawCommonHelper.h"
+
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <new>
+
+namespace
+{
+    // These helpers only operate on UI-sized bitmaps.  Keep hostile or corrupt
+    // HBITMAP metadata from causing an unbounded allocation.
+    constexpr std::size_t MAX_BITMAP_PIXEL_BUFFER_BYTES = 64U * 1024U * 1024U;
+    constexpr std::size_t MAX_BITMAP_ALPHA_POINTS = 1024U * 1024U;
+
+    bool GetBitmapPixelBufferSize(HBITMAP hBitmap, int& width, int& height, std::size_t& pixel_count) noexcept
+    {
+        width = 0;
+        height = 0;
+        pixel_count = 0;
+
+        if (hBitmap == NULL)
+            return false;
+
+        BITMAP bm{};
+        if (GetObject(hBitmap, static_cast<int>(sizeof(bm)), &bm) != static_cast<int>(sizeof(bm))
+            || bm.bmWidth <= 0 || bm.bmHeight <= 0)
+        {
+            return false;
+        }
+
+        const auto bitmap_width = static_cast<std::size_t>(bm.bmWidth);
+        const auto bitmap_height = static_cast<std::size_t>(bm.bmHeight);
+        if (bitmap_height > (std::numeric_limits<std::size_t>::max)() / bitmap_width)
+            return false;
+
+        const auto candidate_pixel_count = bitmap_width * bitmap_height;
+        if (candidate_pixel_count > MAX_BITMAP_PIXEL_BUFFER_BYTES / sizeof(RGBQUAD))
+            return false;
+
+        width = bm.bmWidth;
+        height = bm.bmHeight;
+        pixel_count = candidate_pixel_count;
+        return true;
+    }
+
+    bool TryScaleDimension(LONG source_dimension, LONG target_dimension, LONG divisor, LONG& scaled_dimension) noexcept
+    {
+        if (source_dimension <= 0 || target_dimension <= 0 || divisor <= 0)
+            return false;
+
+        // int × int fits in int64_t, then the result must still fit the Win32
+        // coordinate type before it is stored in CSize.
+        const std::int64_t scaled = static_cast<std::int64_t>(source_dimension)
+            * static_cast<std::int64_t>(target_dimension) / divisor;
+        if (scaled <= 0 || scaled > (std::numeric_limits<LONG>::max)())
+            return false;
+
+        scaled_dimension = static_cast<LONG>(scaled);
+        return true;
+    }
+
+    void AddSaturatingOffset(LONG& coordinate, LONG offset) noexcept
+    {
+        const std::int64_t adjusted = static_cast<std::int64_t>(coordinate) + offset;
+        if (adjusted < (std::numeric_limits<LONG>::min)())
+            coordinate = (std::numeric_limits<LONG>::min)();
+        else if (adjusted > (std::numeric_limits<LONG>::max)())
+            coordinate = (std::numeric_limits<LONG>::max)();
+        else
+            coordinate = static_cast<LONG>(adjusted);
+    }
+}
 
 UINT DrawCommonHelper::ProccessTextFormat(CRect rect, CSize text_length, IDrawCommon::Alignment align, bool multi_line) noexcept
 {
@@ -31,7 +103,16 @@ UINT DrawCommonHelper::ProccessTextFormat(CRect rect, CSize text_length, IDrawCo
 
 void DrawCommonHelper::ImageDrawAreaConvert(CSize image_size, CPoint& start_point, CSize& size, IDrawCommon::StretchMode stretch_mode)
 {
-    if (size.cx == 0 || size.cy == 0)       //如果指定的size为0，则使用位图的实际大小绘制
+    // Do not divide by zero or pass invalid dimensions into GDI/GDI+. A zero
+    // requested size keeps the historical "use image size" behavior; an
+    // invalid image cannot be drawn safely.
+    if (image_size.cx <= 0 || image_size.cy <= 0)
+    {
+        size = CSize(0, 0);
+        return;
+    }
+
+    if (size.cx <= 0 || size.cy <= 0)       //如果指定的size为0，则使用位图的实际大小绘制
     {
         size = CSize(image_size.cx, image_size.cy);
     }
@@ -39,41 +120,55 @@ void DrawCommonHelper::ImageDrawAreaConvert(CSize image_size, CPoint& start_poin
     {
         if (stretch_mode == IDrawCommon::StretchMode::FILL)
         {
-            float w_h_ratio, w_h_ratio_draw;        //图像的宽高比、绘制大小的宽高比
-            w_h_ratio = static_cast<float>(image_size.cx) / image_size.cy;
-            w_h_ratio_draw = static_cast<float>(size.cx) / size.cy;
-            if (w_h_ratio > w_h_ratio_draw)     //如果图像的宽高比大于绘制区域的宽高比，则需要裁剪两边的图像
+            const std::int64_t image_ratio_numerator = static_cast<std::int64_t>(image_size.cx) * size.cy;
+            const std::int64_t draw_ratio_numerator = static_cast<std::int64_t>(size.cx) * image_size.cy;
+            if (image_ratio_numerator > draw_ratio_numerator)     //如果图像的宽高比大于绘制区域的宽高比，则需要裁剪两边的图像
             {
-                int image_width;        //按比例缩放后的宽度
-                image_width = image_size.cx * size.cy / image_size.cy;
-                start_point.x -= ((image_width - size.cx) / 2);
+                LONG image_width;        //按比例缩放后的宽度
+                if (!TryScaleDimension(image_size.cx, size.cy, image_size.cy, image_width))
+                {
+                    size = image_size;
+                    return;
+                }
+                AddSaturatingOffset(start_point.x, -((image_width - size.cx) / 2));
                 size.cx = image_width;
             }
             else
             {
-                int image_height;       //按比例缩放后的高度
-                image_height = image_size.cy * size.cx / image_size.cx;
-                start_point.y -= ((image_height - size.cy) / 2);
+                LONG image_height;       //按比例缩放后的高度
+                if (!TryScaleDimension(image_size.cy, size.cx, image_size.cx, image_height))
+                {
+                    size = image_size;
+                    return;
+                }
+                AddSaturatingOffset(start_point.y, -((image_height - size.cy) / 2));
                 size.cy = image_height;
             }
         }
         else if (stretch_mode == IDrawCommon::StretchMode::FIT)
         {
             CSize draw_size = image_size;
-            float w_h_ratio, w_h_ratio_draw;        //图像的宽高比、绘制大小的宽高比
-            w_h_ratio = static_cast<float>(image_size.cx) / image_size.cy;
-            w_h_ratio_draw = static_cast<float>(size.cx) / size.cy;
-            if (w_h_ratio > w_h_ratio_draw)     //如果图像的宽高比大于绘制区域的宽高比
+            const std::int64_t image_ratio_numerator = static_cast<std::int64_t>(image_size.cx) * size.cy;
+            const std::int64_t draw_ratio_numerator = static_cast<std::int64_t>(size.cx) * image_size.cy;
+            if (image_ratio_numerator > draw_ratio_numerator)     //如果图像的宽高比大于绘制区域的宽高比
             {
-                draw_size.cy = draw_size.cy * size.cx / draw_size.cx;
+                if (!TryScaleDimension(draw_size.cy, size.cx, draw_size.cx, draw_size.cy))
+                {
+                    size = image_size;
+                    return;
+                }
                 draw_size.cx = size.cx;
-                start_point.y += ((size.cy - draw_size.cy) / 2);
+                AddSaturatingOffset(start_point.y, (size.cy - draw_size.cy) / 2);
             }
             else
             {
-                draw_size.cx = draw_size.cx * size.cy / draw_size.cy;
+                if (!TryScaleDimension(draw_size.cx, size.cy, draw_size.cy, draw_size.cx))
+                {
+                    size = image_size;
+                    return;
+                }
                 draw_size.cy = size.cy;
-                start_point.x += ((size.cx - draw_size.cx) / 2);
+                AddSaturatingOffset(start_point.x, (size.cx - draw_size.cx) / 2);
             }
             size = draw_size;
         }
@@ -83,11 +178,11 @@ void DrawCommonHelper::ImageDrawAreaConvert(CSize image_size, CPoint& start_poin
 void DrawCommonHelper::GetBitmapAlphaPixel(HBITMAP hBitmap, std::set<Point>& points)
 {
     points.clear();
-    BITMAP bm;
-    GetObject(hBitmap, sizeof(BITMAP), &bm);
-
-    int width = bm.bmWidth;
-    int height = bm.bmHeight;
+    int width{};
+    int height{};
+    std::size_t pixel_count{};
+    if (!GetBitmapPixelBufferSize(hBitmap, width, height, pixel_count))
+        return;
 
     // 获取位图的像素数据
     BITMAPINFO bmpInfo = { 0 };
@@ -99,36 +194,62 @@ void DrawCommonHelper::GetBitmapAlphaPixel(HBITMAP hBitmap, std::set<Point>& poi
     bmpInfo.bmiHeader.biCompression = BI_RGB;
 
     HDC hdc = CreateCompatibleDC(NULL);
-    SelectObject(hdc, hBitmap);
+    if (hdc == NULL)
+        return;
 
     // 分配内存存储位图像素
-    RGBQUAD* pPixels = new RGBQUAD[width * height];
-    GetDIBits(hdc, hBitmap, 0, height, pPixels, &bmpInfo, DIB_RGB_COLORS);
-
-    // 遍历所有像素点
-    for (int y = 0; y < height; ++y)
+    std::unique_ptr<RGBQUAD[]> pPixels(new (std::nothrow) RGBQUAD[pixel_count]);
+    if (pPixels == nullptr)
     {
-        for (int x = 0; x < width; ++x)
-        {
-            int index = y * width + x;
-            //添加alpha值为0的像素点
-            if (pPixels[index].rgbReserved == 0)
-                points.insert(Point(x, y));
-        }
+        DeleteDC(hdc);
+        return;
     }
 
-    delete[] pPixels;
-    DeleteDC(hdc);
+    if (GetDIBits(hdc, hBitmap, 0, height, pPixels.get(), &bmpInfo, DIB_RGB_COLORS) != height)
+    {
+        DeleteDC(hdc);
+        return;
+    }
 
+    // 遍历所有像素点
+    try
+    {
+        std::set<Point> transparent_points;
+        for (int y = 0; y < height; ++y)
+        {
+            for (int x = 0; x < width; ++x)
+            {
+                const auto index = static_cast<std::size_t>(y) * static_cast<std::size_t>(width)
+                    + static_cast<std::size_t>(x);
+                //添加alpha值为0的像素点
+                if (pPixels[index].rgbReserved == 0)
+                {
+                    if (transparent_points.size() >= MAX_BITMAP_ALPHA_POINTS)
+                    {
+                        DeleteDC(hdc);
+                        return;
+                    }
+                    transparent_points.emplace(x, y);
+                }
+            }
+        }
+
+        points.swap(transparent_points);
+    }
+    catch (const std::bad_alloc&)
+    {
+        points.clear();
+    }
+    DeleteDC(hdc);
 }
 
-void DrawCommonHelper::FixBitmapTextAlpha(HBITMAP hBitmap, BYTE alpha, std::set<Point> alpha_points)
+void DrawCommonHelper::FixBitmapTextAlpha(HBITMAP hBitmap, BYTE alpha, const std::set<Point>& alpha_points)
 {
-    BITMAP bm;
-    GetObject(hBitmap, sizeof(BITMAP), &bm);
-
-    int width = bm.bmWidth;
-    int height = bm.bmHeight;
+    int width{};
+    int height{};
+    std::size_t pixel_count{};
+    if (!GetBitmapPixelBufferSize(hBitmap, width, height, pixel_count))
+        return;
 
     // 获取位图的像素数据
     BITMAPINFO bmpInfo = { 0 };
@@ -140,18 +261,30 @@ void DrawCommonHelper::FixBitmapTextAlpha(HBITMAP hBitmap, BYTE alpha, std::set<
     bmpInfo.bmiHeader.biCompression = BI_RGB;
 
     HDC hdc = CreateCompatibleDC(NULL);
-    SelectObject(hdc, hBitmap);
+    if (hdc == NULL)
+        return;
 
     // 分配内存存储位图像素
-    RGBQUAD* pPixels = new RGBQUAD[width * height];
-    GetDIBits(hdc, hBitmap, 0, height, pPixels, &bmpInfo, DIB_RGB_COLORS);
+    std::unique_ptr<RGBQUAD[]> pPixels(new (std::nothrow) RGBQUAD[pixel_count]);
+    if (pPixels == nullptr)
+    {
+        DeleteDC(hdc);
+        return;
+    }
+
+    if (GetDIBits(hdc, hBitmap, 0, height, pPixels.get(), &bmpInfo, DIB_RGB_COLORS) != height)
+    {
+        DeleteDC(hdc);
+        return;
+    }
 
     // 遍历所有像素
     for (int y = 0; y < height; ++y)
     {
         for (int x = 0; x < width; ++x)
         {
-            int index = y * width + x;
+            const auto index = static_cast<std::size_t>(y) * static_cast<std::size_t>(width)
+                + static_cast<std::size_t>(x);
             //如果检测到alpha值为0，但是却不在alpha_points里，将其修正为正确的alpha值
             if (pPixels[index].rgbReserved == 0 && !alpha_points.contains(Point(x, y)))
                 pPixels[index].rgbReserved = alpha; // 设置Alpha通道
@@ -159,8 +292,11 @@ void DrawCommonHelper::FixBitmapTextAlpha(HBITMAP hBitmap, BYTE alpha, std::set<
     }
 
     // 将修改后的像素数据写回位图
-    SetDIBits(hdc, hBitmap, 0, height, pPixels, &bmpInfo, DIB_RGB_COLORS);
+    if (SetDIBits(hdc, hBitmap, 0, height, pPixels.get(), &bmpInfo, DIB_RGB_COLORS) != height)
+    {
+        DeleteDC(hdc);
+        return;
+    }
 
-    delete[] pPixels;
     DeleteDC(hdc);
 }

@@ -2,19 +2,36 @@
 #include "CommonData.h"
 class CHistoryTrafficFile
 {
+    enum class LoadState
+    {
+        Uninitialized,
+        Missing,
+        Valid,
+        Failed
+    };
+
 public:
 	CHistoryTrafficFile(const wstring& file_path);
 	~CHistoryTrafficFile();
 
-	void Save() const;
-	void SaveTodayOnly() const;	// 仅更新第一行（lines计数）和今天的记录（第二行），用于频繁保存时减少I/O
+	bool Save() const;
+	bool SaveTodayOnly() const;	// 仅更新第一行（lines计数）和今天的记录（第二行），用于频繁保存时减少I/O
 	void Load();
+	bool RecoverFromBackup(const CHistoryTrafficFile& backup);
+	bool IsLoadValid() const { return m_load_state == LoadState::Valid; }
+	bool IsLoadMissing() const { return m_load_state == LoadState::Missing; }
+	bool IsLoadFailed() const { return m_load_state == LoadState::Failed; }
 	void LoadSize();			//仅读取文件的大小
 	void Merge(const CHistoryTrafficFile& history_traffic, bool ignore_same_data = false);		//合并另一个CHistoryTrafficFile对象。如果ignore_same_data为true，则忽略相同日期的项，否则将相同日期的流量数据相加
 	void OnDateChanged();		//日期改变时调用，将今天的记录移到历史记录，创建新的今天的记录
 
 	const wstring& GetFilePath() const { return m_file_path; }
-	const void SetFilePath(const wstring& file_path) { m_file_path = file_path; }
+	void SetFilePath(const wstring& file_path)
+	{
+		m_file_path = file_path;
+		m_load_state = LoadState::Uninitialized;
+		m_destination_can_be_replaced = false;
+	}
 	
 	// 获取完整流量列表（用于统计功能），返回deque引用以兼容现有代码
 	deque<HistoryTraffic>& GetTraffics() { if (m_cache_dirty) UpdateCache(); return m_traffics_cache; }
@@ -40,6 +57,8 @@ private:
 	void InvalidateCache() const { m_cache_dirty = true; }	//标记缓存过期
 
 private:
+	mutable LoadState m_load_state{ LoadState::Uninitialized };
+	mutable bool m_destination_can_be_replaced{};
 	wstring m_file_path;
 	HistoryTraffic m_today_traffic;        // 今天的记录（单独存储，频繁更新）
 	list<HistoryTraffic> m_history_traffics;	// 历史记录链表（按日期从大到小排序）

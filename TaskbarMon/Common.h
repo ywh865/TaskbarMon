@@ -88,7 +88,7 @@ public:
     static wstring GetStartUpPath();
 
     //获取path路径下的文件或文件夹，并将文件或文件夹名称保存在files容器中。
-    static void GetFiles(const wchar_t* path, vector<wstring>& files);
+    static void GetFiles(const wchar_t* path, vector<wstring>& files, size_t max_files = 0);
 
     //获取path路径下的文件或文件夹，每次遍历时调用函数对象func
     //path: 查找的路径
@@ -118,8 +118,12 @@ public:
     //获取临时文件夹的路径
     static wstring GetTemplateDir();
 
-    //获取Appdata/Local/TrafficMonitor的目录，如果不存在，则会自动创建
-    static wstring GetAppDataConfigDir();
+    //获取当前用户 AppData/Roaming/TaskbarMon 目录；失败时返回 false，输出路径为空。
+    static bool GetAppDataConfigDir(wstring& app_data_dir);
+
+    //仅复制当前用户旧 TrafficMonitor 目录中的已知配置文件到 TaskbarMon 目录，绝不覆盖目标文件。
+    //源文件会保留，以便复制失败时不会造成数据丢失。
+    static bool MigrateLegacyAppDataConfig(const wstring& app_data_dir);
 
     //在指定位置绘制文本
     static void DrawWindowText(CDC* pDC, CRect rect, LPCTSTR lpszString, COLORREF color, COLORREF back_color);
@@ -157,7 +161,8 @@ public:
     //安全的格式化字符串，将format_str中形如<%序号%>的字符串替换成初始化列表paras中的元素，元素支持int/double/LPCTSTR/CString格式，序号从1开始
     static CString StringFormat(LPCTSTR format_str, const std::initializer_list<CVariant>& paras);
 
-    //从资源文件中载入字符串，并将资源字符串中形如<%序号%>的字符串替换成可变参数列表中的参数
+    //从资源文件中载入字符串，并安全地替换<%序号%>占位符；为兼容已有语言包，
+    //也只识别无修饰的%d/%i/%u/%s/%S旧式占位符，绝不调用变参格式化。
     static CString LoadTextFormat(const wchar_t* id, const std::initializer_list<CVariant>& paras);
 
     //将int类型转换成字符串

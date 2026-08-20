@@ -14,7 +14,10 @@
 #include "SimpleXML.h"
 #include "TaskbarDefaultStyle.h"
 #include <map>
+#include <atomic>
+#ifndef WITHOUT_TEMPERATURE
 #include "OpenHardwareMonitor/OpenHardwareMonitorApi.h"
+#endif
 #include "TaskBarDlgDrawCommon.h"
 #include "DllFunctions.h"
 #include "StrTable.h"
@@ -91,6 +94,7 @@ public:
     std::shared_ptr<OpenHardwareMonitorApi::IOpenHardwareMonitor> m_pMonitor{};
 #endif // !WITHOUT_TEMPERATURE
 
+    std::atomic<uint64_t> m_hardware_monitor_generation{};
     CCriticalSection m_minitor_lib_critical;        //用于访问OpenHardwareMonitor进行线程同步的临界区对象
     CLazyConstructable<class CTaskBarDlgDrawCommonSupport> m_d2d_taskbar_draw_common_support{}; // 当使用D2D渲染时自动初始化的全局依赖
 
@@ -111,9 +115,7 @@ public:
     void SetDPI(int dpi) { m_dpi = dpi; }
 
     void CheckUpdate(bool message);     //检查更新，如果message为true，则在检查时弹出提示信息
-    void CheckUpdateInThread(bool message); //在后台线程中检查更新
-    //启动时检查更新线程函数
-    static UINT CheckUpdateThreadFunc(LPVOID lpParam);
+    void CheckUpdateInThread(bool message); //检查更新入口（当前 fail-closed）
     static UINT InitOpenHardwareMonitorLibThreadFunc(LPVOID lpParam);
 
     bool SetAutoRun(bool auto_run, bool task_scheduler);
@@ -135,6 +137,7 @@ public:
 
     bool IsCheckingForUpdate() const { return m_checking_update; }      //是否正在检查更新
 
+    void InvalidateOpenHardwareInitialization();
     void InitOpenHardwareLibInThread();     //开启一个后台线程初始化OpenHardwareMonitor
     void UpdateOpenHardwareMonitorEnableState();    //更新硬件监控的启用/禁用状态
 
@@ -149,6 +152,7 @@ public:
     void SetThemeColor(COLORREF color);
 
 private:
+    HANDLE m_instance_mutex{};              //保持命名互斥体句柄，直到应用退出
     bool m_no_multistart_warning{};         //如果为false，则永远都不会弹出“已经有一个程序正在运行”的警告提示
     bool m_exit_when_start_by_restart_manager{ true };      //如果程序被Windows重启管理器重新启动，则退出程序
     int m_dpi{ 96 };

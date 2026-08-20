@@ -48,6 +48,9 @@ void CIconSelectDlg::DoDataExchange(CDataExchange* pDX)
 
 void CIconSelectDlg::DrawPreviewIcon(CDC* pDC)
 {
+    if (pDC == nullptr || pDC->GetSafeHdc() == nullptr)
+        return;
+
     //pDC->FillSolidRect(CRect(CPoint(ICON_X, ICON_Y), CSize(theApp.DPI(16), theApp.DPI(16))), RGB(0, 0, 0));
     //pDC->DrawIcon(ICON_X, ICON_Y, m_icons[m_icon_selected]);
     ::DrawIconEx(pDC->m_hDC, ICON_X, ICON_Y, theApp.m_notify_icons[GetIconSelected()], theApp.DPI(16), theApp.DPI(16), 0, NULL, DI_NORMAL);
@@ -68,6 +71,8 @@ END_MESSAGE_MAP()
 BOOL CIconSelectDlg::OnInitDialog()
 {
     CBaseDialog::OnInitDialog();
+
+    m_icon_selected = GetIconSelected();
 
     // TODO:  在此添加额外的初始化
     SetIcon(theApp.GetMenuIcon(IDI_NOTIFY), FALSE);		// 设置小图标
@@ -108,7 +113,11 @@ void CIconSelectDlg::OnCbnSelchangeCombo1()
     else
         m_preview_pic.SetPicture((HBITMAP)LoadImage(AfxGetInstanceHandle(),
             MAKEINTRESOURCE(IDB_NOTIFY_ICON_PREVIEW), IMAGE_BITMAP, 0, 0, LR_DEFAULTCOLOR | LR_CREATEDIBSECTION));
-    DrawPreviewIcon(m_preview_pic.GetDC());
+    if (CDC* preview_dc = m_preview_pic.GetDC())
+    {
+        DrawPreviewIcon(preview_dc);
+        m_preview_pic.ReleaseDC(preview_dc);
+    }
 }
 
 

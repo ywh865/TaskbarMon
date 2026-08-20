@@ -2,6 +2,8 @@
 #include "ColorSettingListCtrl.h"
 #include "DrawCommonHelper.h"
 
+#include <limits>
+
 IMPLEMENT_DYNAMIC(CColorSettingListCtrl, CListCtrl)
 
 CColorSettingListCtrl::CColorSettingListCtrl()
@@ -40,8 +42,14 @@ void CColorSettingListCtrl::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 		*pResult = CDRF_NOTIFYITEMDRAW;
 		break;
 	case CDDS_ITEMPREPAINT:			//如果为画ITEM之前就要进行颜色的改变
-		if (nmcd.dwItemSpec >= 0 && nmcd.dwItemSpec < GetItemCount())
 		{
+            const int item_count = GetItemCount();
+            const DWORD_PTR item_spec = nmcd.dwItemSpec;
+            if (item_count > 0 &&
+                item_spec <= static_cast<DWORD_PTR>((std::numeric_limits<int>::max)()) &&
+                item_spec < static_cast<DWORD_PTR>(item_count))
+		{
+			const int item_index = static_cast<int>(item_spec);
 			//double range = m_item_rage_data[nmcd.dwItemSpec].data_value;
 			//CDC* pDC = CDC::FromHandle(nmcd.hdc);		//获取绘图DC
 			//CRect item_rect, draw_rect;
@@ -74,32 +82,36 @@ void CColorSettingListCtrl::OnNMCustomdraw(NMHDR *pNMHDR, LRESULT *pResult)
 
             CDC* pDC = CDC::FromHandle(nmcd.hdc);		//获取绘图DC
             CRect item_rect;
-            auto& col_color_map = m_colors[nmcd.dwItemSpec];
+            auto& col_color_map = m_colors[item_index];
             for (auto iter = col_color_map.begin(); iter != col_color_map.end(); ++iter)
             {
-                GetSubItemRect(nmcd.dwItemSpec, iter->first, LVIR_BOUNDS, item_rect);	//获取绘图单元格的矩形区域
+                GetSubItemRect(item_index, iter->first, LVIR_BOUNDS, item_rect);	//获取绘图单元格的矩形区域
                 //设置绘图剪辑区域
                 CDrawCommon::SetDrawRect(pDC, item_rect);
                 //使用双缓冲绘图
                 CDrawDoubleBuffer draw_double_buffer(pDC, item_rect);
+                auto* mem_dc = draw_double_buffer.GetMemDC();
+                if (mem_dc == nullptr)
+                    continue;
                 //填充背景
                 item_rect.MoveToXY(0, 0);
-                draw_double_buffer.GetMemDC()->FillSolidRect(item_rect, GetSysColor(COLOR_WINDOW));
+                mem_dc->FillSolidRect(item_rect, GetSysColor(COLOR_WINDOW));
                 //绘制颜色矩形
                 item_rect.DeflateRect(m_margin, m_margin);
-                draw_double_buffer.GetMemDC()->FillSolidRect(item_rect, iter->second);
+                mem_dc->FillSolidRect(item_rect, iter->second);
                 //绘制矩形边框
                 CDrawCommon drawer;
-                drawer.Create(draw_double_buffer.GetMemDC(), this);
+                drawer.Create(mem_dc, this);
                 drawer.DrawRectOutLine(item_rect, RGB(192, 192, 192));
             }
             //当前列绘制完成后将绘图区域设置为第一列的区域，防止颜色列的区域被覆盖
             CRect rect1{};
-            GetSubItemRect(nmcd.dwItemSpec, 1, LVIR_BOUNDS, rect1);	//获取第1列单元格的矩形区域
+            GetSubItemRect(item_index, 1, LVIR_BOUNDS, rect1);	//获取第1列单元格的矩形区域
             rect1.right = rect1.left;
             rect1.left = 0;
             CDrawCommon::SetDrawRect(pDC, rect1);
 
+		}
 		}
 		*pResult = CDRF_DODEFAULT;
 		break;

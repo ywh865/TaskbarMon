@@ -101,8 +101,13 @@ inline int FontSizeToLfHeight(int font_size, int dpi = 0)
     if (dpi == 0)
     {
         HDC hDC = ::GetDC(HWND_DESKTOP);
-        dpi = GetDeviceCaps(hDC, LOGPIXELSY);
-        ::ReleaseDC(HWND_DESKTOP, hDC);
+        if (hDC != nullptr)
+        {
+            dpi = GetDeviceCaps(hDC, LOGPIXELSY);
+            ::ReleaseDC(HWND_DESKTOP, hDC);
+        }
+        if (dpi <= 0)
+            dpi = USER_DEFAULT_SCREEN_DPI;
     }
     int lfHeight = -MulDiv(font_size, dpi, 72);
     return lfHeight;

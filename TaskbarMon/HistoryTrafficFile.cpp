@@ -2,6 +2,161 @@
 #include "HistoryTrafficFile.h"
 #include "Common.h"
 
+namespace
+{
+    // Normal history files contain one short record per day.  These limits keep
+    // malformed or user-replaced files from causing unbounded allocations or work.
+    constexpr size_t kMaxHistoryTrafficRecords = 32768;
+    constexpr size_t kMaxHistoryTrafficBlankLines = 64;
+    constexpr size_t kMaxHistoryTrafficPhysicalDataLines = kMaxHistoryTrafficRecords + kMaxHistoryTrafficBlankLines;
+    constexpr size_t kMaxHistoryTrafficLineLength = 256;
+    // About 50 TB per direction; this also keeps bounded aggregate byte totals representable.
+    constexpr unsigned __int64 kMaxTrafficKBytes = 50000000000ULL;
+
+    bool IsMissingHistoryFileError(DWORD error)
+    {
+        return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+    }
+
+    bool IsSafeExistingHistoryFile(DWORD attributes)
+    {
+        return attributes != INVALID_FILE_ATTRIBUTES &&
+            (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_DEVICE | FILE_ATTRIBUTE_REPARSE_POINT)) == 0;
+    }
+
+    bool IsTrailingWhitespace(char character)
+    {
+        return character == ' ' || character == '\t' || character == '\r';
+    }
+
+    bool TryParseUnsignedValue(const string& value, unsigned __int64 maximum, unsigned __int64& parsed_value)
+    {
+        if (value.empty())
+            return false;
+
+        unsigned __int64 parsed{};
+        size_t index{};
+        for (; index < value.size(); ++index)
+        {
+            const char character = value[index];
+            if (character < '0' || character > '9')
+                break;
+
+            const unsigned __int64 digit = static_cast<unsigned __int64>(character - '0');
+            if (parsed > maximum / 10 || (parsed == maximum / 10 && digit > maximum % 10))
+                return false;
+            parsed = parsed * 10 + digit;
+        }
+        if (index == 0)
+            return false;
+
+        while (index < value.size() && IsTrailingWhitespace(value[index]))
+            ++index;
+        if (index != value.size())
+            return false;
+
+        parsed_value = parsed;
+        return true;
+    }
+
+    bool TryParseFixedDecimal(const string& value, size_t begin, size_t length, int minimum, int maximum, int& parsed_value)
+    {
+        if (begin > value.size() || length > value.size() - begin)
+            return false;
+
+        int parsed{};
+        for (size_t index{}; index < length; ++index)
+        {
+            const char character = value[begin + index];
+            if (character < '0' || character > '9')
+                return false;
+            parsed = parsed * 10 + character - '0';
+        }
+        if (parsed < minimum || parsed > maximum)
+            return false;
+
+        parsed_value = parsed;
+        return true;
+    }
+
+    bool TryReadHistoryLine(ifstream& file, string& line)
+    {
+        line.clear();
+        char character{};
+        while (file.get(character))
+        {
+            if (character == '\n')
+                return true;
+            if (character == '\0' || line.size() >= kMaxHistoryTrafficLineLength)
+            {
+                file.setstate(std::ios::failbit);
+                return false;
+            }
+            line += character;
+        }
+
+        return !line.empty() && file.eof();
+    }
+    bool TryParseHistoryHeader(const string& header, size_t& declared_record_count)
+    {
+        constexpr char kHeaderPrefix[] = "lines: \"";
+        constexpr size_t kHeaderPrefixLength = sizeof(kHeaderPrefix) - 1;
+        if (header.compare(0, kHeaderPrefixLength, kHeaderPrefix) != 0)
+            return false;
+
+        const size_t closing_quote = header.find('"', kHeaderPrefixLength);
+        if (closing_quote == string::npos || closing_quote == kHeaderPrefixLength)
+            return false;
+
+        unsigned __int64 parsed_record_count{};
+        if (!TryParseUnsignedValue(header.substr(kHeaderPrefixLength, closing_quote - kHeaderPrefixLength),
+            static_cast<unsigned __int64>(kMaxHistoryTrafficRecords), parsed_record_count) || parsed_record_count == 0)
+        {
+            return false;
+        }
+
+        size_t tail = closing_quote + 1;
+        while (tail < header.size() && IsTrailingWhitespace(header[tail]))
+            ++tail;
+        if (tail != header.size())
+            return false;
+
+        declared_record_count = static_cast<size_t>(parsed_record_count);
+        return true;
+    }
+
+    bool TryParseHistoryRecord(const string& line, HistoryTraffic& traffic)
+    {
+        if (line.size() < 12 || line[4] != '/' || line[7] != '/' || line[10] != ' ')
+            return false;
+
+        if (!TryParseFixedDecimal(line, 0, 4, 1900, 3000, traffic.year) ||
+            !TryParseFixedDecimal(line, 5, 2, 1, 12, traffic.month) ||
+            !TryParseFixedDecimal(line, 8, 2, 1, 31, traffic.day))
+        {
+            return false;
+        }
+
+        const size_t separator_index = line.find('/', 11);
+        traffic.mixed = separator_index == string::npos;
+        if (traffic.mixed)
+        {
+            if (!TryParseUnsignedValue(line.substr(11), kMaxTrafficKBytes, traffic.down_kBytes))
+                return false;
+            traffic.up_kBytes = 0;
+        }
+        else
+        {
+            if (!TryParseUnsignedValue(line.substr(11, separator_index - 11), kMaxTrafficKBytes, traffic.up_kBytes) ||
+                !TryParseUnsignedValue(line.substr(separator_index + 1), kMaxTrafficKBytes, traffic.down_kBytes))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
 CHistoryTrafficFile::CHistoryTrafficFile(const wstring& file_path)
 	: m_file_path(file_path)
 {
@@ -50,31 +205,51 @@ void CHistoryTrafficFile::UpdateCache() const
 	m_cache_dirty = false; // 标记缓存已更新
 }
 
-void CHistoryTrafficFile::Save() const
+bool CHistoryTrafficFile::Save() const
 {
-	ofstream file{ m_file_path };
-	if (!file.is_open())
-	{
-		return;
-	}
+    if (m_file_path.empty() || (m_load_state != LoadState::Missing && m_load_state != LoadState::Valid) ||
+        m_history_traffics.size() >= kMaxHistoryTrafficRecords)
+    {
+        return false;
+    }
 
-	char buff[64];
-	
-	// 第一行：总记录数（今天的记录 + 历史记录）
-	size_t total_size = 1 + m_history_traffics.size();
-	sprintf_s(buff, "lines: \"%u\"", static_cast<unsigned int>(total_size));
-	file << buff << "\n";
+    const size_t separator = m_file_path.find_last_of(L"\\/");
+    const wstring directory = separator == wstring::npos ? L"." : m_file_path.substr(0, separator);
+    wchar_t temporary_path[MAX_PATH]{};
+    if (::GetTempFileNameW(directory.c_str(), L"TBH", 0, temporary_path) == 0)
+        return false;
 
-	// 第二行：今天的记录
-	WriteTrafficRecord(file, m_today_traffic);
+    ofstream file{ temporary_path, std::ios::binary | std::ios::trunc };
+    if (!file.is_open())
+    {
+        ::DeleteFileW(temporary_path);
+        return false;
+    }
 
-	// 第三行及之后：历史记录链表
-	for (const auto& history_traffic : m_history_traffics)
-	{
-		WriteTrafficRecord(file, history_traffic);
-	}
+    char buff[64];
+    const size_t total_size = 1 + m_history_traffics.size();
+    sprintf_s(buff, "lines: \"%u\"", static_cast<unsigned int>(total_size));
+    file << buff << "\n";
+    WriteTrafficRecord(file, m_today_traffic);
+    for (const auto& history_traffic : m_history_traffics)
+    {
+        WriteTrafficRecord(file, history_traffic);
+    }
 
-	file.close();
+    file.flush();
+    const bool write_succeeded = file.good();
+    file.close();
+    const bool close_succeeded = file.good();
+    const DWORD move_flags = MOVEFILE_WRITE_THROUGH | (m_destination_can_be_replaced ? MOVEFILE_REPLACE_EXISTING : 0);
+    if (!write_succeeded || !close_succeeded || !::MoveFileExW(temporary_path, m_file_path.c_str(), move_flags))
+    {
+        ::DeleteFileW(temporary_path);
+        return false;
+    }
+
+    m_destination_can_be_replaced = true;
+    m_load_state = LoadState::Valid;
+    return true;
 }
 
 bool CHistoryTrafficFile::IsTodayRecord() const
@@ -88,167 +263,146 @@ bool CHistoryTrafficFile::IsTodayRecord() const
 			m_today_traffic.day == current_time.wDay);
 }
 
-void CHistoryTrafficFile::SaveTodayOnly() const
+bool CHistoryTrafficFile::SaveTodayOnly() const
 {
-	// 增量保存：只更新第一行（lines计数）和第二行（今天的记录）
-	// 前提：今天的记录日期正确（程序自己维护，无需读取文件判断）
-	
-	// 如果今天的记录日期不正确，说明日期刚改变，使用完整保存
-	if (!IsTodayRecord())
-	{
-		Save();
-		return;
-	}
-
-	// 文件不存在时，使用完整保存（首次保存）
-	if (!CCommon::FileExist(m_file_path.c_str()))
-	{
-		Save();
-		return;
-	}
-
-	// 读取文件剩余行（第3行及之后），用于增量更新
-	vector<string> remaining_lines;
-	ifstream in_file{ m_file_path };
-	if (in_file.is_open())
-	{
-		string line;
-		int line_num = 0;
-		while (std::getline(in_file, line))
-		{
-			line_num++;
-			if (line_num > 2) // 跳过前两行
-			{
-				remaining_lines.push_back(line);
-			}
-		}
-		in_file.close();
-	}
-
-	// 写入更新后的文件
-	ofstream out_file{ m_file_path };
-	if (!out_file.is_open())
-	{
-		return;
-	}
-
-	// 第一行：lines计数（今天的记录 + 历史记录）
-	size_t total_size = 1 + m_history_traffics.size();
-	char buff[64];
-	sprintf_s(buff, "lines: \"%u\"", static_cast<unsigned int>(total_size));
-	out_file << buff << "\n";
-
-	// 第二行：今天的记录
-	WriteTrafficRecord(out_file, m_today_traffic);
-
-	// 剩余行：从文件读取，直接写入（不格式化）
-	for (const auto& line : remaining_lines)
-	{
-		out_file << line << "\n";
-	}
-
-	out_file.close();
+    // Full atomic replacement avoids leaving a truncated history file after a crash.
+    return Save();
 }
 
 void CHistoryTrafficFile::Load()
 {
-	m_today_traffic = HistoryTraffic{}; // 初始化今天的记录
-	m_history_traffics.clear(); // 清空历史记录链表
-	InvalidateCache(); // 标记缓存过期
+    m_load_state = LoadState::Uninitialized;
+    m_destination_can_be_replaced = false;
+    m_today_traffic = HistoryTraffic{};
+    m_history_traffics.clear();
+    InvalidateCache();
 
-	ifstream file{ m_file_path };
-	string current_line, temp;
-	HistoryTraffic traffic;
-	bool is_first_data_line = true; // 标记是否是第一条数据行（今天的记录）
-	
-	if (CCommon::FileExist(m_file_path.c_str()))
-	{
-		// 跳过第一行（lines:）
-		std::getline(file, current_line);
-		
-		while (!file.eof())
-		{
-			std::getline(file, current_line);
+    if (m_file_path.empty())
+    {
+        MormalizeData();
+        return;
+    }
 
-			if (current_line.size() < 12)
-			{
-				continue;
-			}
-			temp = current_line.substr(0, 4);
-			traffic.year = atoi(temp.c_str());
-			if (traffic.year < 1900 || traffic.year > 3000)
-			{
-				continue;
-			}
-			temp = current_line.substr(5, 2);
-			traffic.month = atoi(temp.c_str());
-			if (traffic.month < 1 || traffic.month > 12)
-			{
-				continue;
-			}
-			temp = current_line.substr(8, 2);
-			traffic.day = atoi(temp.c_str());
-			if (traffic.day < 1 || traffic.day > 31)
-			{
-				continue;
-			}
+    const DWORD attributes = ::GetFileAttributesW(m_file_path.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES)
+    {
+        if (IsMissingHistoryFileError(::GetLastError()))
+            m_load_state = LoadState::Missing;
+        else
+            m_load_state = LoadState::Failed;
+        MormalizeData();
+        return;
+    }
+    if (!IsSafeExistingHistoryFile(attributes))
+    {
+        m_load_state = LoadState::Failed;
+        MormalizeData();
+        return;
+    }
 
-			size_t separator_index = current_line.find(L'/', 11);
-			traffic.mixed = (separator_index == wstring::npos);
-			if (traffic.mixed)
-			{
-				temp = current_line.substr(11);
-				traffic.down_kBytes = atoll(temp.c_str());
-				traffic.up_kBytes = 0;
-			}
-			else
-			{
-				temp = current_line.substr(11, separator_index - 11);
-				traffic.up_kBytes = atoll(temp.c_str());
-				temp = current_line.substr(separator_index + 1);
-				traffic.down_kBytes = atoll(temp.c_str());
-			}
-			
-			if (traffic.year > 0 && traffic.month > 0 && traffic.day > 0 && traffic.kBytes() > 0)
-			{
-				if (is_first_data_line)
-				{
-					// 第一条数据行是今天的记录
-					m_today_traffic = traffic;
-					is_first_data_line = false;
-				}
-				else
-				{
-					// 其余是历史记录，插入到链表
-					m_history_traffics.push_back(traffic);
-				}
-			}
-		}
-	}
+    m_destination_can_be_replaced = true;
+    ifstream file{ m_file_path, std::ios::binary };
+    size_t declared_record_count{};
+    string current_line;
+    if (!file.is_open() || !TryReadHistoryLine(file, current_line) ||
+        !TryParseHistoryHeader(current_line, declared_record_count))
+    {
+        m_load_state = LoadState::Failed;
+        MormalizeData();
+        return;
+    }
 
-	MormalizeData();
+    bool load_failed{};
+    bool is_first_data_line = true;
+    size_t lines_read{};
+    size_t physical_lines_read{};
+    while (TryReadHistoryLine(file, current_line))
+    {
+        if (++physical_lines_read > kMaxHistoryTrafficPhysicalDataLines)
+        {
+            load_failed = true;
+            break;
+        }
+        if (current_line.empty() || current_line == "\r")
+            continue;
+        if (++lines_read > kMaxHistoryTrafficRecords)
+        {
+            load_failed = true;
+            break;
+        }
+
+        HistoryTraffic traffic{};
+        if (!TryParseHistoryRecord(current_line, traffic))
+        {
+            load_failed = true;
+            break;
+        }
+
+        if (is_first_data_line)
+        {
+            m_today_traffic = traffic;
+            is_first_data_line = false;
+        }
+        else
+        {
+            m_history_traffics.push_back(traffic);
+        }
+    }
+
+    if (!file.eof() || file.bad() || is_first_data_line || lines_read != declared_record_count)
+        load_failed = true;
+    if (load_failed)
+    {
+        m_today_traffic = HistoryTraffic{};
+        m_history_traffics.clear();
+        m_load_state = LoadState::Failed;
+        MormalizeData();
+        return;
+    }
+
+    m_load_state = LoadState::Valid;
+    MormalizeData();
+}
+
+bool CHistoryTrafficFile::RecoverFromBackup(const CHistoryTrafficFile& backup)
+{
+    if (m_load_state != LoadState::Failed || !m_destination_can_be_replaced || !backup.IsLoadValid())
+        return false;
+
+    m_today_traffic = backup.m_today_traffic;
+    m_history_traffics = backup.m_history_traffics;
+    MormalizeData();
+    m_load_state = LoadState::Valid;
+    return true;
 }
 
 void CHistoryTrafficFile::LoadSize()
 {
-	ifstream file{ m_file_path };
-	string current_line, temp;
-	if (CCommon::FileExist(m_file_path.c_str()))
-	{
-		std::getline(file, current_line); // 读取第一行
-		size_t index = current_line.find("lines:");
-		if (index != wstring::npos)
-		{
-			index = current_line.find("\"", index + 6);
-			size_t index1 = current_line.find("\"", index + 1);
-			temp = current_line.substr(index + 1, index1 - index - 1);
-			m_size = atoll(temp.c_str());
-		}
-	}
+    m_size = 0;
+
+    if (m_file_path.empty())
+        return;
+
+    const DWORD attributes = ::GetFileAttributesW(m_file_path.c_str());
+    if (!IsSafeExistingHistoryFile(attributes))
+        return;
+
+    ifstream file{ m_file_path, std::ios::binary };
+    string header;
+    size_t declared_record_count{};
+    if (!file.is_open() || !TryReadHistoryLine(file, header) ||
+        !TryParseHistoryHeader(header, declared_record_count))
+    {
+        return;
+    }
+
+    m_size = declared_record_count;
 }
 
 void CHistoryTrafficFile::Merge(const CHistoryTrafficFile& history_traffic, bool ignore_same_data)
 {
+    if (!history_traffic.IsLoadValid())
+        return;
 	HistoryTraffic today_traffic = CreateTodayTraffic();
 
 	// 合并今天的记录（只合并日期相同的）

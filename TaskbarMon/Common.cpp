@@ -3,6 +3,270 @@
 #include "TaskbarMon.h"
 
 
+#include <ShlObj.h>
+#include <array>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <new>
+
+namespace
+{
+    // This helper is used for user-controlled configuration and cache files.
+    // Keep a firm upper bound so a corrupt/sparse file cannot exhaust process
+    // memory while it is being read.
+    constexpr size_t kMaxFileContentBytes = 16 * 1024 * 1024;
+    constexpr size_t kMaxLogMessageBytes = 64 * 1024;
+    constexpr ULONGLONG kMaxLogFileBytes = 2ULL * 1024ULL * 1024ULL;
+    std::recursive_mutex g_log_write_mutex;
+
+    bool ReadBoundedFile(std::ifstream& file, string& contents)
+    {
+        contents.clear();
+        char read_buffer[4096];
+
+        for (;;)
+        {
+            file.read(read_buffer, static_cast<std::streamsize>(sizeof(read_buffer)));
+            const std::streamsize bytes_read = file.gcount();
+            if (bytes_read > 0)
+            {
+                const size_t chunk_size = static_cast<size_t>(bytes_read);
+                if (chunk_size > kMaxFileContentBytes - contents.size())
+                    return false;
+                try
+                {
+                    contents.append(read_buffer, chunk_size);
+                }
+                catch (const std::bad_alloc&)
+                {
+                    contents.clear();
+                    return false;
+                }
+            }
+
+            if (file.bad())
+                return false;
+            if (file.eof())
+                return true;
+            if (file.fail())
+                return false;
+        }
+    }
+
+    bool IsSafeRegularFilePath(const wchar_t* file_path)
+    {
+        if (file_path == nullptr || *file_path == L'\0')
+            return false;
+
+        const DWORD attributes = GetFileAttributesW(file_path);
+        return attributes != INVALID_FILE_ATTRIBUTES
+            && (attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_DEVICE | FILE_ATTRIBUTE_REPARSE_POINT)) == 0;
+    }
+
+    template <typename Character>
+    size_t BoundedStringLength(const Character* text, size_t maximum_length)
+    {
+        if (text == nullptr)
+            return 0;
+
+        size_t length{};
+        while (length < maximum_length && text[length] != Character{})
+            ++length;
+        return length;
+    }
+
+    ULONGLONG GetLogFileSize(const wchar_t* file_path)
+    {
+        WIN32_FILE_ATTRIBUTE_DATA data{};
+        if (file_path == nullptr || *file_path == L'\0' ||
+            !GetFileAttributesExW(file_path, GetFileExInfoStandard, &data) ||
+            (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
+        {
+            return 0;
+        }
+
+        ULARGE_INTEGER size{};
+        size.HighPart = data.nFileSizeHigh;
+        size.LowPart = data.nFileSizeLow;
+        return size.QuadPart;
+    }
+
+    void WriteBoundedLogRecord(const char* text, size_t text_length, LPCTSTR file_path)
+    {
+        if (text == nullptr || file_path == nullptr || *file_path == _T('\0'))
+            return;
+
+        const DWORD attributes = GetFileAttributesW(file_path);
+        if (attributes != INVALID_FILE_ATTRIBUTES)
+        {
+            if ((attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_DEVICE | FILE_ATTRIBUTE_REPARSE_POINT)) != 0)
+                return;
+        }
+        else
+        {
+            const DWORD attribute_error = GetLastError();
+            if (attribute_error != ERROR_FILE_NOT_FOUND && attribute_error != ERROR_PATH_NOT_FOUND)
+                return;
+        }
+
+        // Logging can occur on the UI and monitor threads, as well as during
+        // crash handling. Skipping a contested record is preferable to a
+        // crash-handler deadlock or concurrent cap check/write race.
+        std::unique_lock<std::recursive_mutex> lock(g_log_write_mutex, std::try_to_lock);
+        if (!lock.owns_lock())
+            return;
+
+        SYSTEMTIME current_time{};
+        GetLocalTime(&current_time);
+        char prefix[32]{};
+        const int prefix_length = sprintf_s(prefix, "%d/%.2d/%.2d %.2d:%.2d:%.2d.%.3d: ",
+            current_time.wYear, current_time.wMonth, current_time.wDay, current_time.wHour,
+            current_time.wMinute, current_time.wSecond, current_time.wMilliseconds);
+        if (prefix_length < 0)
+            return;
+
+        const size_t record_length = static_cast<size_t>(prefix_length) + text_length + 1;
+        if (record_length > kMaxLogFileBytes)
+            return;
+
+        const bool truncate = GetLogFileSize(file_path) > kMaxLogFileBytes - record_length;
+        const std::ios::openmode mode = std::ios::binary | (truncate ? std::ios::trunc : std::ios::app);
+        ofstream file{ file_path, mode };
+        if (!file.is_open())
+            return;
+
+        file.write(prefix, prefix_length);
+        if (text_length != 0)
+            file.write(text, static_cast<std::streamsize>(text_length));
+        file.put('\n');
+    }
+
+    bool IsPathSeparator(wchar_t ch)
+    {
+        return ch == L'\\' || ch == L'/';
+    }
+
+    bool IsAbsoluteWindowsPath(const wstring& path)
+    {
+        const bool is_drive_path = path.size() >= 3
+            && ((path[0] >= L'A' && path[0] <= L'Z') || (path[0] >= L'a' && path[0] <= L'z'))
+            && path[1] == L':'
+            && IsPathSeparator(path[2]);
+        const bool is_unc_path = path.size() >= 2 && IsPathSeparator(path[0]) && IsPathSeparator(path[1]);
+        return is_drive_path || is_unc_path;
+    }
+
+    bool NormalizeAbsolutePath(const wstring& path, wstring& normalized_path)
+    {
+        normalized_path.clear();
+        if (path.empty() || !IsAbsoluteWindowsPath(path))
+            return false;
+
+        const DWORD required_length = GetFullPathNameW(path.c_str(), 0, nullptr, nullptr);
+        if (required_length == 0)
+            return false;
+
+        vector<wchar_t> buffer(required_length);
+        const DWORD actual_length = GetFullPathNameW(path.c_str(), static_cast<DWORD>(buffer.size()), buffer.data(), nullptr);
+        if (actual_length == 0 || actual_length >= buffer.size())
+            return false;
+
+        normalized_path.assign(buffer.data(), actual_length);
+        return IsAbsoluteWindowsPath(normalized_path);
+    }
+
+    wstring EnsureTrailingPathSeparator(wstring path)
+    {
+        if (!path.empty() && !IsPathSeparator(path.back()))
+            path.push_back(L'\\');
+        return path;
+    }
+
+    wstring JoinKnownPathComponent(const wstring& directory, const wchar_t* component)
+    {
+        return EnsureTrailingPathSeparator(directory) + component;
+    }
+
+    wstring RemoveTrailingPathSeparators(wstring path)
+    {
+        while (path.size() > 1 && IsPathSeparator(path.back()))
+        {
+            if (path.size() == 3 && path[1] == L':' && IsPathSeparator(path[2]))
+                break;
+            path.pop_back();
+        }
+        return path;
+    }
+
+    bool IsDirectory(const wstring& path, bool allow_reparse_point)
+    {
+        const DWORD attributes = GetFileAttributesW(path.c_str());
+        if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+            return false;
+        return allow_reparse_point || (attributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
+    }
+
+    bool EnsureSafeDirectory(const wstring& path)
+    {
+        DWORD attributes = GetFileAttributesW(path.c_str());
+        if (attributes == INVALID_FILE_ATTRIBUTES)
+        {
+            const DWORD attributes_error = GetLastError();
+            if (attributes_error != ERROR_FILE_NOT_FOUND && attributes_error != ERROR_PATH_NOT_FOUND)
+                return false;
+
+            if (!CreateDirectoryW(path.c_str(), nullptr))
+            {
+                const DWORD create_error = GetLastError();
+                if (create_error != ERROR_ALREADY_EXISTS)
+                    return false;
+            }
+
+            attributes = GetFileAttributesW(path.c_str());
+        }
+
+        return attributes != INVALID_FILE_ATTRIBUTES
+            && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0
+            && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
+    }
+
+    bool GetRoamingAppDataDirectory(wstring& app_data_dir)
+    {
+        app_data_dir.clear();
+
+        PWSTR raw_path{};
+        const HRESULT result = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, nullptr, &raw_path);
+        if (FAILED(result) || raw_path == nullptr || *raw_path == L'\0')
+        {
+            if (raw_path != nullptr)
+                CoTaskMemFree(raw_path);
+            return false;
+        }
+
+        wstring path{ raw_path };
+        CoTaskMemFree(raw_path);
+        if (!NormalizeAbsolutePath(path, app_data_dir) || !IsDirectory(app_data_dir, true))
+        {
+            app_data_dir.clear();
+            return false;
+        }
+
+        app_data_dir = EnsureTrailingPathSeparator(app_data_dir);
+        return true;
+    }
+
+    bool IsMissingPathError(DWORD error)
+    {
+        return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+    }
+
+    bool AreSamePath(const wstring& first, const wstring& second)
+    {
+        return CompareStringOrdinal(first.c_str(), -1, second.c_str(), -1, TRUE) == CSTR_EQUAL;
+    }
+}
+
 CCommon::CCommon()
 {
 }
@@ -88,7 +352,7 @@ void CCommon::StringNormalize(std::wstring& str)
 }
 
 template<class T>
-static void _StringSplit(const T& str, wchar_t div_ch, vector<T>& results, bool skip_empty = true, bool trim = true)
+static void _StringSplit(const T& str, typename T::value_type div_ch, vector<T>& results, bool skip_empty = true, bool trim = true)
 {
     results.clear();
     size_t split_index = -1;
@@ -184,40 +448,48 @@ bool CCommon::StringTransform(std::wstring& str, bool upper)
 
 bool CCommon::GetFileContent(const wchar_t* file_path, string& contents_buff, bool binary /*= true*/)
 {
+    if (!IsSafeRegularFilePath(file_path))
+        return false;
+
     std::ifstream file{ file_path, (binary ? std::ios::binary : std::ios::in) };
     if (file.fail())
         return false;
-    //获取文件长度
-    file.seekg(0, file.end);
-    size_t length = file.tellg();
-    file.seekg(0, file.beg);
 
-    char* buff = new char[length];
-    file.read(buff, length);
-    file.close();
+    string contents;
+    if (!ReadBoundedFile(file, contents))
+        return false;
 
-    contents_buff.assign(buff, length);
-    delete[] buff;
-
+    contents_buff = std::move(contents);
     return true;
 }
 
 const char* CCommon::GetFileContent(const wchar_t* file_path, size_t& length, bool binary /*= true*/)
 {
-    std::ifstream file{ file_path, (binary ? std::ios::binary : std::ios::in) };
     length = 0;
+    if (!IsSafeRegularFilePath(file_path))
+        return nullptr;
+
+    std::ifstream file{ file_path, (binary ? std::ios::binary : std::ios::in) };
     if (file.fail())
         return nullptr;
-    //获取文件长度
-    file.seekg(0, file.end);
-    length = file.tellg();
-    file.seekg(0, file.beg);
 
-    char* buff = new char[length];
-    file.read(buff, length);
-    file.close();
+    string contents;
+    if (!ReadBoundedFile(file, contents))
+        return nullptr;
 
-    return buff;
+    length = contents.size();
+    const size_t allocation_size = length == 0 ? 1 : length;
+    std::unique_ptr<char[]> buff(new (std::nothrow) char[allocation_size]);
+    if (!buff)
+    {
+        length = 0;
+        return nullptr;
+    }
+
+    if (length > 0)
+        std::copy(contents.begin(), contents.end(), buff.get());
+
+    return buff.release();
 }
 
 CString CCommon::DataSizeToString(unsigned long long size, const PublicSettingData& cfg)
@@ -226,7 +498,8 @@ CString CCommon::DataSizeToString(unsigned long long size, const PublicSettingDa
     CString value_str, unit_str;
     if (!cfg.unit_byte)     //如果使用比特(bit)为单位，则数值乘以8
     {
-        size *= 8;
+        const auto maximum = (std::numeric_limits<unsigned long long>::max)();
+        size = size > maximum / 8 ? maximum : size * 8;
     }
     switch (cfg.speed_unit)
     {
@@ -405,7 +678,7 @@ CString CCommon::KBytesToString(unsigned __int64 kb_size)
 {
     CString k_bytes_str;
     if (kb_size < 1024)
-        k_bytes_str.Format(_T("%d KB"), kb_size);
+        k_bytes_str.Format(_T("%I64u KB"), kb_size);
     else if (kb_size < 1024 * 1024)
         k_bytes_str.Format(_T("%.2f MB"), kb_size / 1024.0);
     else if (kb_size < 1024 * 1024 * 1024)
@@ -417,43 +690,62 @@ CString CCommon::KBytesToString(unsigned __int64 kb_size)
 
 __int64 CCommon::CompareFileTime2(FILETIME time1, FILETIME time2)
 {
-    __int64 a = static_cast<__int64>(time1.dwHighDateTime) << 32 | time1.dwLowDateTime;
-    __int64 b = static_cast<__int64>(time2.dwHighDateTime) << 32 | time2.dwLowDateTime;
-    return b - a;
+    ULARGE_INTEGER first{};
+    first.LowPart = time1.dwLowDateTime;
+    first.HighPart = time1.dwHighDateTime;
+    ULARGE_INTEGER second{};
+    second.LowPart = time2.dwLowDateTime;
+    second.HighPart = time2.dwHighDateTime;
+
+    if (second.QuadPart <= first.QuadPart)
+        return 0;
+
+    const ULONGLONG delta = second.QuadPart - first.QuadPart;
+    const auto maximum = (std::numeric_limits<__int64>::max)();
+    return delta > static_cast<ULONGLONG>(maximum) ? maximum : static_cast<__int64>(delta);
 }
 
 void CCommon::WriteLog(const char* str_text, LPCTSTR file_path)
 {
-    SYSTEMTIME cur_time;
-    GetLocalTime(&cur_time);
-    char buff[32];
-    sprintf_s(buff, "%d/%.2d/%.2d %.2d:%.2d:%.2d.%.3d: ", cur_time.wYear, cur_time.wMonth, cur_time.wDay,
-        cur_time.wHour, cur_time.wMinute, cur_time.wSecond, cur_time.wMilliseconds);
-    ofstream file{ file_path, std::ios::app };  //以追加的方式打开日志文件
-    file << buff;
-    file << str_text << std::endl;
+    if (str_text == nullptr)
+        return;
+    WriteBoundedLogRecord(str_text, BoundedStringLength(str_text, kMaxLogMessageBytes), file_path);
 }
 
 void CCommon::WriteLog(const wchar_t* str_text, LPCTSTR file_path)
 {
-    SYSTEMTIME cur_time;
-    GetLocalTime(&cur_time);
-    char buff[32];
-    sprintf_s(buff, "%d/%.2d/%.2d %.2d:%.2d:%.2d.%.3d: ", cur_time.wYear, cur_time.wMonth, cur_time.wDay,
-        cur_time.wHour, cur_time.wMinute, cur_time.wSecond, cur_time.wMilliseconds);
-    ofstream file{ file_path, std::ios::app };  //以追加的方式打开日志文件
-    file << buff;
-    file << UnicodeToStr(str_text).c_str() << std::endl;
+    if (str_text == nullptr)
+        return;
+
+    try
+    {
+        const size_t length = BoundedStringLength(str_text, kMaxLogMessageBytes / sizeof(wchar_t));
+        const wstring bounded_text(str_text, length);
+        const string text = UnicodeToStr(bounded_text.c_str());
+        WriteBoundedLogRecord(text.data(), text.size(), file_path);
+    }
+    catch (const std::bad_alloc&)
+    {
+        // Logging must never turn an existing failure into a process failure.
+    }
 }
 
 BOOL CCommon::CreateFileShortcut(LPCTSTR lpszLnkFileDir, LPCTSTR lpszFileName, LPCTSTR lpszLnkFileName, LPCTSTR lpszWorkDir, WORD wHotkey, LPCTSTR lpszDescription, int iShowCmd)
 {
-    if (lpszLnkFileDir == NULL)
+    if (lpszLnkFileDir == NULL || *lpszLnkFileDir == _T('\0'))
         return FALSE;
 
-    HRESULT hr;
-    IShellLink* pLink;  //IShellLink对象指针
-    IPersistFile* ppf; //IPersisFil对象指针
+    HRESULT hr{};
+    IShellLink* pLink{};  //IShellLink对象指针
+    IPersistFile* ppf{}; //IPersisFil对象指针
+
+    const auto release_interfaces = [&]() noexcept
+    {
+        if (ppf != nullptr)
+            ppf->Release();
+        if (pLink != nullptr)
+            pLink->Release();
+    };
 
                          //创建IShellLink对象
     hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (void**)&pLink);
@@ -468,19 +760,26 @@ BOOL CCommon::CreateFileShortcut(LPCTSTR lpszLnkFileDir, LPCTSTR lpszFileName, L
         return FALSE;
     }
 
-    TCHAR file_path[MAX_PATH];
-    GetModuleFileName(NULL, file_path, MAX_PATH);
+    TCHAR file_path[MAX_PATH]{};
+    const DWORD module_path_length = GetModuleFileName(NULL, file_path, _countof(file_path));
+    if (module_path_length == 0 || module_path_length >= _countof(file_path))
+    {
+        release_interfaces();
+        return FALSE;
+    }
 
     //目标
-    if (lpszFileName == NULL)
-        pLink->SetPath(file_path);
-    else
-        pLink->SetPath(lpszFileName);
+    hr = pLink->SetPath(lpszFileName == NULL ? file_path : lpszFileName);
+    if (FAILED(hr))
+    {
+        release_interfaces();
+        return FALSE;
+    }
 
     //工作目录
     if (lpszWorkDir != NULL)
     {
-        pLink->SetWorkingDirectory(lpszWorkDir);
+        hr = pLink->SetWorkingDirectory(lpszWorkDir);
     }
     else
     {
@@ -493,8 +792,18 @@ BOOL CCommon::CreateFileShortcut(LPCTSTR lpszLnkFileDir, LPCTSTR lpszFileName, L
             //wcscpy_s(workDirBuf, lpszFileName);
             WStringCopy(workDirBuf, 260, lpszFileName);
         LPTSTR pstr = wcsrchr(workDirBuf, _T('\\'));
+        if (pstr == nullptr)
+        {
+            release_interfaces();
+            return FALSE;
+        }
         *pstr = _T('\0');
-        pLink->SetWorkingDirectory(workDirBuf);
+        hr = pLink->SetWorkingDirectory(workDirBuf);
+    }
+    if (FAILED(hr))
+    {
+        release_interfaces();
+        return FALSE;
     }
 
     //快捷键
@@ -503,16 +812,34 @@ BOOL CCommon::CreateFileShortcut(LPCTSTR lpszLnkFileDir, LPCTSTR lpszFileName, L
 
     //备注
     if (lpszDescription != NULL)
-        pLink->SetDescription(lpszDescription);
+    {
+        hr = pLink->SetDescription(lpszDescription);
+        if (FAILED(hr))
+        {
+            release_interfaces();
+            return FALSE;
+        }
+    }
 
     //显示方式
-    pLink->SetShowCmd(iShowCmd);
+    hr = pLink->SetShowCmd(iShowCmd);
+    if (FAILED(hr))
+    {
+        release_interfaces();
+        return FALSE;
+    }
 
 
     //快捷方式的路径 + 名称
-    wchar_t szBuffer[MAX_PATH];
+    wchar_t szBuffer[MAX_PATH]{};
     if (lpszLnkFileName != NULL) //指定了快捷方式的名称
-        swprintf_s(szBuffer, L"%s\\%s", lpszLnkFileDir, lpszLnkFileName);
+    {
+        if (swprintf_s(szBuffer, _countof(szBuffer), L"%s\\%s", lpszLnkFileDir, lpszLnkFileName) < 0)
+        {
+            release_interfaces();
+            return FALSE;
+        }
+    }
     else
     {
         //没有指定名称，就从取指定文件的文件名作为快捷方式名称。
@@ -524,13 +851,21 @@ BOOL CCommon::CreateFileShortcut(LPCTSTR lpszLnkFileDir, LPCTSTR lpszFileName, L
 
         if (pstr == NULL)
         {
-            ppf->Release();
-            pLink->Release();
+            release_interfaces();
             return FALSE;
         }
         //注意后缀名要从.exe改为.lnk
-        swprintf_s(szBuffer, L"%s\\%s", lpszLnkFileDir, pstr);
-        int nLen = wcslen(szBuffer);
+        if (swprintf_s(szBuffer, _countof(szBuffer), L"%s\\%s", lpszLnkFileDir, pstr) < 0)
+        {
+            release_interfaces();
+            return FALSE;
+        }
+        const size_t nLen = wcslen(szBuffer);
+        if (nLen < 3)
+        {
+            release_interfaces();
+            return FALSE;
+        }
         szBuffer[nLen - 3] = L'l';
         szBuffer[nLen - 2] = L'n';
         szBuffer[nLen - 1] = L'k';
@@ -541,40 +876,44 @@ BOOL CCommon::CreateFileShortcut(LPCTSTR lpszLnkFileDir, LPCTSTR lpszFileName, L
 
     hr = ppf->Save(szBuffer, TRUE);
 
-    ppf->Release();
-    pLink->Release();
+    release_interfaces();
     return SUCCEEDED(hr);
 }
 
 wstring CCommon::GetStartUpPath()
 {
-    LPITEMIDLIST ppidl;
+    LPITEMIDLIST ppidl{};
     TCHAR pszStartUpPath[MAX_PATH]{};
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_STARTUP, &ppidl) == S_OK)
+    if (SHGetSpecialFolderLocation(NULL, CSIDL_STARTUP, &ppidl) == S_OK && ppidl != nullptr)
     {
-        SHGetPathFromIDList(ppidl, pszStartUpPath);
+        if (!SHGetPathFromIDList(ppidl, pszStartUpPath))
+            pszStartUpPath[0] = _T('\0');
         CoTaskMemFree(ppidl);
     }
     return wstring(pszStartUpPath);
 }
 
-void CCommon::GetFiles(const wchar_t* path, vector<wstring>& files)
+void CCommon::GetFiles(const wchar_t* path, vector<wstring>& files, size_t max_files)
 {
     //文件句柄
     intptr_t hFile = 0;
     //文件信息（用Unicode保存使用_wfinddata_t，多字节字符集使用_finddata_t）
     _wfinddata_t fileinfo;
     wstring file_name;
-    if ((hFile = _wfindfirst(path, &fileinfo)) != -1)
+    if ((hFile = _wfindfirst(path, &fileinfo)) == -1)
+        return;
+
+    do
     {
-        do
+        if (max_files != 0 && files.size() >= max_files)
+            break;
+        file_name.assign(fileinfo.name);
+        if (file_name != L"." && file_name != L"..")
         {
-            file_name.assign(fileinfo.name);
-            if (file_name != L"." && file_name != L"..")
-                //files.push_back(wstring(path) + L"\\" + file_name);  //将文件名保存(忽略"."和"..")
-                files.push_back(L"\\" + file_name);  //将文件名保存(忽略"."和"..")
-        } while (_wfindnext(hFile, &fileinfo) == 0);
-    }
+            //files.push_back(wstring(path) + L"\\" + file_name);  //将文件名保存(忽略"."和"..")
+            files.push_back(L"\\" + file_name);  //将文件名保存(忽略"."和"..")
+        }
+    } while (_wfindnext(hFile, &fileinfo) == 0);
     _findclose(hFile);
 }
 
@@ -603,8 +942,9 @@ bool CCommon::FileExist(LPCTSTR file_name)
 
 bool CCommon::IsFolder(const wstring& path)
 {
-    DWORD dwAttrib = GetFileAttributes(path.c_str());
-    return (dwAttrib & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    const DWORD attributes = GetFileAttributesW(path.c_str());
+    return attributes != INVALID_FILE_ATTRIBUTES
+        && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 bool CCommon::MoveAFile(LPCTSTR exist_file, LPCTSTR new_file)
@@ -665,48 +1005,151 @@ ULONGLONG CCommon::GetCurrentTimeSinceEpochMilliseconds()
 
 wstring CCommon::GetModuleDir()
 {
-    wchar_t path[MAX_PATH];
-    GetModuleFileNameW(NULL, path, MAX_PATH);
-    size_t index;
-    wstring current_path{ path };
-    index = current_path.find_last_of(L'\\');
-    current_path = current_path.substr(0, index + 1);
-    return current_path;
+    std::array<wchar_t, 32768> path{};
+    const DWORD length = GetModuleFileNameW(NULL, path.data(), static_cast<DWORD>(path.size()));
+    if (length == 0 || length >= path.size())
+        return wstring();
+
+    const wstring current_path{ path.data(), length };
+    const size_t index = current_path.find_last_of(L"\\/");
+    return index == wstring::npos ? wstring() : current_path.substr(0, index + 1);
 }
 
 wstring CCommon::GetSystemDir()
 {
-    wchar_t buff[MAX_PATH];
-    GetSystemDirectory(buff, MAX_PATH);
-    return wstring(buff);
+    std::array<wchar_t, 32768> buff{};
+    const UINT length = GetSystemDirectoryW(buff.data(), static_cast<UINT>(buff.size()));
+    if (length == 0 || length >= buff.size())
+        return wstring();
+    return wstring(buff.data(), length);
 }
 
 wstring CCommon::GetTemplateDir()
 {
-    wstring result;
-    wchar_t buff[MAX_PATH];
-    GetTempPath(MAX_PATH, buff);        //获取临时文件夹的路径
-    result = buff;
+    std::array<wchar_t, 32768> buff{};
+    const DWORD length = GetTempPathW(static_cast<DWORD>(buff.size()), buff.data());
+    if (length == 0 || length >= buff.size())
+        return wstring();
+
+    wstring result{ buff.data(), length };
     if (result.back() != L'\\' && result.back() != L'/')        //确保路径后面有斜杠
         result.push_back(L'\\');
     return result;
 }
 
-wstring CCommon::GetAppDataConfigDir()
+bool CCommon::GetAppDataConfigDir(wstring& app_data_dir)
 {
-    LPITEMIDLIST ppidl;
-    TCHAR pszAppDataPath[MAX_PATH];
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_APPDATA, &ppidl) == S_OK)
-    {
-        SHGetPathFromIDList(ppidl, pszAppDataPath);
-        CoTaskMemFree(ppidl);
-    }
-    wstring app_data_path{ pszAppDataPath };        //获取到C:/User/用户名/AppData/Roaming路径
-    CreateDirectory(app_data_path.c_str(), NULL);       //如果Roaming不存在，则创建它
-    app_data_path += L"\\TrafficMonitor\\";
-    CreateDirectory(app_data_path.c_str(), NULL);       //如果C:/User/用户名/AppData/Roaming/TrafficMonitor不存在，则创建它
+    app_data_dir.clear();
 
-    return app_data_path;
+    wstring roaming_app_data_dir;
+    if (!GetRoamingAppDataDirectory(roaming_app_data_dir))
+        return false;
+
+    const wstring taskbar_mon_dir = JoinKnownPathComponent(roaming_app_data_dir, L"TaskbarMon");
+    if (!EnsureSafeDirectory(taskbar_mon_dir))
+        return false;
+
+    app_data_dir = EnsureTrailingPathSeparator(taskbar_mon_dir);
+    return true;
+}
+
+bool CCommon::MigrateLegacyAppDataConfig(const wstring& app_data_dir)
+{
+    wstring normalized_destination;
+    if (!NormalizeAbsolutePath(app_data_dir, normalized_destination))
+        return false;
+
+    normalized_destination = RemoveTrailingPathSeparators(normalized_destination);
+    if (!EnsureSafeDirectory(normalized_destination))
+        return false;
+
+    wstring roaming_app_data_dir;
+    if (!GetRoamingAppDataDirectory(roaming_app_data_dir))
+        return false;
+
+    const wstring expected_destination = RemoveTrailingPathSeparators(JoinKnownPathComponent(roaming_app_data_dir, L"TaskbarMon"));
+    if (!AreSamePath(normalized_destination, expected_destination))
+        return false;
+
+    const wstring legacy_directory = JoinKnownPathComponent(roaming_app_data_dir, L"TrafficMonitor");
+    const DWORD legacy_attributes = GetFileAttributesW(legacy_directory.c_str());
+    if (legacy_attributes == INVALID_FILE_ATTRIBUTES)
+        return IsMissingPathError(GetLastError());
+    if ((legacy_attributes & FILE_ATTRIBUTE_DIRECTORY) == 0 || (legacy_attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+        return false;
+
+    struct LegacyFileMigration
+    {
+        const wchar_t* name;
+        ULONGLONG maximum_size;
+    };
+
+    // Keep migration in line with the parsers' accepted input sizes.  The
+    // legacy log is intentionally not copied: it is not configuration and it
+    // can grow without bound.
+    constexpr LegacyFileMigration legacy_files[] = {
+        { L"config.ini", 1024ULL * 1024ULL },
+        { L"history_traffic.dat", 16ULL * 1024ULL * 1024ULL },
+        { L"history_traffic.dat.bak", 16ULL * 1024ULL * 1024ULL },
+    };
+
+    bool succeeded = true;
+    for (const LegacyFileMigration& legacy_file : legacy_files)
+    {
+        const wstring source_path = JoinKnownPathComponent(legacy_directory, legacy_file.name);
+        const DWORD source_attributes = GetFileAttributesW(source_path.c_str());
+        if (source_attributes == INVALID_FILE_ATTRIBUTES)
+        {
+            if (!IsMissingPathError(GetLastError()))
+                succeeded = false;
+            continue;
+        }
+        if ((source_attributes & FILE_ATTRIBUTE_DIRECTORY) != 0 || (source_attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+        {
+            succeeded = false;
+            continue;
+        }
+
+        WIN32_FILE_ATTRIBUTE_DATA source_data{};
+        if (!GetFileAttributesExW(source_path.c_str(), GetFileExInfoStandard, &source_data))
+        {
+            succeeded = false;
+            continue;
+        }
+        if ((source_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
+            (source_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+        {
+            succeeded = false;
+            continue;
+        }
+        ULARGE_INTEGER source_size{};
+        source_size.HighPart = source_data.nFileSizeHigh;
+        source_size.LowPart = source_data.nFileSizeLow;
+        if (source_size.QuadPart > legacy_file.maximum_size)
+        {
+            succeeded = false;
+            continue;
+        }
+
+        const wstring destination_path = JoinKnownPathComponent(normalized_destination, legacy_file.name);
+        const DWORD destination_attributes = GetFileAttributesW(destination_path.c_str());
+        if (destination_attributes != INVALID_FILE_ATTRIBUTES)
+            continue;       //绝不覆盖已经存在的 TaskbarMon 文件。
+        if (!IsMissingPathError(GetLastError()))
+        {
+            succeeded = false;
+            continue;
+        }
+
+        if (!CopyFileW(source_path.c_str(), destination_path.c_str(), TRUE))
+        {
+            const DWORD copy_error = GetLastError();
+            if (copy_error != ERROR_FILE_EXISTS && copy_error != ERROR_ALREADY_EXISTS)
+                succeeded = false;
+        }
+    }
+
+    return succeeded;
 }
 
 void CCommon::DrawWindowText(CDC* pDC, CRect rect, LPCTSTR lpszString, COLORREF color, COLORREF back_color)
@@ -761,20 +1204,42 @@ bool CCommon::IsForegroundFullscreen(HMONITOR hMonitor)
 
 bool CCommon::CopyStringToClipboard(const wstring& str)
 {
-    if (OpenClipboard(NULL))
+    if (str.size() >= (static_cast<size_t>(-1) / sizeof(wchar_t)))
+        return false;
+
+    const size_t byte_count = (str.size() + 1) * sizeof(wchar_t);
+    HGLOBAL clipbuffer = GlobalAlloc(GMEM_MOVEABLE, byte_count);
+    if (clipbuffer == nullptr)
+        return false;
+
+    void* buffer = GlobalLock(clipbuffer);
+    if (buffer == nullptr)
     {
-        HGLOBAL clipbuffer;
-        EmptyClipboard();
-        size_t size = (str.size() + 1) * 2;
-        clipbuffer = GlobalAlloc(GMEM_DDESHARE, size);
-        memcpy_s(GlobalLock(clipbuffer), size, str.c_str(), size);
-        GlobalUnlock(clipbuffer);
-        if (SetClipboardData(CF_UNICODETEXT, clipbuffer) == NULL)
-            return false;
-        CloseClipboard();
-        return true;
+        GlobalFree(clipbuffer);
+        return false;
     }
-    else return false;
+    memcpy_s(buffer, byte_count, str.c_str(), byte_count);
+    GlobalUnlock(clipbuffer);
+
+    if (!OpenClipboard(nullptr))
+    {
+        GlobalFree(clipbuffer);
+        return false;
+    }
+
+    bool succeeded = false;
+    if (EmptyClipboard() && SetClipboardData(CF_UNICODETEXT, clipbuffer) != nullptr)
+    {
+        // Ownership transfers to the clipboard only after SetClipboardData
+        // succeeds.
+        clipbuffer = nullptr;
+        succeeded = true;
+    }
+    CloseClipboard();
+
+    if (clipbuffer != nullptr)
+        GlobalFree(clipbuffer);
+    return succeeded;
 }
 
 
@@ -790,36 +1255,67 @@ wstring CCommon::GetJsonValueSimple(const wstring& json_str, const wstring& name
     if (index == wstring::npos)
         return wstring();
     index = json_str.find_first_not_of(L"\" ", index + 1);
+    if (index == wstring::npos)
+        return wstring();
     size_t index_end = json_str.find_first_of(L"\",]}\r\n", index);
+    if (index_end == wstring::npos || index_end < index)
+        return wstring();
     wstring result = json_str.substr(index, index_end - index);
     return result;
 }
 
 bool CCommon::GetURL(const wstring& url, std::string& result, const wstring& user_agent)
 {
-    bool succeed{ false };
-    CInternetSession* pSession{};
-    CHttpFile* pfile{};
+    result.clear();
+
+    // This helper is used only for fixed public HTTPS endpoints.  Rejecting
+    // other schemes prevents accidental plaintext requests or local-file
+    // access if a future caller passes an untrusted URL.
+    constexpr const wchar_t kHttpsPrefix[] = L"https://";
+    if (url.size() < _countof(kHttpsPrefix) - 1
+        || CompareStringOrdinal(url.c_str(), static_cast<int>(_countof(kHttpsPrefix) - 1),
+                                kHttpsPrefix, static_cast<int>(_countof(kHttpsPrefix) - 1), TRUE) != CSTR_EQUAL)
+    {
+        return false;
+    }
+
+    constexpr DWORD kNetworkTimeoutMs = 5000;
+    constexpr size_t kMaximumResponseBytes = 64 * 1024;
     try
     {
-        pSession = new CInternetSession(user_agent.c_str());
-        pfile = (CHttpFile*)pSession->OpenURL(url.c_str());
-        DWORD dwStatusCode;
-        pfile->QueryInfoStatusCode(dwStatusCode);
-        if (dwStatusCode == HTTP_STATUS_OK)
+        CInternetSession session(user_agent.empty() ? L"TaskbarMon" : user_agent.c_str());
+        if (!session.SetOption(INTERNET_OPTION_CONNECT_TIMEOUT, kNetworkTimeoutMs)
+            || !session.SetOption(INTERNET_OPTION_SEND_TIMEOUT, kNetworkTimeoutMs)
+            || !session.SetOption(INTERNET_OPTION_RECEIVE_TIMEOUT, kNetworkTimeoutMs)
+            || !session.SetOption(INTERNET_OPTION_CONNECT_RETRIES, 1))
         {
-            CString content;
-            CString data;
-            while (pfile->ReadString(data))
-            {
-                content += data;
-            }
-            result = std::string((const char*)content.GetString());
-            succeed = true;
+            return false;
         }
-        pfile->Close();
-        delete pfile;
-        pSession->Close();
+
+        const DWORD flags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE
+            | INTERNET_FLAG_NO_UI | INTERNET_FLAG_NO_AUTO_REDIRECT;
+        std::unique_ptr<CHttpFile> file(static_cast<CHttpFile*>(session.OpenURL(url.c_str(), 1, flags)));
+        if (file == nullptr)
+            return false;
+
+        DWORD status_code{};
+        if (!file->QueryInfoStatusCode(status_code) || status_code != HTTP_STATUS_OK)
+            return false;
+
+        char buffer[4096];
+        for (;;)
+        {
+            const UINT bytes_read = file->Read(buffer, static_cast<UINT>(sizeof(buffer)));
+            if (bytes_read == 0)
+                break;
+            if (bytes_read > kMaximumResponseBytes - result.size())
+            {
+                result.clear();
+                return false;
+            }
+            result.append(buffer, bytes_read);
+        }
+        return true;
     }
     catch (CInternetException* e)
     {
@@ -829,19 +1325,17 @@ bool CCommon::GetURL(const wstring& url, std::string& result, const wstring& use
             CString info = CCommon::LoadTextFormat(IDS_GET_URL_ERROR_LOG_INFO, { url, static_cast<size_t>(e->m_dwError) });
             CCommon::WriteLog(info, theApp.m_log_path.c_str());
         }
-        if (pfile != nullptr)
-        {
-            pfile->Close();
-            delete pfile;
-        }
-        if (pSession != nullptr)
-            pSession->Close();
-        succeed = false;
         e->Delete();        //没有这句会造成内存泄露
-        SAFE_DELETE(pSession);
     }
-    SAFE_DELETE(pSession);
-    return succeed;
+    catch (CException* e)
+    {
+        e->Delete();
+    }
+    catch (...)
+    {
+    }
+    result.clear();
+    return false;
 }
 
 bool CCommon::GetURL(const wstring& url, wstring& result, bool utf8, const wstring& user_agent)
@@ -904,7 +1398,7 @@ void CCommon::GetInternetIp(wstring& ip_address, wstring& ip_location, bool glob
 void CCommon::GetInternetIp2(wstring& ip_address, wstring& ip_location, bool ipv6)
 {
     wstring raw_string;
-    wstring user_agent{ L"TrafficMonitor/" };
+    wstring user_agent{ L"TaskbarMon/" };
     user_agent += VERSION;
     if (GetURL((ipv6 ? L"https://v6.yinghualuo.cn/bejson" : L"https://v4.yinghualuo.cn/bejson"), raw_string, true, user_agent))
     {
@@ -963,10 +1457,62 @@ CString CCommon::StringFormat(LPCTSTR format_str, const std::initializer_list<CV
     return str_rtn;
 }
 
+namespace
+{
+    // Language packs are user-replaceable.  Do not pass their legacy printf
+    // tokens to CString::Format: this parser substitutes only the small,
+    // documented set of positional values and leaves every other '%' sequence
+    // as text.
+    CString SafeLegacyLanguageFormat(LPCTSTR format_str, const std::initializer_list<CVariant>& paras)
+    {
+        CString result;
+        if (format_str == nullptr)
+            return result;
+
+        const CString source{ format_str };
+        const CVariant* const parameters = paras.begin();
+        size_t parameter_index{};
+        for (int index{}; index < source.GetLength();)
+        {
+            const TCHAR current = source[index];
+            if (current != _T('%') || index + 1 >= source.GetLength())
+            {
+                result += current;
+                ++index;
+                continue;
+            }
+
+            const TCHAR specifier = source[index + 1];
+            if (specifier == _T('%'))
+            {
+                result += _T('%');
+                index += 2;
+                continue;
+            }
+
+            const bool is_supported_value = specifier == _T('d') || specifier == _T('i') ||
+                specifier == _T('u') || specifier == _T('s') || specifier == _T('S');
+            if (is_supported_value && parameter_index < paras.size())
+            {
+                result += parameters[parameter_index].ToString();
+                ++parameter_index;
+                index += 2;
+                continue;
+            }
+
+            // Unsupported flags, widths, lengths, and dangerous conversions
+            // such as %n are never interpreted as a format directive.
+            result += current;
+            ++index;
+        }
+        return result;
+    }
+}
+
 CString CCommon::LoadTextFormat(const wchar_t* id, const std::initializer_list<CVariant>& paras)
 {
     CString str = theApp.m_str_table.LoadText(id).c_str();
-    return StringFormat(str.GetString(), paras);
+    return StringFormat(SafeLegacyLanguageFormat(str.GetString(), paras), paras);
 }
 
 CString CCommon::IntToString(__int64 n, bool thousand_separation, bool is_unsigned)
@@ -1031,7 +1577,7 @@ void CCommon::NormalizeFont(LOGFONT& font)
         name = name.substr(0, index);
     }
     //wcsncpy_s(font.lfFaceName, name.c_str(), 32);
-    WStringCopy(font.lfFaceName, 32, name.c_str(), name.size());
+    WStringCopy(font.lfFaceName, 32, name.c_str());
 }
 
 void CCommon::WStringCopy(wchar_t* str_dest, int dest_size, const wchar_t* str_source, int source_size)

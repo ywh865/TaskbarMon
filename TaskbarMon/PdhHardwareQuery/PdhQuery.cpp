@@ -1,6 +1,42 @@
 #include "stdafx.h"
 #include "PdhQuery.h"
 
+#include <cstdint>
+#include <cmath>
+#include <new>
+#include <utility>
+#include <vector>
+
+namespace
+{
+    // PDH sizes and item names originate with the installed counter provider.
+    // Bound them before allocation or dereference so a corrupt provider cannot
+    // consume arbitrary memory or cause an out-of-bounds read.
+    constexpr DWORD kMaximumCounterArrayBytes = 4u * 1024u * 1024u;
+    constexpr DWORD kMaximumCounterArrayItems = 65536u;
+
+    bool GetBoundedCounterNameLength(const TCHAR* name, const BYTE* buffer_begin,
+        size_t buffer_size, size_t& name_length)
+    {
+        name_length = 0;
+        if (name == nullptr || buffer_begin == nullptr || buffer_size < sizeof(TCHAR))
+            return false;
+
+        const uintptr_t begin = reinterpret_cast<uintptr_t>(buffer_begin);
+        const uintptr_t pointer = reinterpret_cast<uintptr_t>(name);
+        if (pointer < begin || pointer - begin > buffer_size - sizeof(TCHAR) ||
+            pointer % alignof(TCHAR) != 0)
+        {
+            return false;
+        }
+
+        const size_t offset = static_cast<size_t>(pointer - begin);
+        const size_t remaining_characters = (buffer_size - offset) / sizeof(TCHAR);
+        while (name_length < remaining_characters && name[name_length] != _T('\0'))
+            ++name_length;
+        return name_length < remaining_characters;
+    }
+}
 CPdhQuery::CPdhQuery(LPCTSTR _fullCounterPath)
     : fullCounterPath(_fullCounterPath)
 {
@@ -39,7 +75,14 @@ bool CPdhQuery::Initialize()
     }
 
     //初始化计数器
-    PdhCollectQueryData(query);
+    if (PdhCollectQueryData(query) != ERROR_SUCCESS)
+    {
+        PdhCloseQuery(query);
+        query = nullptr;
+        counter = nullptr;
+        return false;
+    }
+
     isInitialized = true;
     return true;
 }
@@ -50,11 +93,15 @@ bool CPdhQuery::QueryValue(double& value)
         return false;
 
     //更新数据
-    PdhCollectQueryData(query);
-    PDH_FMT_COUNTERVALUE pdhValue;
-    DWORD dwValue;
+    const PDH_STATUS collect_status = PdhCollectQueryData(query);
+    if (collect_status != ERROR_SUCCESS)
+        return false;
+
+    PDH_FMT_COUNTERVALUE pdhValue{};
+    DWORD dwValue{};
     PDH_STATUS status = PdhGetFormattedCounterValue(counter, PDH_FMT_DOUBLE, &dwValue, &pdhValue);
-    if (status != ERROR_SUCCESS)
+    if (status != ERROR_SUCCESS || pdhValue.CStatus != ERROR_SUCCESS ||
+        !std::isfinite(pdhValue.doubleValue))
     {
         return false;
     }
@@ -68,47 +115,61 @@ bool CPdhQuery::QueryValues(std::vector<CounterValueItem>& values)
     if (!isInitialized)
         return false;
 
-    //更新数据
-    PdhCollectQueryData(query);
-    DWORD dwBufferSize = 0;         // Size of the pItems buffer
-    DWORD dwItemCount = 0;          // Number of items in the pItems buffer
-    PDH_FMT_COUNTERVALUE_ITEM* pItems = NULL;
-    PDH_STATUS status = PdhGetFormattedCounterArray(counter, PDH_FMT_DOUBLE, &dwBufferSize, &dwItemCount, pItems);
-    if (PDH_MORE_DATA == status)
-    {
-        pItems = (PDH_FMT_COUNTERVALUE_ITEM*)malloc(dwBufferSize);
-        if (pItems)
-        {
-            status = PdhGetFormattedCounterArray(counter, PDH_FMT_DOUBLE, &dwBufferSize, &dwItemCount, pItems);
-            if (ERROR_SUCCESS == status)
-            {
-                // Loop through the array and print the instance name and counter value.
-                for (DWORD i = 0; i < dwItemCount; i++)
-                {
-                    CounterValueItem value_item;
-                    value_item.name = pItems[i].szName;
-                    value_item.value = pItems[i].FmtValue.doubleValue;
-                    values.push_back(value_item);
-                }
-            }
-            else
-            {
-                return false;
-            }
+    const PDH_STATUS collect_status = PdhCollectQueryData(query);
+    if (collect_status != ERROR_SUCCESS)
+        return false;
 
-            free(pItems);
-            pItems = NULL;
-            dwBufferSize = dwItemCount = 0;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    else
+    DWORD buffer_size{};
+    DWORD item_count{};
+    const PDH_STATUS first_status = PdhGetFormattedCounterArray(
+        counter, PDH_FMT_DOUBLE, &buffer_size, &item_count, nullptr);
+    if (first_status != PDH_MORE_DATA ||
+        buffer_size < sizeof(PDH_FMT_COUNTERVALUE_ITEM) ||
+        buffer_size > kMaximumCounterArrayBytes ||
+        item_count > kMaximumCounterArrayItems)
     {
         return false;
     }
 
-    return true;
+    try
+    {
+        std::vector<BYTE> buffer(buffer_size);
+        const DWORD allocated_buffer_size = buffer_size;
+        auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM*>(buffer.data());
+        const PDH_STATUS second_status = PdhGetFormattedCounterArray(
+            counter, PDH_FMT_DOUBLE, &buffer_size, &item_count, items);
+        if (second_status != ERROR_SUCCESS ||
+            buffer_size > allocated_buffer_size ||
+            item_count > kMaximumCounterArrayItems ||
+            static_cast<size_t>(item_count) > buffer.size() / sizeof(PDH_FMT_COUNTERVALUE_ITEM))
+        {
+            return false;
+        }
+
+        std::vector<CounterValueItem> collected_values;
+        collected_values.reserve(item_count);
+        for (DWORD index = 0; index < item_count; ++index)
+        {
+            size_t name_length{};
+            if (!GetBoundedCounterNameLength(items[index].szName, buffer.data(), buffer.size(), name_length))
+                return false;
+
+            CounterValueItem value_item;
+            value_item.name.assign(items[index].szName, name_length);
+            if (items[index].FmtValue.CStatus != ERROR_SUCCESS ||
+                !std::isfinite(items[index].FmtValue.doubleValue))
+            {
+                return false;
+            }
+            value_item.value = items[index].FmtValue.doubleValue;
+            collected_values.push_back(std::move(value_item));
+        }
+
+        values.swap(collected_values);
+        return true;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
 }

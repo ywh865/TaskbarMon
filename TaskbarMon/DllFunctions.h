@@ -4,7 +4,17 @@
 #include <dcomp.h> // 包含DCompositionCreateDevice
 #include <dxgi1_3.h> // 包含CreateDXGIFactory2
 #include <tchar.h>
+#include <functional>
+#include <type_traits>
 #include <utility>
+
+namespace DllFunctions
+{
+    // Loads a basename from the Windows system directory only. This avoids
+    // inheriting the current working directory/application directory search
+    // order used by LoadLibrary.
+    HMODULE LoadSystemLibrary(LPCWSTR dll_name) noexcept;
+}
 
 template <class FunctionPointer>
 class CDllFunction
@@ -14,12 +24,12 @@ class CDllFunction
 
 private:
     FunctionPointer m_p_function{nullptr};
-    HMODULE m_h_dll;
+    HMODULE m_h_dll{nullptr};
 
 public:
-    CDllFunction(LPCTSTR dll_name, LPCSTR function_name) noexcept
+    CDllFunction(LPCWSTR dll_name, LPCSTR function_name) noexcept
     {
-        m_h_dll = ::LoadLibrary(dll_name);
+        m_h_dll = DllFunctions::LoadSystemLibrary(dll_name);
         if (m_h_dll != NULL)
         {
             m_p_function = (FunctionPointer)::GetProcAddress(m_h_dll, function_name);
@@ -38,9 +48,15 @@ public:
             m_h_dll = NULL;
         }
     }
+    CDllFunction(const CDllFunction&) = delete;
+    CDllFunction& operator=(const CDllFunction&) = delete;
+    CDllFunction(CDllFunction&&) = delete;
+    CDllFunction& operator=(CDllFunction&&) = delete;
     template <class... Args>
     auto operator()(Args&&... args) const
     {
+        if (m_p_function == nullptr)
+            throw std::bad_function_call{};
         return m_p_function(std::forward<Args>(args)...);
     }
     bool HasValue() const noexcept
@@ -67,12 +83,12 @@ class CDllFunction<R (*)(Args...)>
 
 private:
     FunctionPointer m_p_function{nullptr};
-    HMODULE m_h_dll;
+    HMODULE m_h_dll{nullptr};
 
 public:
-    CDllFunction(LPCTSTR dll_name, LPCSTR function_name) noexcept
+    CDllFunction(LPCWSTR dll_name, LPCSTR function_name) noexcept
     {
-        m_h_dll = ::LoadLibrary(dll_name);
+        m_h_dll = DllFunctions::LoadSystemLibrary(dll_name);
         if (m_h_dll != NULL)
         {
             m_p_function = (FunctionPointer)::GetProcAddress(m_h_dll, function_name);
@@ -91,8 +107,19 @@ public:
             m_h_dll = NULL;
         }
     }
+    CDllFunction(const CDllFunction&) = delete;
+    CDllFunction& operator=(const CDllFunction&) = delete;
+    CDllFunction(CDllFunction&&) = delete;
+    CDllFunction& operator=(CDllFunction&&) = delete;
     R operator()(Args... args) const
     {
+        if (m_p_function == nullptr)
+        {
+            if constexpr (std::is_same_v<R, HRESULT>)
+                return E_NOINTERFACE;
+            else
+                throw std::bad_function_call{};
+        }
         return m_p_function(args...);
     }
     bool HasValue() const noexcept
@@ -108,6 +135,10 @@ class CDllFunctions
 public:
     CDllFunctions();
     ~CDllFunctions();
+    CDllFunctions(const CDllFunctions&) = delete;
+    CDllFunctions& operator=(const CDllFunctions&) = delete;
+    CDllFunctions(CDllFunctions&&) = delete;
+    CDllFunctions& operator=(CDllFunctions&&) = delete;
 
 public:
     HRESULT GetDpiForMonitor(HMONITOR hmonitor, MONITOR_DPI_TYPE dpiType, UINT* dpiX, UINT* dpiY);
