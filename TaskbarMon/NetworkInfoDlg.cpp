@@ -11,10 +11,12 @@
 
 IMPLEMENT_DYNAMIC(CNetworkInfoDlg, CBaseDialog)
 
-CNetworkInfoDlg::CNetworkInfoDlg(vector<NetWorkConection>& adapters, MIB_IFROW* pIfRow, size_t if_row_count,
+CNetworkInfoDlg::CNetworkInfoDlg(MonitorService* monitor_service,
+    const vector<NetWorkConection>& adapters,
+    const vector<MonitorService::InterfaceSnapshot>& interface_rows,
     int connection_selected, CWnd* pParent /*=NULL*/)
-    : CBaseDialog(IDD_NETWORK_INFO_DIALOG, pParent), m_connections(adapters), m_pIfRow(pIfRow),
-    m_if_row_count(if_row_count), m_connection_selected(connection_selected)
+    : CBaseDialog(IDD_NETWORK_INFO_DIALOG, pParent), m_monitor_service(monitor_service),
+    m_connections(adapters), m_interface_rows(interface_rows), m_connection_selected(connection_selected)
 {
     m_current_connection = connection_selected;
 }
@@ -23,11 +25,51 @@ CNetworkInfoDlg::~CNetworkInfoDlg()
 {
 }
 
+void CNetworkInfoDlg::RefreshSnapshot()
+{
+    if (m_monitor_service == nullptr)
+        return;
+
+    const auto snapshot = m_monitor_service->GetNetworkStateSnapshot();
+    DWORD selected_interface_index{};
+    if (m_connection_selected >= 0 &&
+        m_connection_selected < static_cast<int>(m_connections.size()))
+    {
+        selected_interface_index = m_connections[m_connection_selected].interface_index;
+    }
+
+    vector<NetWorkConection> valid_connections;
+    valid_connections.reserve(snapshot.connections.size());
+    int selected_index = -1;
+    for (const auto& connection : snapshot.connections)
+    {
+        if (connection.index < 0 ||
+            static_cast<size_t>(connection.index) >= snapshot.interface_rows.size())
+        {
+            continue;
+        }
+
+        if (selected_interface_index != 0 &&
+            connection.interface_index == selected_interface_index)
+        {
+            selected_index = static_cast<int>(valid_connections.size());
+        }
+        valid_connections.push_back(connection);
+    }
+
+    m_connections = std::move(valid_connections);
+    m_interface_rows = snapshot.interface_rows;
+    if (selected_index < 0 && !m_connections.empty())
+        selected_index = 0;
+    m_connection_selected = selected_index;
+}
+
 
 void CNetworkInfoDlg::ShowInfo()
 {
     CString temp;
-    MIB_IFROW& network_info = GetConnectIfTable(m_connection_selected);
+    const auto& interface_snapshot = GetConnectIfTable(m_connection_selected);
+    const MIB_IFROW& network_info = interface_snapshot.row;
     //接口名
     m_info_list.SetItemText(0, 1, network_info.wszName);
     // bDescr is length-delimited rather than guaranteed NUL-terminated.
@@ -102,21 +144,21 @@ void CNetworkInfoDlg::ShowInfo()
     }
     m_info_list.SetItemText(8, 1, temp);
     //已接收字节数
-    temp.Format(_T("%s (%s)"), CCommon::IntToString(network_info.dwInOctets, true, true), CCommon::DataSizeToString(network_info.dwInOctets));
+    temp.Format(_T("%s (%s)"), CCommon::IntToString(interface_snapshot.in_bytes, true, true), CCommon::DataSizeToString(interface_snapshot.in_bytes));
     m_info_list.SetItemText(9, 1, temp);
     //已发送字节数
-    temp.Format(_T("%s (%s)"), CCommon::IntToString(network_info.dwOutOctets, true, true), CCommon::DataSizeToString(network_info.dwOutOctets));
+    temp.Format(_T("%s (%s)"), CCommon::IntToString(interface_snapshot.out_bytes, true, true), CCommon::DataSizeToString(interface_snapshot.out_bytes));
     m_info_list.SetItemText(10, 1, temp);
     //自程序启动以来已接收字节数
     const NetWorkConection connection = GetConnection(m_connection_selected);
-    const unsigned __int64 in_bytes_since_start = network_info.dwInOctets >= connection.in_bytes
-        ? static_cast<unsigned __int64>(network_info.dwInOctets) - connection.in_bytes
+    const unsigned __int64 in_bytes_since_start = interface_snapshot.in_bytes >= connection.in_bytes
+        ? interface_snapshot.in_bytes - connection.in_bytes
         : 0;
     temp.Format(_T("%s (%s)"), CCommon::IntToString(in_bytes_since_start, true, true), CCommon::DataSizeToString(in_bytes_since_start));
     m_info_list.SetItemText(11, 1, temp);
     //自程序启动以来已发送字节数
-    const unsigned __int64 out_bytes_since_start = network_info.dwOutOctets >= connection.out_bytes
-        ? static_cast<unsigned __int64>(network_info.dwOutOctets) - connection.out_bytes
+    const unsigned __int64 out_bytes_since_start = interface_snapshot.out_bytes >= connection.out_bytes
+        ? interface_snapshot.out_bytes - connection.out_bytes
         : 0;
     temp.Format(_T("%s (%s)"), CCommon::IntToString(out_bytes_since_start, true, true), CCommon::DataSizeToString(out_bytes_since_start));
     m_info_list.SetItemText(12, 1, temp);
@@ -145,14 +187,14 @@ void CNetworkInfoDlg::GetProgramElapsedTime()
     m_info_list.SetItemText(13, 1, temp);
 }
 
-MIB_IFROW& CNetworkInfoDlg::GetConnectIfTable(int connection_index)
+MonitorService::InterfaceSnapshot& CNetworkInfoDlg::GetConnectIfTable(int connection_index)
 {
-    static MIB_IFROW nouse{};
+    static MonitorService::InterfaceSnapshot nouse{};
     if (connection_index >= 0 && connection_index < static_cast<int>(m_connections.size()))
     {
         const int index = m_connections[connection_index].index;
-        if (m_pIfRow != nullptr && index >= 0 && static_cast<size_t>(index) < m_if_row_count)
-            return m_pIfRow[index];
+        if (index >= 0 && static_cast<size_t>(index) < m_interface_rows.size())
+            return m_interface_rows[index];
     }
     return nouse;
 }
@@ -198,7 +240,8 @@ BOOL CNetworkInfoDlg::OnInitDialog()
     // TODO:  在此添加额外的初始化
     SetIcon(theApp.GetMenuIcon(IDI_INFO), FALSE);		// 设置小图标
 
-    //重新获取IP地址
+    // Keep the dialog data tied to the service's current table generation.
+    RefreshSnapshot();
     CAdapterCommon::RefreshIpAddress(m_connections);
 
     //初始化列表控件
@@ -359,6 +402,8 @@ void CNetworkInfoDlg::OnTimer(UINT_PTR nIDEvent)
     // TODO: 在此添加消息处理程序代码和/或调用默认值
     if (nIDEvent == CONNECTION_DETAIL_TIMER)
     {
+        RefreshSnapshot();
+        ShowInfo();
         GetProgramElapsedTime();
     }
 

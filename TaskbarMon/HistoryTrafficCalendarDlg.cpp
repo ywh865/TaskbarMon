@@ -371,8 +371,7 @@ void CHistoryTrafficCalendarDlg::OnCbnSelchangeYearCombo()
     if (index < 0)
         return;
     CString str;
-    if (m_year_combo.GetLBText(index, str) == CB_ERR)
-        return;
+    m_year_combo.GetLBText(index, str);
     m_year = _ttoi(str);
     MonthSelectChanged();
 }

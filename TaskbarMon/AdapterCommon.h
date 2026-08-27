@@ -12,8 +12,8 @@ struct NetWorkConection
 	DWORD interface_index{};	// MIB_IFROW::dwIndex
 	string description;		//网络描述（获取自GetAdapterInfo）
 	string description_2;	//网络描述（获取自GetIfTable）
-	unsigned int in_bytes;	//初始时已接收字节数
-	unsigned int out_bytes;	//初始时已发送字节数
+	uint64_t in_bytes{};	//初始时已接收字节数
+	uint64_t out_bytes{};	//初始时已发送字节数
 	wstring ip_address{ L"-.-.-.-" };	//IP地址
 	wstring subnet_mask{ L"-.-.-.-" };	//子网掩码
 	wstring default_gateway{ L"-.-.-.-" };	//默认网关

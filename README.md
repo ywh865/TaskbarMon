@@ -78,3 +78,35 @@ TaskbarMon/
 ## 许可证
 
 保持上游协议（[Anti 996](LICENSE)）。
+## 当前状态
+
+TaskbarMon 当前可作为纯任务栏监控程序构建和试用。更新检查与温度监控保持
+安全关闭：程序不会访问上游更新清单，也不会在 UI 进程中加载
+`LibreHardwareMonitorLib.dll`。真实 Explorer 宿主验收仍需按
+`docs/TASKBAR_HOST_VALIDATION.md` 在目标 Windows 版本上完成。
+
+## 验证状态
+
+已在 Visual Studio 2022 v143 环境验证以下配置，均为 0 警告、0 错误：
+
+- Release | x64
+- Release | x86
+- Release (lite) | x64
+- Release (lite) | x86
+
+ARM64EC 配置已加入 CI 矩阵；本地构建需要安装对应的 v143 ARM64EC 工具链。
+提交前运行 `scripts/ValidateProject.ps1`，它会检查项目文件、配置矩阵、
+安全选项、禁用功能和发布边界。
+
+## GitHub Actions
+
+推送到 `master` 或 `main`、创建 Pull Request，或手动运行工作流，都会触发
+`.github/workflows/main.yml`。工作流构建 Release 与 Release (lite) 的
+x86、x64、ARM64EC 组合，并上传构建日志、MSBuild 二进制日志和对应的
+`TaskbarMon.exe`。构建产物是验证证据，不替代经过审核的正式发布物。
+
+## 开发约定
+
+代理和贡献者请先阅读根目录 `AGENTS.md`、`docs/BUILD_VALIDATION.md` 和
+`docs/SUPPLY_CHAIN.md`。涉及 Explorer 宿主、更新、DLL、硬件监控或 CI 的
+改动必须同时更新验证说明，并保持失败时的保守回退行为。

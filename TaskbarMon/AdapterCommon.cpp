@@ -74,6 +74,20 @@ namespace
         return pointer % alignof(IP_ADAPTER_INFO) == 0;
     }
 
+    void CaptureInitialCounters(NetWorkConection& connection, const MIB_IFROW& row)
+    {
+        connection.in_bytes = row.dwInOctets;
+        connection.out_bytes = row.dwOutOctets;
+
+        MIB_IF_ROW2 extended_row{};
+        extended_row.InterfaceIndex = row.dwIndex;
+        if (GetIfEntry2(&extended_row) == NO_ERROR)
+        {
+            connection.in_bytes = extended_row.InOctets;
+            connection.out_bytes = extended_row.OutOctets;
+        }
+    }
+
     template <size_t Length>
     string ReadBoundedAnsiBuffer(const char (&value)[Length])
     {
@@ -328,8 +342,7 @@ void CAdapterCommon::GetIfTableInfo(vector<NetWorkConection>& adapters, MIB_IFTA
 
         const MIB_IFROW& row = pIfTable->table[table_index];
         adapter.interface_index = row.dwIndex;
-        adapter.in_bytes = row.dwInOctets;
-        adapter.out_bytes = row.dwOutOctets;
+        CaptureInitialCounters(adapter, row);
         adapter.description_2 = GetIfTableDescription(row);
     }
 }
@@ -349,8 +362,7 @@ void CAdapterCommon::GetAllIfTableInfo(vector<NetWorkConection>& adapters, MIB_I
         connection.description = connection.description_2 = GetIfTableDescription(row);
         connection.index = static_cast<int>(i);
         connection.interface_index = row.dwIndex;
-        connection.in_bytes = row.dwInOctets;
-        connection.out_bytes = row.dwOutOctets;
+        CaptureInitialCounters(connection, row);
 
         for (const auto& adapter : adapters_tmp)
         {

@@ -4,6 +4,7 @@
 #include "D2D1Support.h"
 #include "TaskbarMon.h"
 #include "DrawCommon.h"
+#include "DrawCommonHelper.h"
 #include "WIC.h"
 
 #include <cstdint>
@@ -401,7 +402,6 @@ bool CTaskBarDlgDrawCommonSupport::CheckSupport() noexcept
     {
         return false;
     }
-}
 }
 
 auto CTaskBarDlgDrawCommonWindowSupport::CD3DGdiInteropHelper::CreateDefaultTexture(ComPtr<ID3D10Device1> p_device1, D2D1_SIZE_U size)
@@ -1340,7 +1340,9 @@ namespace TaskBarDlgUser32DrawTextHook
                 if (bitmap_width <= 0 || bitmap_height <= 0
                     || bitmap_width > (std::numeric_limits<LONG>::max)()
                     || bitmap_height > (std::numeric_limits<LONG>::max)()
-                    || bitmap_width > (std::numeric_limits<std::size_t>::max)() / static_cast<std::size_t>(bitmap_height)
+                    || static_cast<std::uint64_t>(bitmap_width) >
+                        static_cast<std::uint64_t>((std::numeric_limits<std::size_t>::max)()) /
+                            static_cast<std::uint64_t>(bitmap_height)
                     || static_cast<std::size_t>(bitmap_width) * static_cast<std::size_t>(bitmap_height)
                         > MAX_TEXT_BITMAP_BYTES / sizeof(std::uint32_t))
                 {

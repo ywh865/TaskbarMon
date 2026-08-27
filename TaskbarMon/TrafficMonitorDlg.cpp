@@ -1409,11 +1409,10 @@ void CTrafficMonitorDlg::OnNetworkInfo()
     if (selected_index < 0 && !valid_connections.empty())
         selected_index = 0;
 
-    MIB_IFROW empty_row{};
-    MIB_IFROW* rows = network_state.interface_rows.empty()
-        ? &empty_row
-        : network_state.interface_rows.data();
-    CNetworkInfoDlg aDlg(valid_connections, rows, network_state.interface_rows.size(), selected_index);
+    CNetworkInfoDlg aDlg(&m_monitor_service,
+        valid_connections,
+        network_state.interface_rows,
+        selected_index);
     aDlg.m_start_time = m_start_time;
     aDlg.DoModal();
     if (IsTaskbarWndValid())

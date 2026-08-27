@@ -38,10 +38,17 @@ public:
 
     // An atomic-at-the-API-boundary copy of the data required by network UI.
     // interface_rows and connections come from the same table generation.
+    struct InterfaceSnapshot
+    {
+        MIB_IFROW row{};
+        uint64_t in_bytes{};
+        uint64_t out_bytes{};
+    };
+
     struct NetworkStateSnapshot
     {
         std::vector<NetWorkConection> connections;
-        std::vector<MIB_IFROW> interface_rows;
+        std::vector<InterfaceSnapshot> interface_rows;
         int selected_index{ -1 };
         DWORD sampled_interface_index{};
     };
@@ -101,6 +108,7 @@ public:
 
 private:
     bool RefreshIfTableLocked();
+    void RefreshInterfaceSnapshotsLocked();
     void InitConnectionsLocked();
     void AutoSelectLocked();
     void ReindexConnectionsLocked();
@@ -128,6 +136,7 @@ private:
 
     std::vector<NetWorkConection> m_connections;
     std::vector<BYTE> m_if_table_storage;
+    std::vector<InterfaceSnapshot> m_interface_snapshots;
     MIB_IFTABLE* m_pIfTable{};
     int m_connection_selected{ -1 };
     DWORD m_sampled_interface_index{};

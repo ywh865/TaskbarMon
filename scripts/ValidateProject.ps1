@@ -204,6 +204,25 @@ $forbiddenUpdateReferences = @(Select-String -LiteralPath @($updateHelper, $upda
 if ($forbiddenUpdateReferences.Count -gt 0) {
     throw 'UpdateHelper contains an upstream update URL or feed reference.'
 }
+$updateSource = Get-Content -LiteralPath $updateHelper -Raw
+if ($updateSource -notmatch 'IsUpdateCheckSupported\(\) const noexcept\s*\{\s*return false;') {
+    throw 'UpdateHelper must remain fail-closed until a signed project-owned manifest is implemented.'
+}
+
+$configSource = Get-Content -LiteralPath (Join-Path $projectDirectory 'core/ConfigStore.cpp') -Raw
+if ($configSource -notmatch 'general\.check_update_when_start\s*=\s*false;') {
+    throw 'ConfigStore must clear the legacy automatic-update opt-in.'
+}
+if ($configSource -notmatch '#ifdef WITHOUT_TEMPERATURE[\s\S]*general\.hardware_monitor_item\s*=\s*0;') {
+    throw 'ConfigStore must clear imported hardware-monitor settings in temperature-free builds.'
+}
+
+$settingsSource = Get-Content -LiteralPath (Join-Path $projectDirectory 'GeneralSettingsDlg.cpp') -Raw
+foreach ($control in @('IDC_CHECK_UPDATE_CHECK', 'IDC_CHECK_NOW_BUTTON', 'IDC_GITHUB_RADIO', 'IDC_GITEE_RADIO')) {
+    if ($settingsSource -notmatch "EnableDlgCtrl\($control,\s*FALSE\)") {
+        throw "General settings must disable the unavailable update control: $control."
+    }
+}
 
 $forbiddenSourcePatterns = @(
     @{ Pattern = '\bCheckUpdateThreadFunc\b'; Description = 'unsafe background update UI entry point' },

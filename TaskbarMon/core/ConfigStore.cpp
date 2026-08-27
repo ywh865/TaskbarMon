@@ -342,6 +342,9 @@ void ConfigStore::Validate(GeneralSettingData& general, TaskBarSettingData& task
     if (general.monitor_time_span < MONITOR_TIME_SPAN_MIN || general.monitor_time_span > MONITOR_TIME_SPAN_MAX)
         general.monitor_time_span = 1000;
 
+    // TaskbarMon has no project-owned signed update channel yet. Clear the
+    // legacy opt-in so imported TrafficMonitor settings cannot re-enable it.
+    general.check_update_when_start = false;
     ResetIfOutOfRange(general.update_source, 0, 1, 0);
     if (general.cpu_usage_acquire_method != GeneralSettingData::CA_CPU_TIME &&
         general.cpu_usage_acquire_method != GeneralSettingData::CA_PDH)
@@ -349,6 +352,15 @@ void ConfigStore::Validate(GeneralSettingData& general, TaskBarSettingData& task
         general.cpu_usage_acquire_method = GeneralSettingData::CA_PDH;
     }
     general.hardware_monitor_item &= static_cast<unsigned int>(HI_CPU | HI_GPU | HI_HDD | HI_MBD);
+#ifdef WITHOUT_TEMPERATURE
+    // Shipped builds do not load the third-party hardware monitor. Clear
+    // imported temperature settings instead of retaining stale state.
+    general.hardware_monitor_item = 0;
+    general.cpu_temp_tip.enable = false;
+    general.gpu_temp_tip.enable = false;
+    general.hdd_temp_tip.enable = false;
+    general.mainboard_temp_tip.enable = false;
+#endif
     LimitStringLength(general.hard_disk_name, kMaximumDeviceNameLength);
     LimitStringLength(general.cpu_core_name, kMaximumDeviceNameLength);
 

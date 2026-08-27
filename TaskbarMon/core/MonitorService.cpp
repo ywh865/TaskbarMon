@@ -279,9 +279,39 @@ MonitorService::NetworkStateSnapshot MonitorService::GetNetworkStateSnapshot() c
     snapshot.selected_index = m_connection_selected;
     snapshot.sampled_interface_index = m_sampled_interface_index;
     const size_t entry_count = TableEntryCount(m_if_table_storage, m_pIfTable);
-    snapshot.interface_rows.reserve(entry_count);
-    for (size_t i = 0; i < entry_count; ++i)
-        snapshot.interface_rows.push_back(m_pIfTable->table[i]);
+    bool counter_cache_matches_table = m_interface_snapshots.size() == entry_count;
+    if (counter_cache_matches_table)
+    {
+        for (size_t i = 0; i < entry_count; ++i)
+        {
+            if (m_interface_snapshots[i].row.dwIndex != m_pIfTable->table[i].dwIndex)
+            {
+                counter_cache_matches_table = false;
+                break;
+            }
+        }
+    }
+
+    if (counter_cache_matches_table)
+    {
+        snapshot.interface_rows = m_interface_snapshots;
+    }
+    else
+    {
+        // Before the worker has published its first complete counter cache,
+        // return the validated table rows without performing network I/O on
+        // the UI thread.
+        snapshot.interface_rows.reserve(entry_count);
+        for (size_t i = 0; i < entry_count; ++i)
+        {
+            const MIB_IFROW& row = m_pIfTable->table[i];
+            InterfaceSnapshot interface_snapshot;
+            interface_snapshot.row = row;
+            interface_snapshot.in_bytes = row.dwInOctets;
+            interface_snapshot.out_bytes = row.dwOutOctets;
+            snapshot.interface_rows.push_back(std::move(interface_snapshot));
+        }
+    }
     return snapshot;
 }
 
@@ -501,6 +531,33 @@ bool MonitorService::RefreshIfTableLocked()
     return false;
 }
 
+void MonitorService::RefreshInterfaceSnapshotsLocked()
+{
+    m_interface_snapshots.clear();
+    if (m_pIfTable == nullptr)
+        return;
+
+    const size_t entry_count = TableEntryCount(m_if_table_storage, m_pIfTable);
+    m_interface_snapshots.reserve(entry_count);
+    for (size_t i = 0; i < entry_count; ++i)
+    {
+        const MIB_IFROW& row = m_pIfTable->table[i];
+        InterfaceSnapshot snapshot;
+        snapshot.row = row;
+        snapshot.in_bytes = row.dwInOctets;
+        snapshot.out_bytes = row.dwOutOctets;
+
+        MIB_IF_ROW2 extended_row{};
+        extended_row.InterfaceIndex = row.dwIndex;
+        if (GetIfEntry2(&extended_row) == NO_ERROR)
+        {
+            snapshot.in_bytes = extended_row.InOctets;
+            snapshot.out_bytes = extended_row.OutOctets;
+        }
+        m_interface_snapshots.push_back(std::move(snapshot));
+    }
+}
+
 void MonitorService::ReindexConnectionsLocked()
 {
     if (m_pIfTable == nullptr)
@@ -659,6 +716,7 @@ void MonitorService::Sample()
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         RefreshIfTableLocked(); // A failed refresh leaves the last valid table intact.
+        RefreshInterfaceSnapshotsLocked();
 
         // Automatic and former "all interfaces" modes follow the Windows
         // route table. They never aggregate tunnel, virtual and physical NICs.

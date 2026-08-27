@@ -259,6 +259,11 @@ BOOL CGeneralSettingsDlg::OnInitDialog()
     // TODO:  在此添加额外的初始化
 
     ((CButton*)GetDlgItem(IDC_CHECK_UPDATE_CHECK))->SetCheck(m_data.check_update_when_start);
+    // The update feed is fail-closed until TaskbarMon owns a signed manifest.
+    EnableDlgCtrl(IDC_CHECK_UPDATE_CHECK, FALSE);
+    EnableDlgCtrl(IDC_CHECK_NOW_BUTTON, FALSE);
+    EnableDlgCtrl(IDC_GITHUB_RADIO, FALSE);
+    EnableDlgCtrl(IDC_GITEE_RADIO, FALSE);
     if (theApp.IsForceShowNotifyIcon())
     {
         m_data.show_notify_icon = true;

@@ -4,6 +4,7 @@
 #include "AdapterCommon.h"
 #include "BaseDialog.h"
 #include "ListCtrlEx.h"
+#include "core/MonitorService.h"
 
 // CNetworkInfoDlg 对话框
 
@@ -12,7 +13,9 @@ class CNetworkInfoDlg : public CBaseDialog
     DECLARE_DYNAMIC(CNetworkInfoDlg)
 
 public:
-    CNetworkInfoDlg(vector<NetWorkConection>& adapters, MIB_IFROW* pIfRow, size_t if_row_count,
+    CNetworkInfoDlg(MonitorService* monitor_service,
+        const vector<NetWorkConection>& adapters,
+        const vector<MonitorService::InterfaceSnapshot>& interface_rows,
         int connection_selected, CWnd* pParent = NULL);   // 标准构造函数
     virtual ~CNetworkInfoDlg();
 
@@ -25,9 +28,9 @@ public:
 
 protected:
 
-    vector<NetWorkConection>& m_connections;
-    MIB_IFROW* m_pIfRow;
-    size_t m_if_row_count{};
+    MonitorService* m_monitor_service{};
+    vector<NetWorkConection> m_connections;
+    vector<MonitorService::InterfaceSnapshot> m_interface_rows;
     int m_connection_selected;		//当前对话框显示的连接
     int m_current_connection;		//初始选择的连接
 
@@ -39,9 +42,10 @@ protected:
     bool m_close_requested{ false };
 
     //void GetIPAddress();	//获取IP地址
+    void RefreshSnapshot();
     void ShowInfo();
     void GetProgramElapsedTime();
-    MIB_IFROW& GetConnectIfTable(int connection_index);    //获取当前选择的网络连接的MIB_IFROW对象。connection_index为m_connections中的索引
+    MonitorService::InterfaceSnapshot& GetConnectIfTable(int connection_index);    //获取当前选择的网络连接快照
     NetWorkConection GetConnection(int connection_index); //获取当前选择的网络连接的NetWorkConection对象。connection_index为m_connections中的索引
 
     virtual CString GetDialogName() const override;
